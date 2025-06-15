@@ -9,6 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
+
+type OrderStatus = Database['public']['Enums']['order_status'];
+type PaymentStatus = Database['public']['Enums']['payment_status'];
+type ShippingStatus = Database['public']['Enums']['shipping_status'];
 
 interface EditOrderDialogProps {
   order: any;
@@ -26,9 +31,9 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [status, setStatus] = useState(order.status);
-  const [paymentStatus, setPaymentStatus] = useState(order.payment_status);
-  const [shippingStatus, setShippingStatus] = useState(order.shipping_status);
+  const [status, setStatus] = useState<OrderStatus>(order.status);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(order.payment_status);
+  const [shippingStatus, setShippingStatus] = useState<ShippingStatus>(order.shipping_status);
   const [note, setNote] = useState(order.note || '');
 
   useEffect(() => {
@@ -40,9 +45,9 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
   const updateOrderMutation = useMutation({
     mutationFn: async (updateData: {
-      status: string;
-      payment_status: string;
-      shipping_status: string;
+      status: OrderStatus;
+      payment_status: PaymentStatus;
+      shipping_status: ShippingStatus;
       note: string;
     }) => {
       const { error } = await supabase
@@ -162,7 +167,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label className="text-slate-700">訂單狀態</Label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(value: OrderStatus) => setStatus(value)}>
                 <SelectTrigger className="border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
@@ -178,7 +183,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
             <div className="space-y-2">
               <Label className="text-slate-700">付款狀態</Label>
-              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+              <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}>
                 <SelectTrigger className="border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
@@ -192,7 +197,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
             <div className="space-y-2">
               <Label className="text-slate-700">出貨狀態</Label>
-              <Select value={shippingStatus} onValueChange={setShippingStatus}>
+              <Select value={shippingStatus} onValueChange={(value: ShippingStatus) => setShippingStatus(value)}>
                 <SelectTrigger className="border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
