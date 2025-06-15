@@ -83,12 +83,18 @@ const ProductManagement = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('未登入');
 
+      const productData = {
+        name: data.name,
+        category: data.category || '布料',
+        color: data.color || null,
+        color_code: data.color_code || null,
+        unit_of_measure: data.unit_of_measure || 'KG',
+        user_id: user.id,
+      };
+
       const { error } = await supabase
         .from('products_new')
-        .insert([{
-          ...data,
-          user_id: user.id,
-        }]);
+        .insert([productData]);
 
       if (error) throw error;
 
@@ -115,9 +121,17 @@ const ProductManagement = () => {
     if (!editingProduct) return;
 
     try {
+      const updateData = {
+        name: data.name,
+        category: data.category || '布料',
+        color: data.color || null,
+        color_code: data.color_code || null,
+        unit_of_measure: data.unit_of_measure || 'KG',
+      };
+
       const { error } = await supabase
         .from('products_new')
-        .update(data)
+        .update(updateData)
         .eq('id', editingProduct.id);
 
       if (error) throw error;
