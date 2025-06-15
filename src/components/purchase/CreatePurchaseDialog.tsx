@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -94,14 +93,10 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       note?: string;
       items: PurchaseItem[];
     }) => {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Generate a unique temporary PO number using timestamp and random number
-      const tempPoNumber = `TEMP-PO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create purchase order with unique temporary po_number
+      // 建立採購單，設置狀態為已下單
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert({
@@ -109,15 +104,16 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           order_id: purchaseData.order_id || null,
           expected_arrival_date: purchaseData.expected_arrival_date || null,
           note: purchaseData.note || null,
-          po_number: tempPoNumber,
+          po_number: '', // 由觸發器自動生成
+          status: 'confirmed', // 設置狀態為已下單
           user_id: user.id
-        })
+        } as any)
         .select()
         .single();
 
       if (purchaseError) throw purchaseError;
 
-      // Create purchase order items
+      // 建立採購單項目
       const itemsToInsert = purchaseData.items.map(item => ({
         purchase_order_id: purchase.id,
         product_id: item.product_id,
@@ -138,7 +134,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     onSuccess: () => {
       toast({
         title: "成功",
-        description: "採購單已成功建立",
+        description: "採購單已成功建立並設為已下單狀態",
       });
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
       onOpenChange(false);

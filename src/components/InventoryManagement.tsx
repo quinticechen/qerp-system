@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { InventoryList } from './inventory/InventoryList';
+import { InventorySummary } from './inventory/InventorySummary';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
 
 const InventoryManagement = () => {
@@ -22,7 +24,20 @@ const InventoryManagement = () => {
         </Button>
       </div>
       
-      <InventoryList />
+      <Tabs defaultValue="summary" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="summary">庫存統計</TabsTrigger>
+          <TabsTrigger value="records">入庫記錄</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="summary">
+          <InventorySummary />
+        </TabsContent>
+        
+        <TabsContent value="records">
+          <InventoryList />
+        </TabsContent>
+      </Tabs>
       
       <CreateInventoryDialog 
         open={isCreateDialogOpen}

@@ -188,6 +188,13 @@ export type Database = {
             foreignKeyName: "inventory_rolls_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
+            referencedRelation: "inventory_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "inventory_rolls_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
             referencedRelation: "products_new"
             referencedColumns: ["id"]
           },
@@ -207,7 +214,9 @@ export type Database = {
           order_id: string
           product_id: string
           quantity: number
+          shipped_quantity: number | null
           specifications: Json | null
+          status: string | null
           total_rolls: number | null
           unit_price: number
           updated_at: string
@@ -218,7 +227,9 @@ export type Database = {
           order_id: string
           product_id: string
           quantity: number
+          shipped_quantity?: number | null
           specifications?: Json | null
+          status?: string | null
           total_rolls?: number | null
           unit_price: number
           updated_at?: string
@@ -229,7 +240,9 @@ export type Database = {
           order_id?: string
           product_id?: string
           quantity?: number
+          shipped_quantity?: number | null
           specifications?: Json | null
+          status?: string | null
           total_rolls?: number | null
           unit_price?: number
           updated_at?: string
@@ -241,6 +254,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_summary"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "order_products_product_id_fkey"
@@ -393,7 +413,9 @@ export type Database = {
           ordered_rolls: number | null
           product_id: string
           purchase_order_id: string
+          received_quantity: number | null
           specifications: Json | null
+          status: string | null
           unit_price: number
           updated_at: string
         }
@@ -404,7 +426,9 @@ export type Database = {
           ordered_rolls?: number | null
           product_id: string
           purchase_order_id: string
+          received_quantity?: number | null
           specifications?: Json | null
+          status?: string | null
           unit_price: number
           updated_at?: string
         }
@@ -415,11 +439,20 @@ export type Database = {
           ordered_rolls?: number | null
           product_id?: string
           purchase_order_id?: string
+          received_quantity?: number | null
           specifications?: Json | null
+          status?: string | null
           unit_price?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_summary"
+            referencedColumns: ["product_id"]
+          },
           {
             foreignKeyName: "purchase_order_items_product_id_fkey"
             columns: ["product_id"]
@@ -538,6 +571,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shipment_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_summary"
+            referencedColumns: ["product_id"]
           },
           {
             foreignKeyName: "shipment_history_product_id_fkey"
@@ -691,6 +731,13 @@ export type Database = {
             foreignKeyName: "stock_thresholds_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: true
+            referencedRelation: "inventory_summary"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "stock_thresholds_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
             referencedRelation: "products_new"
             referencedColumns: ["id"]
           },
@@ -729,7 +776,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      inventory_summary: {
+        Row: {
+          a_grade_stock: number | null
+          b_grade_stock: number | null
+          c_grade_stock: number | null
+          color: string | null
+          d_grade_stock: number | null
+          defective_stock: number | null
+          product_id: string | null
+          product_name: string | null
+          total_rolls: number | null
+          total_stock: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_current_user_role: {
@@ -752,6 +813,7 @@ export type Database = {
         | "partial_arrived"
         | "completed"
         | "cancelled"
+        | "partial_received"
       shipping_status: "not_started" | "partial_shipped" | "shipped"
       user_role: "admin" | "sales" | "assistant" | "accounting" | "warehouse"
     }
@@ -884,6 +946,7 @@ export const Constants = {
         "partial_arrived",
         "completed",
         "cancelled",
+        "partial_received",
       ],
       shipping_status: ["not_started", "partial_shipped", "shipped"],
       user_role: ["admin", "sales", "assistant", "accounting", "warehouse"],
