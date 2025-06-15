@@ -1,86 +1,303 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2, Search, Phone, Mail, MapPin } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, Edit, Trash2, Search, Users, Mail, Phone, MapPin } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface Customer {
+const customerSchema = z.object({
+  name: z.string().min(1, '客戶名稱為必填'),
+  contact_person: z.string().optional(),
+  email: z.string().email('請輸入有效的電子郵件').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+});
+
+type CustomerFormData = z.infer<typeof customerSchema>;
+type Customer = {
   id: string;
   name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  orderCount: number;
-  totalAmount: string;
-  lastOrderDate: string;
-}
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 const CustomerManagement = () => {
-  const [customers] = useState<Customer[]>([
-    {
-      id: '1',
-      name: '永豐紡織有限公司',
-      contactPerson: '王大明',
-      email: 'contact@yongfeng.com',
-      phone: '02-2345-6789',
-      address: '台北市中山區民生東路123號',
-      orderCount: 25,
-      totalAmount: '¥1,250,000',
-      lastOrderDate: '2025-01-14'
-    },
-    {
-      id: '2',
-      name: '昌隆實業股份有限公司',
-      contactPerson: '李小華',
-      email: 'info@changlong.com',
-      phone: '03-456-7890',
-      address: '桃園市桃園區中正路456號',
-      orderCount: 18,
-      totalAmount: '¥890,000',
-      lastOrderDate: '2025-01-12'
-    },
-    {
-      id: '3',
-      name: '宏達布料工廠',
-      contactPerson: '陳志明',
-      email: 'sales@hongda.com',
-      phone: '04-567-8901',
-      address: '台中市西屯區台灣大道789號',
-      orderCount: 32,
-      totalAmount: '¥1,680,000',
-      lastOrderDate: '2025-01-15'
-    }
-  ]);
-
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const { toast } = useToast();
+
+  const form = useForm<CustomerFormData>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+    },
+  });
+
+  const loadCustomers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (error: any) {
+      toast({
+        title: "載入失敗",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const onSubmit = async (data: CustomerFormData) => {
+    try {
+      const customerData = {
+        name: data.name,
+        contact_person: data.contact_person || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+      };
+
+      if (editingCustomer) {
+        const { error } = await supabase
+          .from('customers')
+          .update(customerData)
+          .eq('id', editingCustomer.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "更新成功",
+          description: `客戶「${data.name}」已更新`,
+        });
+      } else {
+        const { error } = await supabase
+          .from('customers')
+          .insert([customerData]);
+
+        if (error) throw error;
+
+        toast({
+          title: "新增成功",
+          description: `客戶「${data.name}」已新增`,
+        });
+      }
+
+      form.reset();
+      setEditingCustomer(null);
+      setIsDialogOpen(false);
+      loadCustomers();
+    } catch (error: any) {
+      toast({
+        title: editingCustomer ? "更新失敗" : "新增失敗",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async (customer: Customer) => {
+    if (!confirm(`確定要刪除客戶「${customer.name}」嗎？`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', customer.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "刪除成功",
+        description: `客戶「${customer.name}」已刪除`,
+      });
+
+      loadCustomers();
+    } catch (error: any) {
+      toast({
+        title: "刪除失敗",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    form.reset({
+      name: customer.name,
+      contact_person: customer.contact_person || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+    });
+    setIsDialogOpen(true);
+  };
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
+    (customer.contact_person && customer.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-slate-800">客戶管理</h2>
-        <Button onClick={() => setShowAddForm(true)} className="bg-blue-600 hover:bg-blue-700">
-          <Plus size={16} className="mr-2" />
-          新增客戶
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setEditingCustomer(null);
+                form.reset({
+                  name: '',
+                  contact_person: '',
+                  email: '',
+                  phone: '',
+                  address: '',
+                });
+              }}
+            >
+              <Plus size={16} className="mr-2" />
+              新增客戶
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>{editingCustomer ? '編輯客戶' : '新增客戶'}</DialogTitle>
+              <DialogDescription>
+                {editingCustomer ? '修改客戶資訊' : '建立新的客戶檔案'}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>客戶名稱 *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="請輸入客戶名稱" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="contact_person"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>聯絡人</FormLabel>
+                      <FormControl>
+                        <Input placeholder="請輸入聯絡人姓名" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>電子郵件</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="example@email.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>電話</FormLabel>
+                        <FormControl>
+                          <Input placeholder="請輸入電話號碼" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>地址</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="請輸入完整地址" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    取消
+                  </Button>
+                  <Button type="submit">
+                    {editingCustomer ? '更新' : '新增'}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* 搜尋 */}
+      {/* 搜尋列 */}
       <Card>
         <CardContent className="p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
             <Input
-              placeholder="搜尋客戶名稱或聯絡人..."
+              placeholder="搜尋客戶名稱、聯絡人或電子郵件..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -90,101 +307,102 @@ const CustomerManagement = () => {
       </Card>
 
       {/* 客戶列表 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredCustomers.map((customer) => (
-          <Card key={customer.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{customer.name}</CardTitle>
-                  <CardDescription>聯絡人: {customer.contactPerson}</CardDescription>
-                </div>
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Edit size={14} />
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2 text-sm">
-                  <Mail size={14} className="text-slate-400" />
-                  <span className="text-slate-600">{customer.email}</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm">
-                  <Phone size={14} className="text-slate-400" />
-                  <span className="text-slate-600">{customer.phone}</span>
-                </div>
-                <div className="flex items-start space-x-2 text-sm">
-                  <MapPin size={14} className="text-slate-400 mt-0.5" />
-                  <span className="text-slate-600">{customer.address}</span>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 pt-3 border-t border-slate-100">
-                <div className="text-center">
-                  <p className="text-sm text-slate-600">訂單數量</p>
-                  <p className="text-lg font-semibold text-blue-600">{customer.orderCount}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-slate-600">總金額</p>
-                  <p className="text-lg font-semibold text-green-600">{customer.totalAmount}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-slate-600">最後訂單</p>
-                  <p className="text-sm font-medium text-slate-800">{customer.lastOrderDate}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* 新增客戶表單 */}
-      {showAddForm && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle>新增客戶</CardTitle>
-            <CardDescription>請填入新客戶的詳細資訊</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="customerName">公司名稱</Label>
-                <Input id="customerName" placeholder="輸入公司名稱" />
-              </div>
-              <div>
-                <Label htmlFor="contactPerson">聯絡人</Label>
-                <Input id="contactPerson" placeholder="輸入聯絡人姓名" />
-              </div>
-              <div>
-                <Label htmlFor="email">電子郵件</Label>
-                <Input id="email" type="email" placeholder="輸入電子郵件" />
-              </div>
-              <div>
-                <Label htmlFor="phone">電話號碼</Label>
-                <Input id="phone" placeholder="輸入電話號碼" />
-              </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Users className="mr-2" size={20} />
+            客戶列表
+          </CardTitle>
+          <CardDescription>
+            管理客戶資訊，共 {filteredCustomers.length} 位客戶
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-slate-600">載入中...</p>
             </div>
-            <div>
-              <Label htmlFor="address">地址</Label>
-              <Input id="address" placeholder="輸入完整地址" />
+          ) : filteredCustomers.length === 0 ? (
+            <div className="text-center py-8">
+              <Users size={48} className="mx-auto text-slate-400 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-600 mb-2">
+                {searchTerm ? '沒有找到符合的客戶' : '尚未新增客戶'}
+              </h3>
+              <p className="text-slate-500">
+                {searchTerm ? '請嘗試調整搜尋條件' : '點擊「新增客戶」開始建立客戶檔案'}
+              </p>
             </div>
-            <div className="flex justify-end space-x-3">
-              <Button variant="outline" onClick={() => setShowAddForm(false)}>
-                取消
-              </Button>
-              <Button onClick={() => setShowAddForm(false)}>
-                儲存客戶
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>客戶名稱</TableHead>
+                  <TableHead>聯絡人</TableHead>
+                  <TableHead>電子郵件</TableHead>
+                  <TableHead>電話</TableHead>
+                  <TableHead>地址</TableHead>
+                  <TableHead>建立時間</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell>{customer.contact_person || '-'}</TableCell>
+                    <TableCell>
+                      {customer.email ? (
+                        <div className="flex items-center">
+                          <Mail size={14} className="mr-1 text-slate-400" />
+                          {customer.email}
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {customer.phone ? (
+                        <div className="flex items-center">
+                          <Phone size={14} className="mr-1 text-slate-400" />
+                          {customer.phone}
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {customer.address ? (
+                        <div className="flex items-center max-w-xs">
+                          <MapPin size={14} className="mr-1 text-slate-400 flex-shrink-0" />
+                          <span className="truncate">{customer.address}</span>
+                        </div>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>{new Date(customer.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(customer)}
+                        >
+                          <Edit size={14} className="mr-1" />
+                          編輯
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDelete(customer)}
+                        >
+                          <Trash2 size={14} className="mr-1" />
+                          刪除
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
