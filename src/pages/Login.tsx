@@ -1,11 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,27 +15,55 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // 檢查是否已登入
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate('/dashboard');
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: "登入失敗",
+        description: "請輸入電子郵件和密碼",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // 模擬登入過程
-    setTimeout(() => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "登入成功",
+        description: "歡迎使用紡織業 ERP 系統",
+      });
+
+      navigate('/dashboard');
+    } catch (error: any) {
+      toast({
+        title: "登入失敗",
+        description: error.message || "請檢查您的電子郵件和密碼",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      if (email && password) {
-        toast({
-          title: "登入成功",
-          description: "歡迎使用紡織業 ERP 系統",
-        });
-      } else {
-        toast({
-          title: "登入失敗",
-          description: "請檢查您的電子郵件和密碼",
-          variant: "destructive",
-        });
-      }
-    }, 1500);
+    }
   };
 
   return (
@@ -90,7 +120,7 @@ const Login = () => {
                   placeholder="請輸入您的電子郵件"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 text-base bg-white border-2 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl px-4 transition-all duration-200"
+                  className="h-12 text-base bg-white border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl px-4 transition-all duration-200"
                   required
                 />
               </div>
@@ -106,7 +136,7 @@ const Login = () => {
                     placeholder="請輸入您的密碼"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-12 text-base bg-white border-2 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl px-4 pr-12 transition-all duration-200"
+                    className="h-12 text-base bg-white border-2 border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-xl px-4 pr-12 transition-all duration-200"
                     required
                   />
                   <button
