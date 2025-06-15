@@ -13,7 +13,10 @@ const OrderManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">訂單管理</h2>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
+        <Button 
+          onClick={() => setIsCreateDialogOpen(true)}
+          className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
+        >
           <Plus className="mr-2 h-4 w-4" />
           新增訂單
         </Button>

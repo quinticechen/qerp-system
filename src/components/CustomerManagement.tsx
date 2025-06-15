@@ -1,466 +1,414 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, Users, Mail, Phone, MapPin } from 'lucide-react';
+import { Plus, Search, Edit, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-const customerSchema = z.object({
-  name: z.string().min(1, '客戶名稱為必填'),
-  contact_person: z.string().optional(),
-  email: z.string().email('請輸入有效的電子郵件').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-});
-
-type CustomerFormData = z.infer<typeof customerSchema>;
-type Customer = {
+interface Customer {
   id: string;
   name: string;
   contact_person: string | null;
-  email: string | null;
   phone: string | null;
+  email: string | null;
   address: string | null;
   created_at: string;
-  updated_at: string;
-};
+}
 
 const CustomerManagement = () => {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const { toast } = useToast();
-
-  const form = useForm<CustomerFormData>({
-    resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: '',
-      contact_person: '',
-      email: '',
-      phone: '',
-      address: '',
-    },
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    contact_person: '',
+    phone: '',
+    email: '',
+    address: ''
   });
 
-  const loadCustomers = async () => {
-    try {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: customers, isLoading, error } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error: any) {
-      toast({
-        title: "載入失敗",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadCustomers();
-  }, []);
-
-  const onSubmit = async (data: CustomerFormData) => {
-    setSubmitting(true);
-    
-    try {
-      const customerData = {
-        name: data.name,
-        contact_person: data.contact_person || null,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-      };
-
-      if (editingCustomer) {
-        const { error } = await supabase
-          .from('customers')
-          .update(customerData)
-          .eq('id', editingCustomer.id);
-
-        if (error) throw error;
-
-        toast({
-          title: "更新成功",
-          description: `客戶「${data.name}」已更新`,
-        });
-      } else {
-        const { error } = await supabase
-          .from('customers')
-          .insert([customerData]);
-
-        if (error) throw error;
-
-        toast({
-          title: "新增成功",
-          description: `客戶「${data.name}」已新增`,
-        });
+      if (error) {
+        console.error('Error fetching customers:', error);
+        throw error;
       }
 
-      form.reset();
-      setEditingCustomer(null);
-      setIsDialogOpen(false);
-      loadCustomers();
-    } catch (error: any) {
+      return data as Customer[];
+    }
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async (newCustomer: Omit<Customer, 'id' | 'created_at'>) => {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([newCustomer]);
+
+      if (error) {
+        console.error('Error creating customer:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
       toast({
-        title: editingCustomer ? "更新失敗" : "新增失敗",
-        description: error.message,
+        title: "成功",
+        description: "客戶已成功建立",
+      });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setIsCreateDialogOpen(false);
+      setNewCustomer({
+        name: '',
+        contact_person: '',
+        phone: '',
+        email: '',
+        address: ''
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating customer:', error);
+      toast({
+        title: "錯誤",
+        description: "建立客戶時發生錯誤",
         variant: "destructive",
       });
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+  });
 
-  const handleDelete = async (customer: Customer) => {
-    try {
-      const { error } = await supabase
+  const updateCustomerMutation = useMutation({
+    mutationFn: async (customer: Customer) => {
+      const { data, error } = await supabase
         .from('customers')
-        .delete()
+        .update(customer)
         .eq('id', customer.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating customer:', error);
+        throw error;
+      }
 
+      return data;
+    },
+    onSuccess: () => {
       toast({
-        title: "刪除成功",
-        description: `客戶「${customer.name}」已刪除`,
+        title: "成功",
+        description: "客戶已成功更新",
       });
-
-      loadCustomers();
-    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setEditingCustomer(null);
+    },
+    onError: (error) => {
+      console.error('Error updating customer:', error);
       toast({
-        title: "刪除失敗",
-        description: error.message,
+        title: "錯誤",
+        description: "更新客戶時發生錯誤",
         variant: "destructive",
       });
-    }
-  };
+    },
+  });
 
-  const handleEdit = (customer: Customer) => {
-    setEditingCustomer(customer);
-    form.reset({
-      name: customer.name,
-      contact_person: customer.contact_person || '',
-      email: customer.email || '',
-      phone: customer.phone || '',
-      address: customer.address || '',
-    });
-    setIsDialogOpen(true);
-  };
+  const deleteCustomerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
 
-  const handleAddNew = () => {
-    setEditingCustomer(null);
-    form.reset({
-      name: '',
-      contact_person: '',
-      email: '',
-      phone: '',
-      address: '',
-    });
-    setIsDialogOpen(true);
-  };
+      if (error) {
+        console.error('Error deleting customer:', error);
+        throw error;
+      }
 
-  const filteredCustomers = customers.filter(customer =>
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: "成功",
+        description: "客戶已成功刪除",
+      });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (error) => {
+      console.error('Error deleting customer:', error);
+      toast({
+        title: "錯誤",
+        description: "刪除客戶時發生錯誤",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredCustomers = customers?.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (customer.contact_person && customer.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    (customer.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
+    (customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
+
+  const handleCreateCustomer = async () => {
+    createCustomerMutation.mutate(newCustomer);
+  };
+
+  const handleUpdateCustomer = async (customer: Customer) => {
+    updateCustomerMutation.mutate(customer);
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    deleteCustomerMutation.mutate(id);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">客戶管理</h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={handleAddNew}
-            >
-              <Plus size={16} className="mr-2" />
+            <Button className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm">
+              <Plus className="mr-2 h-4 w-4" />
               新增客戶
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-white border border-gray-200">
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle className="text-gray-900">
-                {editingCustomer ? '編輯客戶' : '新增客戶'}
-              </DialogTitle>
+              <DialogTitle className="text-gray-900">新增客戶</DialogTitle>
               <DialogDescription className="text-gray-700">
-                {editingCustomer ? '修改客戶資訊' : '建立新的客戶檔案'}
+                建立新的客戶資料
               </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-800">客戶名稱 *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="請輸入客戶名稱" 
-                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right text-gray-800">
+                  客戶名稱
+                </Label>
+                <Input
+                  id="name"
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
                 />
-                
-                <FormField
-                  control={form.control}
-                  name="contact_person"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-800">聯絡人</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="請輸入聯絡人姓名" 
-                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="contact_person" className="text-right text-gray-800">
+                  聯絡人
+                </Label>
+                <Input
+                  id="contact_person"
+                  value={newCustomer.contact_person}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, contact_person: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-800">電子郵件</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="email" 
-                            placeholder="example@email.com" 
-                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-800">電話</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="請輸入電話號碼" 
-                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-800">地址</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="請輸入完整地址" 
-                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right text-gray-800">
+                  電話
+                </Label>
+                <Input
+                  id="phone"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
                 />
-
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsDialogOpen(false)}
-                    disabled={submitting}
-                    className="border-gray-300 text-gray-800 hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    取消
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={submitting}
-                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                  >
-                    {submitting ? '處理中...' : (editingCustomer ? '更新' : '新增')}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right text-gray-800">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="address" className="text-right text-gray-800">
+                  地址
+                </Label>
+                <Input
+                  id="address"
+                  value={newCustomer.address}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleCreateCustomer} disabled={createCustomerMutation.isPending}>
+                {createCustomerMutation.isPending ? '建立中...' : '建立客戶'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* 搜尋列 */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={16} />
-            <Input
-              placeholder="搜尋客戶名稱、聯絡人或電子郵件..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 text-gray-900"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 客戶列表 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center text-gray-900">
-            <Users className="mr-2" size={20} />
-            客戶列表
-          </CardTitle>
-          <CardDescription className="text-gray-700">
-            管理客戶資訊，共 {filteredCustomers.length} 位客戶
+      <Card className="border-gray-200 shadow-sm">
+        <CardHeader className="border-b border-gray-100">
+          <CardTitle className="text-gray-900">客戶列表</CardTitle>
+          <CardDescription className="text-gray-600">
+            管理客戶資料
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-700">載入中...</p>
+        <CardContent className="p-6">
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="搜尋客戶名稱、聯絡人或電話..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500"
+              />
             </div>
-          ) : filteredCustomers.length === 0 ? (
-            <div className="text-center py-8">
-              <Users size={48} className="mx-auto text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                {searchTerm ? '沒有找到符合的客戶' : '尚未新增客戶'}
-              </h3>
-              <p className="text-gray-600">
-                {searchTerm ? '請嘗試調整搜尋條件' : '點擊「新增客戶」開始建立客戶檔案'}
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-gray-800">客戶名稱</TableHead>
-                  <TableHead className="text-gray-800">聯絡人</TableHead>
-                  <TableHead className="text-gray-800">電子郵件</TableHead>
-                  <TableHead className="text-gray-800">電話</TableHead>
-                  <TableHead className="text-gray-800">地址</TableHead>
-                  <TableHead className="text-gray-800">建立時間</TableHead>
-                  <TableHead className="text-right text-gray-800">操作</TableHead>
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-gray-900 font-semibold">客戶名稱</TableHead>
+                <TableHead className="text-gray-900 font-semibold">聯絡人</TableHead>
+                <TableHead className="text-gray-900 font-semibold">電話</TableHead>
+                <TableHead className="text-gray-900 font-semibold">Email</TableHead>
+                <TableHead className="text-gray-900 font-semibold">地址</TableHead>
+                <TableHead className="text-gray-900 font-semibold">建立時間</TableHead>
+                <TableHead className="text-gray-900 font-semibold">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCustomers?.map((customer) => (
+                <TableRow key={customer.id} className="hover:bg-gray-50">
+                  <TableCell className="font-medium text-gray-900">{customer.name}</TableCell>
+                  <TableCell className="text-gray-800">{customer.contact_person}</TableCell>
+                  <TableCell className="text-gray-800">{customer.phone}</TableCell>
+                  <TableCell className="text-gray-800">{customer.email}</TableCell>
+                  <TableCell className="text-gray-800">{customer.address}</TableCell>
+                  <TableCell className="text-gray-800">{new Date(customer.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingCustomer(customer)}
+                      className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteCustomer(customer.id)}
+                      className="text-red-600 hover:text-red-800 hover:bg-gray-100 border-gray-300 ml-2"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium text-gray-900">{customer.name}</TableCell>
-                    <TableCell className="text-gray-800">{customer.contact_person || '-'}</TableCell>
-                    <TableCell>
-                      {customer.email ? (
-                        <div className="flex items-center text-gray-800">
-                          <Mail size={14} className="mr-1 text-gray-600" />
-                          {customer.email}
-                        </div>
-                      ) : <span className="text-gray-600">-</span>}
-                    </TableCell>
-                    <TableCell>
-                      {customer.phone ? (
-                        <div className="flex items-center text-gray-800">
-                          <Phone size={14} className="mr-1 text-gray-600" />
-                          {customer.phone}
-                        </div>
-                      ) : <span className="text-gray-600">-</span>}
-                    </TableCell>
-                    <TableCell>
-                      {customer.address ? (
-                        <div className="flex items-center max-w-xs text-gray-800">
-                          <MapPin size={14} className="mr-1 text-gray-600 flex-shrink-0" />
-                          <span className="truncate">{customer.address}</span>
-                        </div>
-                      ) : <span className="text-gray-600">-</span>}
-                    </TableCell>
-                    <TableCell className="text-gray-800">{new Date(customer.created_at).toLocaleDateString('zh-TW')}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(customer)}
-                          className="text-gray-800 hover:text-gray-900"
-                        >
-                          <Edit size={14} className="mr-1" />
-                          編輯
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                            >
-                              <Trash2 size={14} className="mr-1" />
-                              刪除
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-white">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-gray-900">確認刪除客戶</AlertDialogTitle>
-                              <AlertDialogDescription className="text-gray-700">
-                                您確定要刪除客戶「{customer.name}」嗎？
-                                <br />
-                                <span className="text-red-600 font-medium">此操作無法復原！</span>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="text-gray-800">取消</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleDelete(customer)}
-                                className="bg-red-600 hover:bg-red-700"
-                              >
-                                確認刪除
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+              ))}
+            </TableBody>
+          </Table>
+
+          {filteredCustomers?.length === 0 && (
+            <div className="text-center py-8 text-gray-600">
+              {searchTerm ? '沒有找到符合條件的客戶' : '尚無客戶'}
+            </div>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingCustomer} onOpenChange={(open) => !open && setEditingCustomer(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">編輯客戶</DialogTitle>
+            <DialogDescription className="text-gray-700">
+              修改客戶資料
+            </DialogDescription>
+          </DialogHeader>
+          {editingCustomer && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right text-gray-800">
+                  客戶名稱
+                </Label>
+                <Input
+                  id="name"
+                  value={editingCustomer.name}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="contact_person" className="text-right text-gray-800">
+                  聯絡人
+                </Label>
+                <Input
+                  id="contact_person"
+                  value={editingCustomer.contact_person || ''}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, contact_person: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right text-gray-800">
+                  電話
+                </Label>
+                <Input
+                  id="phone"
+                  value={editingCustomer.phone || ''}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right text-gray-800">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={editingCustomer.email || ''}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="address" className="text-right text-gray-800">
+                  地址
+                </Label>
+                <Input
+                  id="address"
+                  value={editingCustomer.address || ''}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
+                  className="col-span-3 border-gray-300 text-gray-900"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCustomer(null)}>
+              取消
+            </Button>
+            <Button onClick={() => editingCustomer && handleUpdateCustomer(editingCustomer)} disabled={updateCustomerMutation.isPending}>
+              {updateCustomerMutation.isPending ? '更新中...' : '更新客戶'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

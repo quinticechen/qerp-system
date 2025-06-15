@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -154,14 +155,14 @@ export const OrderList = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-gray-200 shadow-sm">
+      <CardHeader className="border-b border-gray-100">
         <CardTitle className="text-gray-900">訂單列表</CardTitle>
-        <CardDescription className="text-gray-700">
+        <CardDescription className="text-gray-600">
           管理客戶訂單
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-6">
         <div className="mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
@@ -169,7 +170,7 @@ export const OrderList = () => {
               placeholder="搜尋訂單編號或客戶名稱..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 border-gray-200 text-gray-900"
+              className="pl-10 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -177,19 +178,19 @@ export const OrderList = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-gray-800">訂單編號</TableHead>
-              <TableHead className="text-gray-800">客戶</TableHead>
-              <TableHead className="text-gray-800">訂單狀態</TableHead>
-              <TableHead className="text-gray-800">付款狀態</TableHead>
-              <TableHead className="text-gray-800">出貨狀態</TableHead>
-              <TableHead className="text-gray-800">總金額</TableHead>
-              <TableHead className="text-gray-800">建立時間</TableHead>
-              <TableHead className="text-gray-800">操作</TableHead>
+              <TableHead className="text-gray-900 font-semibold">訂單編號</TableHead>
+              <TableHead className="text-gray-900 font-semibold">客戶</TableHead>
+              <TableHead className="text-gray-900 font-semibold">訂單狀態</TableHead>
+              <TableHead className="text-gray-900 font-semibold">付款狀態</TableHead>
+              <TableHead className="text-gray-900 font-semibold">出貨狀態</TableHead>
+              <TableHead className="text-gray-900 font-semibold">總金額</TableHead>
+              <TableHead className="text-gray-900 font-semibold">建立時間</TableHead>
+              <TableHead className="text-gray-900 font-semibold">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredOrders.map((order) => (
-              <TableRow key={order.id}>
+              <TableRow key={order.id} className="hover:bg-gray-50">
                 <TableCell className="font-medium text-gray-900">
                   {order.order_number}
                 </TableCell>
@@ -211,7 +212,7 @@ export const OrderList = () => {
                     {getShippingStatusText(order.shipping_status)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-gray-800">
+                <TableCell className="text-gray-900 font-medium">
                   ${calculateOrderTotal(order).toLocaleString()}
                 </TableCell>
                 <TableCell className="text-gray-800">
@@ -222,7 +223,7 @@ export const OrderList = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setEditingOrder(order)}
-                    className="text-gray-800 hover:text-gray-900"
+                    className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -233,7 +234,7 @@ export const OrderList = () => {
         </Table>
 
         {filteredOrders.length === 0 && (
-          <div className="text-center py-8 text-gray-700">
+          <div className="text-center py-8 text-gray-600">
             {searchTerm ? '沒有找到符合條件的訂單' : '尚無訂單'}
           </div>
         )}
