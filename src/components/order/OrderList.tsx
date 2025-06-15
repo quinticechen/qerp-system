@@ -21,7 +21,7 @@ interface Order {
   created_at: string;
   customers: {
     name: string;
-  };
+  } | null;
   order_products: Array<{
     id: string;
     quantity: number;
@@ -29,7 +29,7 @@ interface Order {
     products_new: {
       name: string;
       color: string;
-    };
+    } | null;
   }>;
 }
 
@@ -65,10 +65,11 @@ export const OrderList = () => {
     }
   });
 
-  const filteredOrders = orders?.filter(order =>
-    order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customers.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredOrders = orders?.filter(order => {
+    const customerName = order.customers?.name || '未知客戶';
+    return order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customerName.toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -195,7 +196,7 @@ export const OrderList = () => {
                   {order.order_number}
                 </TableCell>
                 <TableCell className="text-gray-800">
-                  {order.customers.name}
+                  {order.customers?.name || '未知客戶'}
                 </TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(order.status)}>

@@ -79,7 +79,10 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('使用者未登入');
 
-      // Create order - include order_number with temporary value that will be overwritten by trigger
+      // Generate a unique temporary order number using timestamp and random number
+      const tempOrderNumber = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Create order with unique temporary order number
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -89,7 +92,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           status: 'pending',
           payment_status: 'unpaid',
           shipping_status: 'not_started',
-          order_number: 'TEMP' // Temporary value, will be overwritten by database trigger
+          order_number: tempOrderNumber
         })
         .select()
         .single();
