@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,10 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, Clock, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -36,10 +36,18 @@ type Product = {
   created_at: string;
   updated_at: string;
   user_id: string;
+  updated_by: string | null;
+};
+
+type UserProfile = {
+  id: string;
+  email: string;
+  full_name: string | null;
 };
 
 const ProductManagement = () => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [userProfiles, setUserProfiles] = useState<{ [key: string]: UserProfile }>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -58,6 +66,27 @@ const ProductManagement = () => {
     },
   });
 
+  // 載入用戶資料
+  const loadUserProfiles = async (userIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      if (error) throw error;
+
+      const profilesMap: { [key: string]: UserProfile } = {};
+      data?.forEach(profile => {
+        profilesMap[profile.id] = profile;
+      });
+      
+      setUserProfiles(prev => ({ ...prev, ...profilesMap }));
+    } catch (error: any) {
+      console.error('Failed to load user profiles:', error);
+    }
+  };
+
   // 載入產品列表
   const loadProducts = async () => {
     try {
@@ -74,6 +103,17 @@ const ProductManagement = () => {
       
       console.log('Products loaded:', data);
       setProducts(data || []);
+
+      // 收集所有相關的用戶 ID
+      const userIds = new Set<string>();
+      data?.forEach(product => {
+        if (product.user_id) userIds.add(product.user_id);
+        if (product.updated_by) userIds.add(product.updated_by);
+      });
+
+      if (userIds.size > 0) {
+        await loadUserProfiles(Array.from(userIds));
+      }
     } catch (error: any) {
       console.error('Failed to load products:', error);
       toast({
@@ -177,10 +217,8 @@ const ProductManagement = () => {
     }
   };
 
-  // 刪除產品
+  // 刪除產品 - 新增確認對話框
   const handleDelete = async (product: Product) => {
-    if (!confirm(`確定要刪除產品「${product.name}」嗎？`)) return;
-
     try {
       const { error } = await supabase
         .from('products_new')
@@ -202,6 +240,13 @@ const ProductManagement = () => {
         variant: "destructive",
       });
     }
+  };
+
+  // 取得用戶顯示名稱
+  const getUserDisplayName = (userId: string | null) => {
+    if (!userId) return '-';
+    const profile = userProfiles[userId];
+    return profile?.full_name || profile?.email || '未知用戶';
   };
 
   // 編輯產品
@@ -420,6 +465,7 @@ const ProductManagement = () => {
                   <TableHead>顏色代碼</TableHead>
                   <TableHead>計量單位</TableHead>
                   <TableHead>建立時間</TableHead>
+                  <TableHead>最後修改</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
@@ -444,6 +490,20 @@ const ProductManagement = () => {
                     </TableCell>
                     <TableCell>{product.unit_of_measure}</TableCell>
                     <TableCell>{new Date(product.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col text-sm">
+                        <div className="flex items-center text-slate-600">
+                          <Clock size={12} className="mr-1" />
+                          {new Date(product.updated_at).toLocaleDateString('zh-TW')}
+                        </div>
+                        {product.updated_by && (
+                          <div className="flex items-center text-slate-500 mt-1">
+                            <User size={12} className="mr-1" />
+                            {getUserDisplayName(product.updated_by)}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button
@@ -454,14 +514,36 @@ const ProductManagement = () => {
                           <Edit size={14} className="mr-1" />
                           編輯
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(product)}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          刪除
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                            >
+                              <Trash2 size={14} className="mr-1" />
+                              刪除
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-white">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>確認刪除產品</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                您確定要刪除產品「{product.name}」嗎？
+                                <br />
+                                <span className="text-red-600 font-medium">此操作無法復原！</span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDelete(product)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                確認刪除
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +41,7 @@ const CustomerManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<CustomerFormData>({
@@ -78,6 +80,8 @@ const CustomerManagement = () => {
   }, []);
 
   const onSubmit = async (data: CustomerFormData) => {
+    setSubmitting(true);
+    
     try {
       const customerData = {
         name: data.name,
@@ -122,12 +126,12 @@ const CustomerManagement = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (customer: Customer) => {
-    if (!confirm(`確定要刪除客戶「${customer.name}」嗎？`)) return;
-
     try {
       const { error } = await supabase
         .from('customers')
@@ -163,6 +167,18 @@ const CustomerManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const handleAddNew = () => {
+    setEditingCustomer(null);
+    form.reset({
+      name: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+    });
+    setIsDialogOpen(true);
+  };
+
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (customer.contact_person && customer.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -176,26 +192,19 @@ const CustomerManagement = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingCustomer(null);
-                form.reset({
-                  name: '',
-                  contact_person: '',
-                  email: '',
-                  phone: '',
-                  address: '',
-                });
-              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleAddNew}
             >
               <Plus size={16} className="mr-2" />
               新增客戶
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] bg-white border border-gray-200">
             <DialogHeader>
-              <DialogTitle>{editingCustomer ? '編輯客戶' : '新增客戶'}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-gray-900">
+                {editingCustomer ? '編輯客戶' : '新增客戶'}
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
                 {editingCustomer ? '修改客戶資訊' : '建立新的客戶檔案'}
               </DialogDescription>
             </DialogHeader>
@@ -206,9 +215,13 @@ const CustomerManagement = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>客戶名稱 *</FormLabel>
+                      <FormLabel className="text-gray-700">客戶名稱 *</FormLabel>
                       <FormControl>
-                        <Input placeholder="請輸入客戶名稱" {...field} />
+                        <Input 
+                          placeholder="請輸入客戶名稱" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -220,9 +233,13 @@ const CustomerManagement = () => {
                   name="contact_person"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>聯絡人</FormLabel>
+                      <FormLabel className="text-gray-700">聯絡人</FormLabel>
                       <FormControl>
-                        <Input placeholder="請輸入聯絡人姓名" {...field} />
+                        <Input 
+                          placeholder="請輸入聯絡人姓名" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -235,9 +252,14 @@ const CustomerManagement = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>電子郵件</FormLabel>
+                        <FormLabel className="text-gray-700">電子郵件</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="example@email.com" {...field} />
+                          <Input 
+                            type="email" 
+                            placeholder="example@email.com" 
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -249,9 +271,13 @@ const CustomerManagement = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>電話</FormLabel>
+                        <FormLabel className="text-gray-700">電話</FormLabel>
                         <FormControl>
-                          <Input placeholder="請輸入電話號碼" {...field} />
+                          <Input 
+                            placeholder="請輸入電話號碼" 
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -264,9 +290,13 @@ const CustomerManagement = () => {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>地址</FormLabel>
+                      <FormLabel className="text-gray-700">地址</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="請輸入完整地址" {...field} />
+                        <Textarea 
+                          placeholder="請輸入完整地址" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -278,11 +308,17 @@ const CustomerManagement = () => {
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
+                    disabled={submitting}
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   >
                     取消
                   </Button>
-                  <Button type="submit">
-                    {editingCustomer ? '更新' : '新增'}
+                  <Button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                  >
+                    {submitting ? '處理中...' : (editingCustomer ? '更新' : '新增')}
                   </Button>
                 </div>
               </form>
@@ -386,14 +422,36 @@ const CustomerManagement = () => {
                           <Edit size={14} className="mr-1" />
                           編輯
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(customer)}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          刪除
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                            >
+                              <Trash2 size={14} className="mr-1" />
+                              刪除
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-white">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>確認刪除客戶</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                您確定要刪除客戶「{customer.name}」嗎？
+                                <br />
+                                <span className="text-red-600 font-medium">此操作無法復原！</span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDelete(customer)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                確認刪除
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

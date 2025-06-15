@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +41,7 @@ const FactoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingFactory, setEditingFactory] = useState<Factory | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<FactoryFormData>({
@@ -78,6 +80,8 @@ const FactoryManagement = () => {
   }, []);
 
   const onSubmit = async (data: FactoryFormData) => {
+    setSubmitting(true);
+    
     try {
       const factoryData = {
         name: data.name,
@@ -122,12 +126,12 @@ const FactoryManagement = () => {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (factory: Factory) => {
-    if (!confirm(`確定要刪除工廠「${factory.name}」嗎？`)) return;
-
     try {
       const { error } = await supabase
         .from('factories')
@@ -163,6 +167,18 @@ const FactoryManagement = () => {
     setIsDialogOpen(true);
   };
 
+  const handleAddNew = () => {
+    setEditingFactory(null);
+    form.reset({
+      name: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+    });
+    setIsDialogOpen(true);
+  };
+
   const filteredFactories = factories.filter(factory =>
     factory.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (factory.contact_person && factory.contact_person.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -176,26 +192,19 @@ const FactoryManagement = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingFactory(null);
-                form.reset({
-                  name: '',
-                  contact_person: '',
-                  email: '',
-                  phone: '',
-                  address: '',
-                });
-              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleAddNew}
             >
               <Plus size={16} className="mr-2" />
               新增工廠
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] bg-white border border-gray-200">
             <DialogHeader>
-              <DialogTitle>{editingFactory ? '編輯工廠' : '新增工廠'}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-gray-900">
+                {editingFactory ? '編輯工廠' : '新增工廠'}
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
                 {editingFactory ? '修改工廠/供應商資訊' : '建立新的工廠/供應商檔案'}
               </DialogDescription>
             </DialogHeader>
@@ -206,9 +215,13 @@ const FactoryManagement = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>工廠名稱 *</FormLabel>
+                      <FormLabel className="text-gray-700">工廠名稱 *</FormLabel>
                       <FormControl>
-                        <Input placeholder="請輸入工廠名稱" {...field} />
+                        <Input 
+                          placeholder="請輸入工廠名稱" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -220,9 +233,13 @@ const FactoryManagement = () => {
                   name="contact_person"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>聯絡人</FormLabel>
+                      <FormLabel className="text-gray-700">聯絡人</FormLabel>
                       <FormControl>
-                        <Input placeholder="請輸入聯絡人姓名" {...field} />
+                        <Input 
+                          placeholder="請輸入聯絡人姓名" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -235,9 +252,14 @@ const FactoryManagement = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>電子郵件</FormLabel>
+                        <FormLabel className="text-gray-700">電子郵件</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="example@email.com" {...field} />
+                          <Input 
+                            type="email" 
+                            placeholder="example@email.com" 
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -249,9 +271,13 @@ const FactoryManagement = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>電話</FormLabel>
+                        <FormLabel className="text-gray-700">電話</FormLabel>
                         <FormControl>
-                          <Input placeholder="請輸入電話號碼" {...field} />
+                          <Input 
+                            placeholder="請輸入電話號碼" 
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -264,9 +290,13 @@ const FactoryManagement = () => {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>地址</FormLabel>
+                      <FormLabel className="text-gray-700">地址</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="請輸入完整地址" {...field} />
+                        <Textarea 
+                          placeholder="請輸入完整地址" 
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -278,11 +308,17 @@ const FactoryManagement = () => {
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
+                    disabled={submitting}
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   >
                     取消
                   </Button>
-                  <Button type="submit">
-                    {editingFactory ? '更新' : '新增'}
+                  <Button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                  >
+                    {submitting ? '處理中...' : (editingFactory ? '更新' : '新增')}
                   </Button>
                 </div>
               </form>
@@ -386,14 +422,36 @@ const FactoryManagement = () => {
                           <Edit size={14} className="mr-1" />
                           編輯
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(factory)}
-                        >
-                          <Trash2 size={14} className="mr-1" />
-                          刪除
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                            >
+                              <Trash2 size={14} className="mr-1" />
+                              刪除
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-white">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>確認刪除工廠</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                您確定要刪除工廠「{factory.name}」嗎？
+                                <br />
+                                <span className="text-red-600 font-medium">此操作無法復原！</span>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDelete(factory)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                確認刪除
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>
