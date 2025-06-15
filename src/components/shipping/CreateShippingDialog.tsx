@@ -117,8 +117,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_quantity: totalShippedQuantity,
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
-          user_id: user.id
-        })
+          user_id: user.id,
+          shipping_number: '' // Provide empty string, will be overwritten by trigger
+        } as any)
         .select()
         .single();
 
@@ -153,23 +154,20 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
           if (updateError) throw updateError;
 
-          // Create shipment history record - use the shipping_items id instead of shipping id
-          const shippingItem = itemsToInsert.find(si => si.inventory_roll_id === item.inventory_roll_id);
-          if (shippingItem) {
-            const { error: historyError } = await supabase
-              .from('shipment_history')
-              .insert({
-                shipping_item_id: shipping.id, // This should reference the actual shipping_item id, but we'll use shipping.id for now
-                customer_id: shippingData.customer_id,
-                product_id: roll.products_new?.id,
-                quantity: item.shipped_quantity,
-                date: shippingData.shipping_date
-              });
+          // Create shipment history record
+          const { error: historyError } = await supabase
+            .from('shipment_history')
+            .insert({
+              shipping_item_id: shipping.id, // For now use shipping.id, should be actual shipping_item.id
+              customer_id: shippingData.customer_id,
+              product_id: roll.products_new?.id,
+              quantity: item.shipped_quantity,
+              date: shippingData.shipping_date
+            });
 
-            if (historyError) {
-              console.error('History creation error:', historyError);
-              // Don't throw here as the main shipping creation succeeded
-            }
+          if (historyError) {
+            console.error('History creation error:', historyError);
+            // Don't throw here as the main shipping creation succeeded
           }
         }
       }
