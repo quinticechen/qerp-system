@@ -269,7 +269,7 @@ const ProductManagement = () => {
                       <FormControl>
                         <Input 
                           placeholder="請輸入產品名稱" 
-                          className="bg-white border-gray-300 text-gray-900"
+                          className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                           {...field} 
                         />
                       </FormControl>
@@ -286,14 +286,14 @@ const ProductManagement = () => {
                       <FormLabel className="text-gray-700">類別</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectTrigger className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
                             <SelectValue placeholder="選擇產品類別" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent className="bg-white border-gray-200">
-                          <SelectItem value="布料" className="text-gray-900">布料</SelectItem>
-                          <SelectItem value="紗線" className="text-gray-900">紗線</SelectItem>
-                          <SelectItem value="輔料" className="text-gray-900">輔料</SelectItem>
+                        <SelectContent className="bg-white border-gray-200 shadow-lg">
+                          <SelectItem value="布料" className="text-gray-900 hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900">布料</SelectItem>
+                          <SelectItem value="紗線" className="text-gray-900 hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900">紗線</SelectItem>
+                          <SelectItem value="輔料" className="text-gray-900 hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900">輔料</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -311,7 +311,7 @@ const ProductManagement = () => {
                         <FormControl>
                           <Input 
                             placeholder="如：米白、深藍" 
-                            className="bg-white border-gray-300 text-gray-900"
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                             {...field} 
                           />
                         </FormControl>
@@ -329,7 +329,7 @@ const ProductManagement = () => {
                         <FormControl>
                           <Input 
                             placeholder="如：#FFFFFF" 
-                            className="bg-white border-gray-300 text-gray-900"
+                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                             {...field} 
                           />
                         </FormControl>
@@ -339,9 +339,9 @@ const ProductManagement = () => {
                   />
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded border">
-                  <Label className="text-sm text-gray-600">計量單位：公斤 (KG)</Label>
-                  <p className="text-xs text-gray-500 mt-1">布料產品統一使用公斤作為計量單位</p>
+                <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                  <Label className="text-sm text-blue-800 font-medium">計量單位：公斤 (KG)</Label>
+                  <p className="text-xs text-blue-600 mt-1">布料產品統一使用公斤作為計量單位</p>
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
@@ -350,14 +350,14 @@ const ProductManagement = () => {
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
                     disabled={submitting}
-                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   >
                     取消
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={submitting}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
                   >
                     {submitting ? '處理中...' : (editingProduct ? '更新' : '新增')}
                   </Button>
