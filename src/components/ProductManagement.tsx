@@ -17,13 +17,12 @@ import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-// 產品表單驗證模式
+// 產品表單驗證模式 - 移除 unit_of_measure，固定為 'KG'
 const productSchema = z.object({
   name: z.string().min(1, '產品名稱為必填'),
   category: z.string().default('布料'),
   color: z.string().optional(),
   color_code: z.string().optional(),
-  unit_of_measure: z.string().default('KG'),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -45,6 +44,7 @@ const ProductManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -55,21 +55,27 @@ const ProductManagement = () => {
       category: '布料',
       color: '',
       color_code: '',
-      unit_of_measure: 'KG',
     },
   });
 
   // 載入產品列表
   const loadProducts = async () => {
     try {
+      console.log('Loading products...');
       const { data, error } = await supabase
         .from('products_new')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading products:', error);
+        throw error;
+      }
+      
+      console.log('Products loaded:', data);
       setProducts(data || []);
     } catch (error: any) {
+      console.error('Failed to load products:', error);
       toast({
         title: "載入失敗",
         description: error.message,
@@ -95,24 +101,40 @@ const ProductManagement = () => {
       return;
     }
 
+    setSubmitting(true);
+    
     try {
+      console.log('Submitting product data:', data);
+      console.log('Current user:', user);
+
+      // 確保必填欄位存在
+      if (!data.name || data.name.trim() === '') {
+        throw new Error('產品名稱為必填欄位');
+      }
+
       const productData = {
-        name: data.name,
+        name: data.name.trim(),
         category: data.category || '布料',
-        color: data.color || null,
-        color_code: data.color_code || null,
-        unit_of_measure: data.unit_of_measure || 'KG',
+        color: data.color && data.color.trim() !== '' ? data.color.trim() : null,
+        color_code: data.color_code && data.color_code.trim() !== '' ? data.color_code.trim() : null,
+        unit_of_measure: 'KG', // 固定為 KG
         user_id: user.id,
       };
 
+      console.log('Final product data to submit:', productData);
+
       if (editingProduct) {
         // 更新產品
+        console.log('Updating product with ID:', editingProduct.id);
         const { error } = await supabase
           .from('products_new')
           .update(productData)
           .eq('id', editingProduct.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
 
         toast({
           title: "更新成功",
@@ -120,11 +142,18 @@ const ProductManagement = () => {
         });
       } else {
         // 新增產品
-        const { error } = await supabase
+        console.log('Inserting new product...');
+        const { data: insertedData, error } = await supabase
           .from('products_new')
-          .insert([productData]);
+          .insert([productData])
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
+
+        console.log('Product inserted successfully:', insertedData);
 
         toast({
           title: "新增成功",
@@ -135,13 +164,16 @@ const ProductManagement = () => {
       form.reset();
       setEditingProduct(null);
       setIsDialogOpen(false);
-      loadProducts();
+      await loadProducts();
     } catch (error: any) {
+      console.error('Submit error:', error);
       toast({
         title: editingProduct ? "更新失敗" : "新增失敗",
-        description: error.message,
+        description: error.message || '操作失敗，請稍後再試',
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -180,7 +212,18 @@ const ProductManagement = () => {
       category: product.category,
       color: product.color || '',
       color_code: product.color_code || '',
-      unit_of_measure: product.unit_of_measure,
+    });
+    setIsDialogOpen(true);
+  };
+
+  // 開啟新增對話框
+  const handleAddNew = () => {
+    setEditingProduct(null);
+    form.reset({
+      name: '',
+      category: '布料',
+      color: '',
+      color_code: '',
     });
     setIsDialogOpen(true);
   };
@@ -199,26 +242,19 @@ const ProductManagement = () => {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                setEditingProduct(null);
-                form.reset({
-                  name: '',
-                  category: '布料',
-                  color: '',
-                  color_code: '',
-                  unit_of_measure: 'KG',
-                });
-              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleAddNew}
             >
               <Plus size={16} className="mr-2" />
               新增產品
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] bg-white border border-gray-200">
             <DialogHeader>
-              <DialogTitle>{editingProduct ? '編輯產品' : '新增產品'}</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-gray-900">
+                {editingProduct ? '編輯產品' : '新增產品'}
+              </DialogTitle>
+              <DialogDescription className="text-gray-600">
                 {editingProduct ? '修改產品資訊' : '建立新的布料產品型號'}
               </DialogDescription>
             </DialogHeader>
@@ -229,9 +265,13 @@ const ProductManagement = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>產品名稱 *</FormLabel>
+                      <FormLabel className="text-gray-700">產品名稱 *</FormLabel>
                       <FormControl>
-                        <Input placeholder="請輸入產品名稱" {...field} />
+                        <Input 
+                          placeholder="請輸入產品名稱" 
+                          className="bg-white border-gray-300 text-gray-900"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -243,17 +283,17 @@ const ProductManagement = () => {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>類別</FormLabel>
+                      <FormLabel className="text-gray-700">類別</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-white border-gray-300 text-gray-900">
                             <SelectValue placeholder="選擇產品類別" />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="布料">布料</SelectItem>
-                          <SelectItem value="紗線">紗線</SelectItem>
-                          <SelectItem value="輔料">輔料</SelectItem>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="布料" className="text-gray-900">布料</SelectItem>
+                          <SelectItem value="紗線" className="text-gray-900">紗線</SelectItem>
+                          <SelectItem value="輔料" className="text-gray-900">輔料</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -267,9 +307,13 @@ const ProductManagement = () => {
                     name="color"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>顏色</FormLabel>
+                        <FormLabel className="text-gray-700">顏色</FormLabel>
                         <FormControl>
-                          <Input placeholder="如：米白、深藍" {...field} />
+                          <Input 
+                            placeholder="如：米白、深藍" 
+                            className="bg-white border-gray-300 text-gray-900"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -281,9 +325,13 @@ const ProductManagement = () => {
                     name="color_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>顏色代碼</FormLabel>
+                        <FormLabel className="text-gray-700">顏色代碼</FormLabel>
                         <FormControl>
-                          <Input placeholder="如：#FFFFFF" {...field} />
+                          <Input 
+                            placeholder="如：#FFFFFF" 
+                            className="bg-white border-gray-300 text-gray-900"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -291,40 +339,27 @@ const ProductManagement = () => {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="unit_of_measure"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>計量單位</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="選擇計量單位" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="KG">公斤 (KG)</SelectItem>
-                          <SelectItem value="M">公尺 (M)</SelectItem>
-                          <SelectItem value="YD">碼 (YD)</SelectItem>
-                          <SelectItem value="PCS">件 (PCS)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="bg-gray-50 p-3 rounded border">
+                  <Label className="text-sm text-gray-600">計量單位：公斤 (KG)</Label>
+                  <p className="text-xs text-gray-500 mt-1">布料產品統一使用公斤作為計量單位</p>
+                </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
+                    disabled={submitting}
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     取消
                   </Button>
-                  <Button type="submit">
-                    {editingProduct ? '更新' : '新增'}
+                  <Button 
+                    type="submit" 
+                    disabled={submitting}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {submitting ? '處理中...' : (editingProduct ? '更新' : '新增')}
                   </Button>
                 </div>
               </form>
