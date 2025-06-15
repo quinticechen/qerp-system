@@ -1,0 +1,346 @@
+
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Trash } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface CreateOrderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+interface OrderProduct {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_rolls: number | null;
+  specifications: any;
+}
+
+export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
+  open,
+  onOpenChange,
+}) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [note, setNote] = useState('');
+  const [products, setProducts] = useState<OrderProduct[]>([{
+    product_id: '',
+    quantity: 0,
+    unit_price: 0,
+    total_rolls: null,
+    specifications: {}
+  }]);
+
+  // Fetch customers
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch products
+  const { data: availableProducts } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products_new')
+        .select('id, name, color')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async (orderData: {
+      customer_id: string;
+      note: string;
+      products: OrderProduct[];
+    }) => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('使用者未登入');
+
+      // Create order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: orderData.customer_id,
+          user_id: user.id,
+          note: orderData.note,
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Create order products
+      const orderProducts = orderData.products.map(product => ({
+        order_id: order.id,
+        product_id: product.product_id,
+        quantity: product.quantity,
+        unit_price: product.unit_price,
+        total_rolls: product.total_rolls,
+        specifications: product.specifications,
+      }));
+
+      const { error: productsError } = await supabase
+        .from('order_products')
+        .insert(orderProducts);
+
+      if (productsError) throw productsError;
+
+      return order;
+    },
+    onSuccess: () => {
+      toast({
+        title: "成功",
+        description: "訂單已成功建立",
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onOpenChange(false);
+      resetForm();
+    },
+    onError: (error) => {
+      console.error('Error creating order:', error);
+      toast({
+        title: "錯誤",
+        description: "建立訂單時發生錯誤",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setSelectedCustomer('');
+    setNote('');
+    setProducts([{
+      product_id: '',
+      quantity: 0,
+      unit_price: 0,
+      total_rolls: null,
+      specifications: {}
+    }]);
+  };
+
+  const addProduct = () => {
+    setProducts([...products, {
+      product_id: '',
+      quantity: 0,
+      unit_price: 0,
+      total_rolls: null,
+      specifications: {}
+    }]);
+  };
+
+  const removeProduct = (index: number) => {
+    if (products.length > 1) {
+      setProducts(products.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateProduct = (index: number, field: keyof OrderProduct, value: any) => {
+    const updatedProducts = [...products];
+    updatedProducts[index] = { ...updatedProducts[index], [field]: value };
+    setProducts(updatedProducts);
+  };
+
+  const handleSubmit = () => {
+    if (!selectedCustomer) {
+      toast({
+        title: "錯誤",
+        description: "請選擇客戶",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validProducts = products.filter(p => p.product_id && p.quantity > 0 && p.unit_price > 0);
+    if (validProducts.length === 0) {
+      toast({
+        title: "錯誤",
+        description: "請至少添加一個有效的產品",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createOrderMutation.mutate({
+      customer_id: selectedCustomer,
+      note,
+      products: validProducts,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-slate-800">新增訂單</DialogTitle>
+          <DialogDescription className="text-slate-600">
+            建立新的客戶訂單
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Customer Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="customer" className="text-slate-700">客戶 *</Label>
+            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+              <SelectTrigger className="border-slate-200">
+                <SelectValue placeholder="選擇客戶..." />
+              </SelectTrigger>
+              <SelectContent>
+                {customers?.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Products Section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-slate-700">產品明細 *</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addProduct}>
+                <Plus className="h-4 w-4 mr-2" />
+                新增產品
+              </Button>
+            </div>
+
+            {products.map((product, index) => (
+              <Card key={index} className="border-slate-200">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700">產品 *</Label>
+                      <Select
+                        value={product.product_id}
+                        onValueChange={(value) => updateProduct(index, 'product_id', value)}
+                      >
+                        <SelectTrigger className="border-slate-200">
+                          <SelectValue placeholder="選擇產品..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableProducts?.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name} {p.color && `(${p.color})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700">公斤數 *</Label>
+                      <Input
+                        type="number"
+                        value={product.quantity}
+                        onChange={(e) => updateProduct(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="border-slate-200 text-slate-800"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700">單價 (每公斤) *</Label>
+                      <Input
+                        type="number"
+                        value={product.unit_price}
+                        onChange={(e) => updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        className="border-slate-200 text-slate-800"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-slate-700">預計總卷數</Label>
+                      <Input
+                        type="number"
+                        value={product.total_rolls || ''}
+                        onChange={(e) => updateProduct(index, 'total_rolls', e.target.value ? parseInt(e.target.value) : null)}
+                        className="border-slate-200 text-slate-800"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="text-sm text-slate-600">
+                      小計: ${(product.quantity * product.unit_price).toLocaleString()}
+                    </div>
+                    {products.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeProduct(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Order Note */}
+          <div className="space-y-2">
+            <Label htmlFor="note" className="text-slate-700">訂單備註</Label>
+            <Textarea
+              id="note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="輸入訂單備註..."
+              className="border-slate-200 text-slate-800"
+            />
+          </div>
+
+          {/* Order Total */}
+          <div className="bg-slate-50 p-4 rounded-lg">
+            <div className="text-lg font-semibold text-slate-800">
+              訂單總計: ${products.reduce((total, p) => total + (p.quantity * p.unit_price), 0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={createOrderMutation.isPending}
+          >
+            {createOrderMutation.isPending ? '建立中...' : '建立訂單'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
