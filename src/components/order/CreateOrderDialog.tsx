@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -80,7 +79,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('使用者未登入');
 
-      // Create order - don't include order_number, let the trigger handle it
+      // Create order - include order_number with temporary value that will be overwritten by trigger
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -89,7 +88,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           note: orderData.note,
           status: 'pending',
           payment_status: 'unpaid',
-          shipping_status: 'not_started'
+          shipping_status: 'not_started',
+          order_number: 'TEMP' // Temporary value, will be overwritten by database trigger
         })
         .select()
         .single();
