@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -49,55 +48,79 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
     }
   ]);
 
-  // 獲取採購單列表
-  const { data: purchaseOrders } = useQuery({
+  // 獲取採購單列表 - 修復查詢
+  const { data: purchaseOrders, isLoading: purchaseOrdersLoading } = useQuery({
     queryKey: ['purchaseOrders'],
     queryFn: async () => {
+      console.log('Fetching purchase orders...');
       const { data, error } = await supabase
         .from('purchase_orders')
         .select('id, po_number, factory_id')
         .eq('status', 'confirmed')
         .order('po_number');
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error fetching purchase orders:', error);
+        throw error;
+      }
+      console.log('Purchase orders fetched:', data);
       return data;
     }
   });
 
   // 獲取工廠列表
-  const { data: factories } = useQuery({
+  const { data: factories, isLoading: factoriesLoading } = useQuery({
     queryKey: ['factories'],
     queryFn: async () => {
+      console.log('Fetching factories...');
       const { data, error } = await supabase
         .from('factories')
         .select('id, name')
         .order('name');
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error fetching factories:', error);
+        throw error;
+      }
+      console.log('Factories fetched:', data);
       return data;
     }
   });
 
   // 獲取產品列表
-  const { data: products } = useQuery({
+  const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
+      console.log('Fetching products...');
       const { data, error } = await supabase
         .from('products_new')
         .select('id, name, color')
         .order('name');
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error fetching products:', error);
+        throw error;
+      }
+      console.log('Products fetched:', data);
       return data;
     }
   });
 
-  // 獲取倉庫列表
-  const { data: warehouses } = useQuery({
+  // 獲取倉庫列表 - 修復查詢
+  const { data: warehouses, isLoading: warehousesLoading } = useQuery({
     queryKey: ['warehouses'],
     queryFn: async () => {
+      console.log('Fetching warehouses...');
       const { data, error } = await supabase
         .from('warehouses')
         .select('id, name')
         .order('name');
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error fetching warehouses:', error);
+        throw error;
+      }
+      console.log('Warehouses fetched:', data);
       return data;
     }
   });
@@ -117,13 +140,18 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
         user_id: user.id
       };
 
+      console.log('Creating inventory with data:', inventoryData);
+
       const { data: inventory, error: inventoryError } = await supabase
         .from('inventories')
         .insert(inventoryData)
         .select()
         .single();
 
-      if (inventoryError) throw inventoryError;
+      if (inventoryError) {
+        console.error('Inventory creation error:', inventoryError);
+        throw inventoryError;
+      }
 
       // 創建布卷記錄
       const rollsData = inventoryRolls
@@ -144,11 +172,16 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
         throw new Error('請至少添加一個有效的布卷記錄');
       }
 
+      console.log('Creating inventory rolls with data:', rollsData);
+
       const { error: rollsError } = await supabase
         .from('inventory_rolls')
         .insert(rollsData);
 
-      if (rollsError) throw rollsError;
+      if (rollsError) {
+        console.error('Inventory rolls creation error:', rollsError);
+        throw rollsError;
+      }
 
       return inventory;
     },
@@ -176,13 +209,13 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
         specifications: ''
       }]);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      console.error('Error creating inventory:', error);
       toast({
         title: "錯誤",
-        description: "建立入庫記錄失敗",
+        description: error.message || "建立入庫記錄失敗",
         variant: "destructive"
       });
-      console.error('Error creating inventory:', error);
     }
   });
 
@@ -266,38 +299,62 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="purchase_order" className="text-gray-700">採購單 *</Label>
-              <Select value={formData.purchase_order_id} onValueChange={(value) => {
-                setFormData({...formData, purchase_order_id: value});
-                const selectedPO = purchaseOrders?.find(po => po.id === value);
-                if (selectedPO) {
-                  setFormData(prev => ({...prev, factory_id: selectedPO.factory_id}));
-                }
-              }}>
+              <Select 
+                value={formData.purchase_order_id} 
+                onValueChange={(value) => {
+                  console.log('Selected purchase order:', value);
+                  setFormData({...formData, purchase_order_id: value});
+                  const selectedPO = purchaseOrders?.find(po => po.id === value);
+                  if (selectedPO) {
+                    setFormData(prev => ({...prev, factory_id: selectedPO.factory_id}));
+                  }
+                }}
+                disabled={purchaseOrdersLoading}
+              >
                 <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇採購單" />
+                  <SelectValue placeholder={purchaseOrdersLoading ? "載入中..." : "選擇採購單"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {purchaseOrders?.map((po) => (
-                    <SelectItem key={po.id} value={po.id}>
-                      {po.po_number}
+                  {purchaseOrders && purchaseOrders.length > 0 ? (
+                    purchaseOrders.map((po) => (
+                      <SelectItem key={po.id} value={po.id}>
+                        {po.po_number}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-data" disabled>
+                      {purchaseOrdersLoading ? "載入中..." : "沒有可用的採購單"}
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="factory" className="text-gray-700">工廠 *</Label>
-              <Select value={formData.factory_id} onValueChange={(value) => setFormData({...formData, factory_id: value})}>
+              <Select 
+                value={formData.factory_id} 
+                onValueChange={(value) => {
+                  console.log('Selected factory:', value);
+                  setFormData({...formData, factory_id: value});
+                }}
+                disabled={factoriesLoading}
+              >
                 <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇工廠" />
+                  <SelectValue placeholder={factoriesLoading ? "載入中..." : "選擇工廠"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {factories?.map((factory) => (
-                    <SelectItem key={factory.id} value={factory.id}>
-                      {factory.name}
+                  {factories && factories.length > 0 ? (
+                    factories.map((factory) => (
+                      <SelectItem key={factory.id} value={factory.id}>
+                        {factory.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-data" disabled>
+                      {factoriesLoading ? "載入中..." : "沒有可用的工廠"}
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -377,16 +434,23 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
                     <Select 
                       value={roll.product_id} 
                       onValueChange={(value) => updateInventoryRoll(index, 'product_id', value)}
+                      disabled={productsLoading}
                     >
                       <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <SelectValue placeholder="選擇產品" />
+                        <SelectValue placeholder={productsLoading ? "載入中..." : "選擇產品"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {products?.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} {product.color && `- ${product.color}`}
+                        {products && products.length > 0 ? (
+                          products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} {product.color && `- ${product.color}`}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>
+                            {productsLoading ? "載入中..." : "沒有可用的產品"}
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -396,16 +460,23 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
                     <Select 
                       value={roll.warehouse_id} 
                       onValueChange={(value) => updateInventoryRoll(index, 'warehouse_id', value)}
+                      disabled={warehousesLoading}
                     >
                       <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <SelectValue placeholder="選擇倉庫" />
+                        <SelectValue placeholder={warehousesLoading ? "載入中..." : "選擇倉庫"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {warehouses?.map((warehouse) => (
-                          <SelectItem key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name}
+                        {warehouses && warehouses.length > 0 ? (
+                          warehouses.map((warehouse) => (
+                            <SelectItem key={warehouse.id} value={warehouse.id}>
+                              {warehouse.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-data" disabled>
+                            {warehousesLoading ? "載入中..." : "沒有可用的倉庫"}
                           </SelectItem>
-                        ))}
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
