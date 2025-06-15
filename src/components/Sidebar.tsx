@@ -11,7 +11,8 @@ import {
   BarChart3,
   Settings,
   User,
-  ClipboardList
+  ClipboardList,
+  Truck
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -24,6 +25,7 @@ const Sidebar = () => {
     { id: 'order', label: '訂單管理', icon: ShoppingCart, path: '/order' },
     { id: 'purchase', label: '採購管理', icon: ClipboardList, path: '/purchase' },
     { id: 'inventory', label: '庫存管理', icon: Warehouse, path: '/inventory' },
+    { id: 'shipping', label: '出貨管理', icon: Truck, path: '/shipping' },
     { id: 'factory', label: '工廠管理', icon: Factory, path: '/factory' },
     { id: 'customer', label: '客戶管理', icon: Users, path: '/customer' },
     { id: 'user', label: '用戶管理', icon: User, path: '/user' },

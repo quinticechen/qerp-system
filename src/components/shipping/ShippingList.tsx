@@ -1,0 +1,208 @@
+
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { SearchInput } from '@/components/ui/search-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, Edit, Filter } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { ViewShippingDialog } from './ViewShippingDialog';
+import { EditShippingDialog } from './EditShippingDialog';
+
+export const ShippingList = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('all');
+  const [selectedShipping, setSelectedShipping] = useState<any | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  const { data: shippings, isLoading } = useQuery({
+    queryKey: ['shippings', searchTerm, customerFilter],
+    queryFn: async () => {
+      let query = supabase
+        .from('shippings')
+        .select(`
+          *,
+          customers (name),
+          orders (order_number),
+          shipping_items (
+            id,
+            shipped_quantity,
+            inventory_rolls (
+              roll_number,
+              products_new (name, color)
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (searchTerm) {
+        query = query.or(`shipping_number.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%`);
+      }
+
+      if (customerFilter !== 'all') {
+        query = query.eq('customer_id', customerFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: customers } = useQuery({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const handleView = (shipping: any) => {
+    setSelectedShipping(shipping);
+    setViewDialogOpen(true);
+  };
+
+  const handleEdit = (shipping: any) => {
+    setSelectedShipping(shipping);
+    setEditDialogOpen(true);
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-gray-500">載入中...</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* 搜尋和篩選 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-gray-900">
+            <Filter className="h-5 w-5" />
+            篩選條件
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SearchInput
+              placeholder="搜尋出貨單號或客戶名稱..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <SelectValue placeholder="選擇客戶" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部客戶</SelectItem>
+                {customers?.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 出貨單列表 */}
+      <div className="grid gap-4">
+        {shippings?.map((shipping) => (
+          <Card key={shipping.id} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{shipping.shipping_number}</h3>
+                  <p className="text-gray-600">客戶：{shipping.customers?.name}</p>
+                  {shipping.orders && (
+                    <p className="text-gray-600">關聯訂單：{shipping.orders.order_number}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-500">
+                    {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-gray-500">總重量</p>
+                  <p className="font-medium text-gray-900">{shipping.total_shipped_quantity} 公斤</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">總卷數</p>
+                  <p className="font-medium text-gray-900">{shipping.total_shipped_rolls}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">項目數</p>
+                  <p className="font-medium text-gray-900">{shipping.shipping_items?.length || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">出貨日期</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleView(shipping)}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  查看
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEdit(shipping)}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  編輯
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {shippings?.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-gray-500">沒有找到出貨單</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* 對話框 */}
+      {selectedShipping && (
+        <>
+          <ViewShippingDialog
+            open={viewDialogOpen}
+            onOpenChange={setViewDialogOpen}
+            shipping={selectedShipping}
+          />
+          <EditShippingDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            shipping={selectedShipping}
+          />
+        </>
+      )}
+    </div>
+  );
+};
