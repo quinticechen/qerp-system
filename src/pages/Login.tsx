@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { Eye, EyeOff, LogIn, User } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -36,111 +37,125 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
-      {/* 背景裝飾元素 */}
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width=%2260%22%20height=%2260%22%20viewBox=%220%200%2060%2060%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg%20fill=%22none%22%20fill-rule=%22evenodd%22%3E%3Cg%20fill=%22%23ffffff%22%20fill-opacity=%220.03%22%3E%3Cpath%20d=%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-20"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-slate-100 dark:from-slate-900 dark:via-blue-900 dark:to-slate-900 relative overflow-hidden">
+      {/* 背景裝飾圓圈 */}
+      <div className="absolute top-0 left-0 w-96 h-96 bg-gradient-to-br from-blue-400/30 to-blue-600/30 rounded-full blur-3xl -translate-x-48 -translate-y-48"></div>
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tl from-blue-500/20 to-blue-700/20 rounded-full blur-3xl translate-x-48 translate-y-48"></div>
       
       {/* 主要內容 */}
-      <div className="w-full max-w-md space-y-8 relative z-10">
+      <div className="w-full max-w-md space-y-8 relative z-10 px-4">
         {/* Logo 和標題區域 */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-6">
           <div className="flex justify-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl flex items-center justify-center shadow-2xl">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-500/25">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <div className="w-8 h-8 bg-white rounded-xl flex items-center justify-center">
+                  <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-white">紡織業 ERP 系統</h1>
-            <p className="text-blue-200">整合性企業資源管理平台</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">紡織業 ERP</h1>
+            <p className="text-slate-600 dark:text-slate-400">現代化企業資源管理系統</p>
           </div>
         </div>
 
         {/* 登入表單卡片 */}
-        <Card className="bg-white/10 backdrop-blur-lg border-white/20 shadow-2xl">
-          <CardHeader className="space-y-2 text-center">
-            <CardTitle className="text-2xl text-white">歡迎回來</CardTitle>
-            <CardDescription className="text-blue-100">
-              請輸入您的帳號資訊以登入系統
+        <Card className="card-elevated backdrop-blur-sm bg-white/80 dark:bg-slate-800/80 border-white/50 dark:border-slate-700/50 shadow-2xl shadow-blue-500/10">
+          <CardHeader className="space-y-2 text-center pb-4">
+            <CardTitle className="text-2xl text-slate-900 dark:text-white flex items-center justify-center gap-2">
+              <User size={24} className="text-blue-600" />
+              登入系統
+            </CardTitle>
+            <CardDescription className="text-slate-600 dark:text-slate-400">
+              請輸入您的帳號資訊
             </CardDescription>
           </CardHeader>
           
-          <CardContent>
-            <Tabs defaultValue="login" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-1 bg-white/10 border-white/20">
-                <TabsTrigger value="login" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
-                  登入
-                </TabsTrigger>
-              </TabsList>
+          <CardContent className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="form-label">
+                  電子郵件
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="請輸入您的電子郵件"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="form-input h-12 text-base"
+                  required
+                />
+              </div>
               
-              <TabsContent value="login" className="space-y-4">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-white text-sm font-medium">
-                      電子郵件
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="請輸入您的電子郵件"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-200 focus:border-blue-400 focus:ring-blue-400"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-white text-sm font-medium">
-                      密碼
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="請輸入您的密碼"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-200 focus:border-blue-400 focus:ring-blue-400"
-                      required
-                    />
-                  </div>
-                  
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                    disabled={isLoading}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="form-label">
+                  密碼
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="請輸入您的密碼"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input h-12 text-base pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
                   >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>登入中...</span>
-                      </div>
-                    ) : (
-                      '登入系統'
-                    )}
-                  </Button>
-                </form>
-                
-                <div className="text-center">
-                  <a
-                    href="#"
-                    className="text-blue-200 hover:text-white text-sm transition-colors duration-200"
-                  >
-                    忘記密碼？
-                  </a>
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+              
+              <div className="pt-2">
+                <Button
+                  type="submit"
+                  className="w-full h-12 btn-blue text-base font-medium rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>登入中...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center space-x-2">
+                      <LogIn size={20} />
+                      <span>登入系統</span>
+                    </div>
+                  )}
+                </Button>
+              </div>
+            </form>
+            
+            <div className="text-center border-t border-slate-200 dark:border-slate-700 pt-4">
+              <a
+                href="#"
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium transition-colors duration-200 hover:underline"
+              >
+                忘記密碼？
+              </a>
+            </div>
           </CardContent>
         </Card>
 
         {/* 底部資訊 */}
-        <div className="text-center space-y-2">
-          <p className="text-blue-200 text-sm">
-            支援角色：業務 | 助理 | 會計 | 倉庫管理員 | 高層
-          </p>
-          <p className="text-blue-300/60 text-xs">
+        <div className="text-center space-y-3">
+          <div className="flex flex-wrap justify-center gap-2 text-xs">
+            {['業務', '助理', '會計', '倉庫管理員', '高層'].map((role, index) => (
+              <span key={role} className="badge-blue">
+                {role}
+              </span>
+            ))}
+          </div>
+          <p className="text-slate-500 dark:text-slate-400 text-xs">
             © 2025 紡織業 ERP 系統. 版權所有.
           </p>
         </div>
