@@ -13,7 +13,7 @@ import { ViewInventoryDialog } from './ViewInventoryDialog';
 export const InventoryList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
-  const [selectedInventory, setSelectedInventory] = useState<string | null>(null);
+  const [selectedInventory, setSelectedInventory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
   const { data: inventories, isLoading } = useQuery({
@@ -90,8 +90,8 @@ export const InventoryList = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleView = (inventoryId: string) => {
-    setSelectedInventory(inventoryId);
+  const handleView = (inventory: any) => {
+    setSelectedInventory(inventory);
     setViewDialogOpen(true);
   };
 
@@ -214,7 +214,7 @@ export const InventoryList = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleView(inventory.id)}
+                    onClick={() => handleView(inventory)}
                     className="border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     <Eye className="h-4 w-4 mr-1" />
@@ -241,7 +241,7 @@ export const InventoryList = () => {
         <ViewInventoryDialog
           open={viewDialogOpen}
           onOpenChange={setViewDialogOpen}
-          inventoryId={selectedInventory}
+          inventory={selectedInventory}
         />
       )}
     </div>

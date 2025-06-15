@@ -13,8 +13,8 @@ import { EditPurchaseDialog } from './EditPurchaseDialog';
 
 export const PurchaseList = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedPurchase, setSelectedPurchase] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled'>('all');
+  const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -64,13 +64,13 @@ export const PurchaseList = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleView = (purchaseId: string) => {
-    setSelectedPurchase(purchaseId);
+  const handleView = (purchase: any) => {
+    setSelectedPurchase(purchase);
     setViewDialogOpen(true);
   };
 
-  const handleEdit = (purchaseId: string) => {
-    setSelectedPurchase(purchaseId);
+  const handleEdit = (purchase: any) => {
+    setSelectedPurchase(purchase);
     setEditDialogOpen(true);
   };
 
@@ -96,7 +96,7 @@ export const PurchaseList = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(value: 'all' | 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled') => setStatusFilter(value)}>
               <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue placeholder="選擇狀態" />
               </SelectTrigger>
@@ -173,7 +173,7 @@ export const PurchaseList = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleView(purchase.id)}
+                    onClick={() => handleView(purchase)}
                     className="border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     <Eye className="h-4 w-4 mr-1" />
@@ -182,7 +182,7 @@ export const PurchaseList = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleEdit(purchase.id)}
+                    onClick={() => handleEdit(purchase)}
                     className="border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     <Edit className="h-4 w-4 mr-1" />
@@ -209,12 +209,12 @@ export const PurchaseList = () => {
           <ViewPurchaseDialog
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
-            purchaseId={selectedPurchase}
+            purchase={selectedPurchase}
           />
           <EditPurchaseDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
-            purchaseId={selectedPurchase}
+            purchase={selectedPurchase}
           />
         </>
       )}
