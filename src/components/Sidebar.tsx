@@ -10,7 +10,8 @@ import {
   ShoppingCart, 
   BarChart3,
   Settings,
-  User
+  User,
+  ClipboardList
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -21,6 +22,7 @@ const Sidebar = () => {
     { id: 'dashboard', label: '儀表板', icon: BarChart3, path: '/dashboard' },
     { id: 'product', label: '產品管理', icon: Package, path: '/product' },
     { id: 'order', label: '訂單管理', icon: ShoppingCart, path: '/order' },
+    { id: 'purchase', label: '採購管理', icon: ClipboardList, path: '/purchase' },
     { id: 'inventory', label: '庫存管理', icon: Warehouse, path: '/inventory' },
     { id: 'factory', label: '工廠管理', icon: Factory, path: '/factory' },
     { id: 'customer', label: '客戶管理', icon: Users, path: '/customer' },
