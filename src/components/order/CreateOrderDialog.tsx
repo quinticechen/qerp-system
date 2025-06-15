@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -197,8 +196,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-slate-800">新增訂單</DialogTitle>
-          <DialogDescription className="text-slate-600">
+          <DialogTitle className="text-gray-900">新增訂單</DialogTitle>
+          <DialogDescription className="text-gray-700">
             建立新的客戶訂單
           </DialogDescription>
         </DialogHeader>
@@ -206,9 +205,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         <div className="space-y-6">
           {/* Customer Selection */}
           <div className="space-y-2">
-            <Label htmlFor="customer" className="text-slate-700">客戶 *</Label>
+            <Label htmlFor="customer" className="text-gray-800">客戶 *</Label>
             <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-              <SelectTrigger className="border-slate-200">
+              <SelectTrigger className="border-gray-200">
                 <SelectValue placeholder="選擇客戶..." />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +223,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           {/* Products Section */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Label className="text-slate-700">產品明細 *</Label>
+              <Label className="text-gray-800">產品明細 *</Label>
               <Button type="button" variant="outline" size="sm" onClick={addProduct}>
                 <Plus className="h-4 w-4 mr-2" />
                 新增產品
@@ -232,16 +231,16 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
             </div>
 
             {products.map((product, index) => (
-              <Card key={index} className="border-slate-200">
+              <Card key={index} className="border-gray-200">
                 <CardContent className="p-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-slate-700">產品 *</Label>
+                      <Label className="text-gray-800">產品 *</Label>
                       <Select
                         value={product.product_id}
                         onValueChange={(value) => updateProduct(index, 'product_id', value)}
                       >
-                        <SelectTrigger className="border-slate-200">
+                        <SelectTrigger className="border-gray-200">
                           <SelectValue placeholder="選擇產品..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -255,43 +254,43 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-700">公斤數 *</Label>
+                      <Label className="text-gray-800">公斤數 *</Label>
                       <Input
                         type="number"
                         value={product.quantity}
                         onChange={(e) => updateProduct(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="border-slate-200 text-slate-800"
+                        className="border-gray-200 text-gray-900"
                         min="0"
                         step="0.01"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-700">單價 (每公斤) *</Label>
+                      <Label className="text-gray-800">單價 (每公斤) *</Label>
                       <Input
                         type="number"
                         value={product.unit_price}
                         onChange={(e) => updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="border-slate-200 text-slate-800"
+                        className="border-gray-200 text-gray-900"
                         min="0"
                         step="0.01"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-slate-700">預計總卷數</Label>
+                      <Label className="text-gray-800">預計總卷數</Label>
                       <Input
                         type="number"
                         value={product.total_rolls || ''}
                         onChange={(e) => updateProduct(index, 'total_rolls', e.target.value ? parseInt(e.target.value) : null)}
-                        className="border-slate-200 text-slate-800"
+                        className="border-gray-200 text-gray-900"
                         min="0"
                       />
                     </div>
                   </div>
 
                   <div className="mt-4 flex justify-between items-center">
-                    <div className="text-sm text-slate-600">
+                    <div className="text-sm text-gray-700">
                       小計: ${(product.quantity * product.unit_price).toLocaleString()}
                     </div>
                     {products.length > 1 && (
@@ -313,19 +312,19 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
           {/* Order Note */}
           <div className="space-y-2">
-            <Label htmlFor="note" className="text-slate-700">訂單備註</Label>
+            <Label htmlFor="note" className="text-gray-800">訂單備註</Label>
             <Textarea
               id="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="輸入訂單備註..."
-              className="border-slate-200 text-slate-800"
+              className="border-gray-200 text-gray-900"
             />
           </div>
 
           {/* Order Total */}
-          <div className="bg-slate-50 p-4 rounded-lg">
-            <div className="text-lg font-semibold text-slate-800">
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="text-lg font-semibold text-gray-900">
               訂單總計: ${products.reduce((total, p) => total + (p.quantity * p.unit_price), 0).toLocaleString()}
             </div>
           </div>

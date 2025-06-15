@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,7 +137,7 @@ export const OrderList = () => {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center text-slate-600">載入中...</div>
+          <div className="text-center text-gray-700">載入中...</div>
         </CardContent>
       </Card>
     );
@@ -157,20 +156,20 @@ export const OrderList = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">訂單列表</CardTitle>
-        <CardDescription className="text-slate-600">
+        <CardTitle className="text-gray-900">訂單列表</CardTitle>
+        <CardDescription className="text-gray-700">
           管理客戶訂單
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
             <Input
               placeholder="搜尋訂單編號或客戶名稱..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 border-slate-200 text-slate-800"
+              className="pl-10 border-gray-200 text-gray-900"
             />
           </div>
         </div>
@@ -178,23 +177,23 @@ export const OrderList = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-slate-700">訂單編號</TableHead>
-              <TableHead className="text-slate-700">客戶</TableHead>
-              <TableHead className="text-slate-700">訂單狀態</TableHead>
-              <TableHead className="text-slate-700">付款狀態</TableHead>
-              <TableHead className="text-slate-700">出貨狀態</TableHead>
-              <TableHead className="text-slate-700">總金額</TableHead>
-              <TableHead className="text-slate-700">建立時間</TableHead>
-              <TableHead className="text-slate-700">操作</TableHead>
+              <TableHead className="text-gray-800">訂單編號</TableHead>
+              <TableHead className="text-gray-800">客戶</TableHead>
+              <TableHead className="text-gray-800">訂單狀態</TableHead>
+              <TableHead className="text-gray-800">付款狀態</TableHead>
+              <TableHead className="text-gray-800">出貨狀態</TableHead>
+              <TableHead className="text-gray-800">總金額</TableHead>
+              <TableHead className="text-gray-800">建立時間</TableHead>
+              <TableHead className="text-gray-800">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredOrders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell className="font-medium text-slate-800">
+                <TableCell className="font-medium text-gray-900">
                   {order.order_number}
                 </TableCell>
-                <TableCell className="text-slate-700">
+                <TableCell className="text-gray-800">
                   {order.customers.name}
                 </TableCell>
                 <TableCell>
@@ -212,10 +211,10 @@ export const OrderList = () => {
                     {getShippingStatusText(order.shipping_status)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-slate-700">
+                <TableCell className="text-gray-800">
                   ${calculateOrderTotal(order).toLocaleString()}
                 </TableCell>
-                <TableCell className="text-slate-700">
+                <TableCell className="text-gray-800">
                   {new Date(order.created_at).toLocaleDateString('zh-TW')}
                 </TableCell>
                 <TableCell>
@@ -223,7 +222,7 @@ export const OrderList = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => setEditingOrder(order)}
-                    className="text-slate-700 hover:text-slate-900"
+                    className="text-gray-800 hover:text-gray-900"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -234,7 +233,7 @@ export const OrderList = () => {
         </Table>
 
         {filteredOrders.length === 0 && (
-          <div className="text-center py-8 text-slate-600">
+          <div className="text-center py-8 text-gray-700">
             {searchTerm ? '沒有找到符合條件的訂單' : '尚無訂單'}
           </div>
         )}

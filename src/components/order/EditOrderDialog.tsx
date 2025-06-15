@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -124,37 +123,37 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-slate-800">編輯訂單</DialogTitle>
-          <DialogDescription className="text-slate-600">
+          <DialogTitle className="text-gray-900">編輯訂單</DialogTitle>
+          <DialogDescription className="text-gray-700">
             訂單編號: {order.order_number}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Order Information */}
-          <div className="bg-slate-50 p-4 rounded-lg space-y-2">
-            <div className="text-sm text-slate-600">
+          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="text-sm text-gray-700">
               <strong>客戶:</strong> {order.customers.name}
             </div>
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-gray-700">
               <strong>訂單總額:</strong> ${calculateOrderTotal().toLocaleString()}
             </div>
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-gray-700">
               <strong>建立時間:</strong> {new Date(order.created_at).toLocaleString('zh-TW')}
             </div>
           </div>
 
           {/* Product Details */}
           <div className="space-y-2">
-            <Label className="text-slate-700">訂單產品</Label>
+            <Label className="text-gray-800">訂單產品</Label>
             <div className="space-y-2">
               {order.order_products.map((product: any, index: number) => (
-                <div key={index} className="bg-slate-50 p-3 rounded border">
-                  <div className="text-sm text-slate-800">
+                <div key={index} className="bg-gray-50 p-3 rounded border">
+                  <div className="text-sm text-gray-900">
                     <strong>{product.products_new.name}</strong>
                     {product.products_new.color && ` (${product.products_new.color})`}
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-sm text-gray-700">
                     數量: {product.quantity}kg | 單價: ${product.unit_price} | 
                     小計: ${(product.quantity * product.unit_price).toLocaleString()}
                   </div>
@@ -166,9 +165,9 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           {/* Status Updates */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label className="text-slate-700">訂單狀態</Label>
+              <Label className="text-gray-800">訂單狀態</Label>
               <Select value={status} onValueChange={(value: OrderStatus) => setStatus(value)}>
-                <SelectTrigger className="border-slate-200">
+                <SelectTrigger className="border-gray-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -182,9 +181,9 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700">付款狀態</Label>
+              <Label className="text-gray-800">付款狀態</Label>
               <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => setPaymentStatus(value)}>
-                <SelectTrigger className="border-slate-200">
+                <SelectTrigger className="border-gray-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -196,9 +195,9 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700">出貨狀態</Label>
+              <Label className="text-gray-800">出貨狀態</Label>
               <Select value={shippingStatus} onValueChange={(value: ShippingStatus) => setShippingStatus(value)}>
-                <SelectTrigger className="border-slate-200">
+                <SelectTrigger className="border-gray-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -212,13 +211,13 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
           {/* Order Note */}
           <div className="space-y-2">
-            <Label htmlFor="note" className="text-slate-700">訂單備註</Label>
+            <Label htmlFor="note" className="text-gray-800">訂單備註</Label>
             <Textarea
               id="note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="輸入訂單備註..."
-              className="border-slate-200 text-slate-800"
+              className="border-gray-200 text-gray-900"
             />
           </div>
         </div>

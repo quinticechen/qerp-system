@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -188,7 +187,7 @@ const FactoryManagement = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">工廠管理</h2>
+        <h2 className="text-2xl font-bold text-gray-900">工廠管理</h2>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
@@ -204,7 +203,7 @@ const FactoryManagement = () => {
               <DialogTitle className="text-gray-900">
                 {editingFactory ? '編輯工廠' : '新增工廠'}
               </DialogTitle>
-              <DialogDescription className="text-gray-600">
+              <DialogDescription className="text-gray-700">
                 {editingFactory ? '修改工廠/供應商資訊' : '建立新的工廠/供應商檔案'}
               </DialogDescription>
             </DialogHeader>
@@ -215,7 +214,7 @@ const FactoryManagement = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700">工廠名稱 *</FormLabel>
+                      <FormLabel className="text-gray-800">工廠名稱 *</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="請輸入工廠名稱" 
@@ -233,7 +232,7 @@ const FactoryManagement = () => {
                   name="contact_person"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700">聯絡人</FormLabel>
+                      <FormLabel className="text-gray-800">聯絡人</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="請輸入聯絡人姓名" 
@@ -252,7 +251,7 @@ const FactoryManagement = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">電子郵件</FormLabel>
+                        <FormLabel className="text-gray-800">電子郵件</FormLabel>
                         <FormControl>
                           <Input 
                             type="email" 
@@ -271,7 +270,7 @@ const FactoryManagement = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">電話</FormLabel>
+                        <FormLabel className="text-gray-800">電話</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="請輸入電話號碼" 
@@ -290,7 +289,7 @@ const FactoryManagement = () => {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700">地址</FormLabel>
+                      <FormLabel className="text-gray-800">地址</FormLabel>
                       <FormControl>
                         <Textarea 
                           placeholder="請輸入完整地址" 
@@ -309,7 +308,7 @@ const FactoryManagement = () => {
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
                     disabled={submitting}
-                    className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    className="border-gray-300 text-gray-800 hover:bg-gray-50 hover:text-gray-900"
                   >
                     取消
                   </Button>
@@ -331,12 +330,12 @@ const FactoryManagement = () => {
       <Card>
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={16} />
             <Input
               placeholder="搜尋工廠名稱、聯絡人或電子郵件..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-gray-900"
             />
           </div>
         </CardContent>
@@ -345,11 +344,11 @@ const FactoryManagement = () => {
       {/* 工廠列表 */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
+          <CardTitle className="flex items-center text-gray-900">
             <Factory className="mr-2" size={20} />
             工廠列表
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-700">
             管理工廠/供應商資訊，共 {filteredFactories.length} 家工廠
           </CardDescription>
         </CardHeader>
@@ -357,15 +356,15 @@ const FactoryManagement = () => {
           {loading ? (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-600">載入中...</p>
+              <p className="text-gray-700">載入中...</p>
             </div>
           ) : filteredFactories.length === 0 ? (
             <div className="text-center py-8">
-              <Factory size={48} className="mx-auto text-slate-400 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-600 mb-2">
+              <Factory size={48} className="mx-auto text-gray-500 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 {searchTerm ? '沒有找到符合的工廠' : '尚未新增工廠'}
               </h3>
-              <p className="text-slate-500">
+              <p className="text-gray-600">
                 {searchTerm ? '請嘗試調整搜尋條件' : '點擊「新增工廠」開始建立工廠檔案'}
               </p>
             </div>
@@ -373,51 +372,52 @@ const FactoryManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>工廠名稱</TableHead>
-                  <TableHead>聯絡人</TableHead>
-                  <TableHead>電子郵件</TableHead>
-                  <TableHead>電話</TableHead>
-                  <TableHead>地址</TableHead>
-                  <TableHead>建立時間</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead className="text-gray-800">工廠名稱</TableHead>
+                  <TableHead className="text-gray-800">聯絡人</TableHead>
+                  <TableHead className="text-gray-800">電子郵件</TableHead>
+                  <TableHead className="text-gray-800">電話</TableHead>
+                  <TableHead className="text-gray-800">地址</TableHead>
+                  <TableHead className="text-gray-800">建立時間</TableHead>
+                  <TableHead className="text-right text-gray-800">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredFactories.map((factory) => (
                   <TableRow key={factory.id}>
-                    <TableCell className="font-medium">{factory.name}</TableCell>
-                    <TableCell>{factory.contact_person || '-'}</TableCell>
+                    <TableCell className="font-medium text-gray-900">{factory.name}</TableCell>
+                    <TableCell className="text-gray-800">{factory.contact_person || '-'}</TableCell>
                     <TableCell>
                       {factory.email ? (
-                        <div className="flex items-center">
-                          <Mail size={14} className="mr-1 text-slate-400" />
+                        <div className="flex items-center text-gray-800">
+                          <Mail size={14} className="mr-1 text-gray-600" />
                           {factory.email}
                         </div>
-                      ) : '-'}
+                      ) : <span className="text-gray-600">-</span>}
                     </TableCell>
                     <TableCell>
                       {factory.phone ? (
-                        <div className="flex items-center">
-                          <Phone size={14} className="mr-1 text-slate-400" />
+                        <div className="flex items-center text-gray-800">
+                          <Phone size={14} className="mr-1 text-gray-600" />
                           {factory.phone}
                         </div>
-                      ) : '-'}
+                      ) : <span className="text-gray-600">-</span>}
                     </TableCell>
                     <TableCell>
                       {factory.address ? (
-                        <div className="flex items-center max-w-xs">
-                          <MapPin size={14} className="mr-1 text-slate-400 flex-shrink-0" />
+                        <div className="flex items-center max-w-xs text-gray-800">
+                          <MapPin size={14} className="mr-1 text-gray-600 flex-shrink-0" />
                           <span className="truncate">{factory.address}</span>
                         </div>
-                      ) : '-'}
+                      ) : <span className="text-gray-600">-</span>}
                     </TableCell>
-                    <TableCell>{new Date(factory.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                    <TableCell className="text-gray-800">{new Date(factory.created_at).toLocaleDateString('zh-TW')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleEdit(factory)}
+                          className="text-gray-800 hover:text-gray-900"
                         >
                           <Edit size={14} className="mr-1" />
                           編輯
@@ -434,15 +434,15 @@ const FactoryManagement = () => {
                           </AlertDialogTrigger>
                           <AlertDialogContent className="bg-white">
                             <AlertDialogHeader>
-                              <AlertDialogTitle>確認刪除工廠</AlertDialogTitle>
-                              <AlertDialogDescription>
+                              <AlertDialogTitle className="text-gray-900">確認刪除工廠</AlertDialogTitle>
+                              <AlertDialogDescription className="text-gray-700">
                                 您確定要刪除工廠「{factory.name}」嗎？
                                 <br />
                                 <span className="text-red-600 font-medium">此操作無法復原！</span>
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogCancel className="text-gray-800">取消</AlertDialogCancel>
                               <AlertDialogAction 
                                 onClick={() => handleDelete(factory)}
                                 className="bg-red-600 hover:bg-red-700"
