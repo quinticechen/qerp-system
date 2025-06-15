@@ -307,7 +307,7 @@ const ProductManagement = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">產品管理</h2>
+        <h2 className="text-2xl font-bold text-slate-900">產品管理</h2>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button 
@@ -323,7 +323,7 @@ const ProductManagement = () => {
               <DialogTitle className="text-gray-900">
                 {editingProduct ? '編輯產品' : '新增產品'}
               </DialogTitle>
-              <DialogDescription className="text-gray-600">
+              <DialogDescription className="text-gray-700">
                 {editingProduct ? '修改產品資訊' : '建立新的布料產品型號'}
               </DialogDescription>
             </DialogHeader>
@@ -334,7 +334,7 @@ const ProductManagement = () => {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700">產品名稱 *</FormLabel>
+                      <FormLabel className="text-gray-900 font-medium">產品名稱 *</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="請輸入產品名稱" 
@@ -352,7 +352,7 @@ const ProductManagement = () => {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700">類別</FormLabel>
+                      <FormLabel className="text-gray-900 font-medium">類別</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
@@ -376,7 +376,7 @@ const ProductManagement = () => {
                     name="color"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">顏色</FormLabel>
+                        <FormLabel className="text-gray-900 font-medium">顏色</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="如：米白、深藍" 
@@ -394,7 +394,7 @@ const ProductManagement = () => {
                     name="color_code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700">顏色代碼</FormLabel>
+                        <FormLabel className="text-gray-900 font-medium">顏色代碼</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="如：#FFFFFF" 
@@ -409,8 +409,8 @@ const ProductManagement = () => {
                 </div>
 
                 <div className="bg-blue-50 p-3 rounded border border-blue-200">
-                  <Label className="text-sm text-blue-800 font-medium">計量單位：公斤 (KG)</Label>
-                  <p className="text-xs text-blue-600 mt-1">布料產品統一使用公斤作為計量單位</p>
+                  <Label className="text-sm text-blue-900 font-medium">計量單位：公斤 (KG)</Label>
+                  <p className="text-xs text-blue-700 mt-1">布料產品統一使用公斤作為計量單位</p>
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
@@ -419,7 +419,7 @@ const ProductManagement = () => {
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
                     disabled={submitting}
-                    className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    className="border-gray-300 text-gray-900 hover:bg-gray-50 hover:text-gray-900"
                   >
                     取消
                   </Button>
@@ -441,12 +441,12 @@ const ProductManagement = () => {
       <Card>
         <CardContent className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" size={16} />
             <Input
               placeholder="搜尋產品名稱、顏色或顏色代碼..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 text-gray-900 placeholder:text-gray-500"
             />
           </div>
         </CardContent>
@@ -455,11 +455,11 @@ const ProductManagement = () => {
       {/* 產品列表 */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center">
+          <CardTitle className="flex items-center text-slate-900">
             <Package className="mr-2" size={20} />
             產品列表
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-700">
             管理布料產品型號，共 {filteredProducts.length} 項產品
           </CardDescription>
         </CardHeader>
@@ -467,15 +467,15 @@ const ProductManagement = () => {
           {loading ? (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-slate-600">載入中...</p>
+              <p className="text-slate-700">載入中...</p>
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="text-center py-8">
-              <Package size={48} className="mx-auto text-slate-400 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-600 mb-2">
+              <Package size={48} className="mx-auto text-slate-500 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">
                 {searchTerm ? '沒有找到符合的產品' : '尚未新增產品'}
               </h3>
-              <p className="text-slate-500">
+              <p className="text-slate-600">
                 {searchTerm ? '請嘗試調整搜尋條件' : '點擊「新增產品」開始建立產品型號'}
               </p>
             </div>
@@ -483,45 +483,45 @@ const ProductManagement = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>產品名稱</TableHead>
-                  <TableHead>類別</TableHead>
-                  <TableHead>顏色</TableHead>
-                  <TableHead>顏色代碼</TableHead>
-                  <TableHead>計量單位</TableHead>
-                  <TableHead>建立時間</TableHead>
-                  <TableHead>最後修改</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">產品名稱</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">類別</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">顏色</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">顏色代碼</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">計量單位</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">建立時間</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">最後修改</TableHead>
+                  <TableHead className="text-right text-gray-900 font-semibold">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium text-gray-900">{product.name}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{product.category}</Badge>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">{product.category}</Badge>
                     </TableCell>
-                    <TableCell>{product.color || '-'}</TableCell>
+                    <TableCell className="text-gray-900">{product.color || '無'}</TableCell>
                     <TableCell>
                       {product.color_code ? (
                         <div className="flex items-center space-x-2">
                           <div 
-                            className="w-4 h-4 rounded border border-slate-300"
+                            className="w-4 h-4 rounded border border-slate-400"
                             style={{ backgroundColor: product.color_code }}
                           ></div>
-                          <span className="text-sm">{product.color_code}</span>
+                          <span className="text-sm text-gray-900">{product.color_code}</span>
                         </div>
-                      ) : '-'}
+                      ) : <span className="text-gray-900">無</span>}
                     </TableCell>
-                    <TableCell>{product.unit_of_measure}</TableCell>
-                    <TableCell>{new Date(product.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                    <TableCell className="text-gray-900">{product.unit_of_measure}</TableCell>
+                    <TableCell className="text-gray-900">{new Date(product.created_at).toLocaleDateString('zh-TW')}</TableCell>
                     <TableCell>
                       <div className="flex flex-col text-sm">
-                        <div className="flex items-center text-slate-600">
+                        <div className="flex items-center text-gray-700">
                           <Clock size={12} className="mr-1" />
                           {new Date(product.updated_at).toLocaleDateString('zh-TW')}
                         </div>
                         {product.updated_by && (
-                          <div className="flex items-center text-slate-500 mt-1">
+                          <div className="flex items-center text-gray-600 mt-1">
                             <User size={12} className="mr-1" />
                             {getUserDisplayName(product.updated_by)}
                           </div>
@@ -534,6 +534,7 @@ const ProductManagement = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => handleEdit(product)}
+                          className="border-gray-300 text-gray-900 hover:bg-gray-50"
                         >
                           <Edit size={14} className="mr-1" />
                           編輯
@@ -543,6 +544,7 @@ const ProductManagement = () => {
                             <Button
                               size="sm"
                               variant="destructive"
+                              className="bg-red-600 hover:bg-red-700 text-white"
                             >
                               <Trash2 size={14} className="mr-1" />
                               刪除
@@ -550,18 +552,18 @@ const ProductManagement = () => {
                           </AlertDialogTrigger>
                           <AlertDialogContent className="bg-white">
                             <AlertDialogHeader>
-                              <AlertDialogTitle>確認刪除產品</AlertDialogTitle>
-                              <AlertDialogDescription>
+                              <AlertDialogTitle className="text-gray-900">確認刪除產品</AlertDialogTitle>
+                              <AlertDialogDescription className="text-gray-700">
                                 您確定要刪除產品「{product.name}」嗎？
                                 <br />
-                                <span className="text-red-600 font-medium">此操作無法復原！</span>
+                                <span className="text-red-600 font-semibold">此操作無法復原！</span>
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogCancel className="text-gray-900 border-gray-300 hover:bg-gray-50">取消</AlertDialogCancel>
                               <AlertDialogAction 
                                 onClick={() => handleDelete(product)}
-                                className="bg-red-600 hover:bg-red-700"
+                                className="bg-red-600 hover:bg-red-700 text-white"
                               >
                                 確認刪除
                               </AlertDialogAction>
