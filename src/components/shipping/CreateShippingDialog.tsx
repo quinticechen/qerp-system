@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,10 +29,14 @@ interface OrderProduct {
   };
 }
 
-interface ShippingItem {
-  order_product_id: string;
+interface ShippingRoll {
   inventory_roll_id: string;
   shipped_quantity: number;
+}
+
+interface ShippingItem {
+  order_product_id: string;
+  rolls: ShippingRoll[];
 }
 
 export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
@@ -150,8 +155,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       if (!user) throw new Error('User not authenticated');
 
       // 計算總計
-      const totalShippedQuantity = shippingData.items.reduce((sum, item) => sum + item.shipped_quantity, 0);
-      const totalShippedRolls = shippingData.items.length;
+      const allRolls = shippingData.items.flatMap(item => item.rolls);
+      const totalShippedQuantity = allRolls.reduce((sum, roll) => sum + roll.shipped_quantity, 0);
+      const totalShippedRolls = allRolls.length;
 
       // 建立出貨記錄
       const { data: shipping, error: shippingError } = await supabase
@@ -172,10 +178,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       if (shippingError) throw shippingError;
 
       // 建立出貨項目
-      const itemsToInsert = shippingData.items.map(item => ({
+      const itemsToInsert = allRolls.map(roll => ({
         shipping_id: shipping.id,
-        inventory_roll_id: item.inventory_roll_id,
-        shipped_quantity: item.shipped_quantity
+        inventory_roll_id: roll.inventory_roll_id,
+        shipped_quantity: roll.shipped_quantity
       }));
 
       const { error: itemsError } = await supabase
@@ -185,10 +191,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       if (itemsError) throw itemsError;
 
       // 更新庫存布卷數量
-      for (const item of shippingData.items) {
-        const roll = availableRolls?.find(r => r.id === item.inventory_roll_id);
-        if (roll) {
-          const newQuantity = roll.current_quantity - item.shipped_quantity;
+      for (const roll of allRolls) {
+        const inventoryRoll = availableRolls?.find(r => r.id === roll.inventory_roll_id);
+        if (inventoryRoll) {
+          const newQuantity = inventoryRoll.current_quantity - roll.shipped_quantity;
           
           const { error: updateError } = await supabase
             .from('inventory_rolls')
@@ -196,7 +202,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
               current_quantity: newQuantity,
               is_allocated: newQuantity <= 0
             })
-            .eq('id', item.inventory_roll_id);
+            .eq('id', roll.inventory_roll_id);
 
           if (updateError) throw updateError;
         }
@@ -237,26 +243,54 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     if (checked) {
       setSelectedItems(prev => [...prev, {
         order_product_id: orderProduct.id,
-        inventory_roll_id: '',
-        shipped_quantity: orderProduct.quantity - (orderProduct.shipped_quantity || 0)
+        rolls: [{
+          inventory_roll_id: '',
+          shipped_quantity: orderProduct.quantity - (orderProduct.shipped_quantity || 0)
+        }]
       }]);
     } else {
       setSelectedItems(prev => prev.filter(i => i.order_product_id !== orderProduct.id));
     }
   };
 
-  const updateItemRoll = (orderProductId: string, rollId: string) => {
+  const addRollToItem = (orderProductId: string) => {
     setSelectedItems(prev => prev.map(item => 
       item.order_product_id === orderProductId 
-        ? { ...item, inventory_roll_id: rollId }
+        ? { ...item, rolls: [...item.rolls, { inventory_roll_id: '', shipped_quantity: 0 }] }
         : item
     ));
   };
 
-  const updateItemQuantity = (orderProductId: string, quantity: number) => {
+  const removeRollFromItem = (orderProductId: string, rollIndex: number) => {
     setSelectedItems(prev => prev.map(item => 
       item.order_product_id === orderProductId 
-        ? { ...item, shipped_quantity: quantity }
+        ? { ...item, rolls: item.rolls.filter((_, index) => index !== rollIndex) }
+        : item
+    ));
+  };
+
+  const updateRollSelection = (orderProductId: string, rollIndex: number, rollId: string) => {
+    setSelectedItems(prev => prev.map(item => 
+      item.order_product_id === orderProductId 
+        ? { 
+            ...item, 
+            rolls: item.rolls.map((roll, index) => 
+              index === rollIndex ? { ...roll, inventory_roll_id: rollId } : roll
+            )
+          }
+        : item
+    ));
+  };
+
+  const updateRollQuantity = (orderProductId: string, rollIndex: number, quantity: number) => {
+    setSelectedItems(prev => prev.map(item => 
+      item.order_product_id === orderProductId 
+        ? { 
+            ...item, 
+            rolls: item.rolls.map((roll, index) => 
+              index === rollIndex ? { ...roll, shipped_quantity: quantity } : roll
+            )
+          }
         : item
     ));
   };
@@ -276,7 +310,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     }
 
     const validItems = selectedItems.filter(item => 
-      item.inventory_roll_id && item.shipped_quantity > 0
+      item.rolls.some(roll => roll.inventory_roll_id && roll.shipped_quantity > 0)
     );
 
     if (validItems.length === 0) {
@@ -299,7 +333,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-900">新增出貨單</DialogTitle>
           <DialogDescription className="text-gray-700">
@@ -382,6 +416,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={(checked) => toggleProductSelection(product, checked as boolean)}
+                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                         />
                         <div>
                           <h4 className="font-medium text-gray-900">
@@ -395,42 +430,74 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                         </div>
                       </div>
 
-                      {isSelected && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pl-6">
-                          <div className="space-y-2">
+                      {isSelected && selectedItem && (
+                        <div className="pl-6 space-y-3">
+                          <div className="flex justify-between items-center">
                             <Label className="text-gray-800">選擇布卷</Label>
-                            <Select 
-                              value={selectedItem?.inventory_roll_id || ''}
-                              onValueChange={(value) => updateItemRoll(product.id, value)}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addRollToItem(product.id)}
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
                             >
-                              <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                                <SelectValue placeholder="選擇布卷" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableRollsForProduct.map((roll) => (
-                                  <SelectItem key={roll.id} value={roll.id}>
-                                    {roll.roll_number} - 庫存: {roll.current_quantity}kg - {roll.quality}級
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <Plus className="h-4 w-4 mr-2" />
+                              新增布卷
+                            </Button>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label className="text-gray-800">出貨數量 (公斤)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max={Math.min(
-                                remainingQuantity,
-                                availableRollsForProduct.find(r => r.id === selectedItem?.inventory_roll_id)?.current_quantity || 0
-                              )}
-                              value={selectedItem?.shipped_quantity || 0}
-                              onChange={(e) => updateItemQuantity(product.id, parseFloat(e.target.value) || 0)}
-                              className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            />
-                          </div>
+                          {selectedItem.rolls.map((roll, rollIndex) => (
+                            <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
+                              <div className="space-y-2">
+                                <Label className="text-gray-800">選擇布卷</Label>
+                                <Select 
+                                  value={roll.inventory_roll_id}
+                                  onValueChange={(value) => updateRollSelection(product.id, rollIndex, value)}
+                                >
+                                  <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
+                                    <SelectValue placeholder="選擇布卷" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableRollsForProduct.map((availableRoll) => (
+                                      <SelectItem key={availableRoll.id} value={availableRoll.id}>
+                                        {availableRoll.roll_number} - 庫存: {availableRoll.current_quantity}kg - {availableRoll.quality}級
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-gray-800">出貨數量 (公斤)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={Math.min(
+                                    remainingQuantity,
+                                    availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.current_quantity || 0
+                                  )}
+                                  value={roll.shipped_quantity || 0}
+                                  onChange={(e) => updateRollQuantity(product.id, rollIndex, parseFloat(e.target.value) || 0)}
+                                  className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                />
+                              </div>
+
+                              <div className="flex items-end">
+                                {selectedItem.rolls.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeRollFromItem(product.id, rollIndex)}
+                                    className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

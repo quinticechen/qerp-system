@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,11 +30,15 @@ interface PurchaseOrderItem {
   };
 }
 
+interface InventoryRoll {
+  received_quantity: number;
+  quality: 'A' | 'B' | 'C' | 'D' | 'defective';
+}
+
 interface InventoryItem {
   purchase_order_item_id: string;
   product_id: string;
-  received_quantity: number;
-  quality: 'A' | 'B' | 'C' | 'D' | 'defective';
+  rolls: InventoryRoll[];
 }
 
 export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
@@ -141,29 +146,30 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
       if (inventoryError) throw inventoryError;
 
-      // 為每個項目建立庫存布卷記錄
+      // 為每個項目的每卷建立庫存布卷記錄
       for (const item of inventoryData.items) {
-        // 獲取預設倉庫（使用第一個倉庫）
         const defaultWarehouse = warehouses?.[0];
         if (!defaultWarehouse) throw new Error('No warehouse available');
 
-        // 生成布卷編號
-        const rollNumber = `ROLL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        for (const roll of item.rolls) {
+          // 生成布卷編號
+          const rollNumber = `ROLL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-        const { error: rollError } = await supabase
-          .from('inventory_rolls')
-          .insert({
-            inventory_id: inventory.id,
-            product_id: item.product_id,
-            roll_number: rollNumber,
-            quantity: item.received_quantity,
-            current_quantity: item.received_quantity,
-            quality: item.quality,
-            warehouse_id: defaultWarehouse.id,
-            is_allocated: false
-          });
+          const { error: rollError } = await supabase
+            .from('inventory_rolls')
+            .insert({
+              inventory_id: inventory.id,
+              product_id: item.product_id,
+              roll_number: rollNumber,
+              quantity: roll.received_quantity,
+              current_quantity: roll.received_quantity,
+              quality: roll.quality,
+              warehouse_id: defaultWarehouse.id,
+              is_allocated: false
+            });
 
-        if (rollError) throw rollError;
+          if (rollError) throw rollError;
+        }
       }
 
       return inventory;
@@ -200,26 +206,54 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       setSelectedItems(prev => [...prev, {
         purchase_order_item_id: item.id,
         product_id: item.product_id,
-        received_quantity: item.ordered_quantity - (item.received_quantity || 0),
-        quality: 'A'
+        rolls: [{
+          received_quantity: item.ordered_quantity - (item.received_quantity || 0),
+          quality: 'A'
+        }]
       }]);
     } else {
       setSelectedItems(prev => prev.filter(i => i.purchase_order_item_id !== item.id));
     }
   };
 
-  const updateItemQuantity = (itemId: string, quantity: number) => {
+  const addRollToItem = (itemId: string) => {
     setSelectedItems(prev => prev.map(item => 
       item.purchase_order_item_id === itemId 
-        ? { ...item, received_quantity: quantity }
+        ? { ...item, rolls: [...item.rolls, { received_quantity: 0, quality: 'A' }] }
         : item
     ));
   };
 
-  const updateItemQuality = (itemId: string, quality: 'A' | 'B' | 'C' | 'D' | 'defective') => {
+  const removeRollFromItem = (itemId: string, rollIndex: number) => {
     setSelectedItems(prev => prev.map(item => 
       item.purchase_order_item_id === itemId 
-        ? { ...item, quality }
+        ? { ...item, rolls: item.rolls.filter((_, index) => index !== rollIndex) }
+        : item
+    ));
+  };
+
+  const updateRollQuantity = (itemId: string, rollIndex: number, quantity: number) => {
+    setSelectedItems(prev => prev.map(item => 
+      item.purchase_order_item_id === itemId 
+        ? { 
+            ...item, 
+            rolls: item.rolls.map((roll, index) => 
+              index === rollIndex ? { ...roll, received_quantity: quantity } : roll
+            )
+          }
+        : item
+    ));
+  };
+
+  const updateRollQuality = (itemId: string, rollIndex: number, quality: 'A' | 'B' | 'C' | 'D' | 'defective') => {
+    setSelectedItems(prev => prev.map(item => 
+      item.purchase_order_item_id === itemId 
+        ? { 
+            ...item, 
+            rolls: item.rolls.map((roll, index) => 
+              index === rollIndex ? { ...roll, quality } : roll
+            )
+          }
         : item
     ));
   };
@@ -234,10 +268,14 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       return;
     }
 
-    if (selectedItems.length === 0) {
+    const validItems = selectedItems.filter(item => 
+      item.rolls.some(roll => roll.received_quantity > 0)
+    );
+
+    if (validItems.length === 0) {
       toast({
         title: "錯誤",
-        description: "請選擇至少一個入庫項目",
+        description: "請選擇至少一個有效的入庫項目",
         variant: "destructive",
       });
       return;
@@ -247,13 +285,13 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       purchase_order_id: purchaseOrderId,
       arrival_date: arrivalDate,
       note: note || undefined,
-      items: selectedItems
+      items: validItems
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-900">新增入庫</DialogTitle>
           <DialogDescription className="text-gray-700">
@@ -319,6 +357,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={(checked) => toggleItemSelection(item, checked as boolean)}
+                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                         />
                         <div>
                           <h4 className="font-medium text-gray-900">
@@ -332,39 +371,71 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                         </div>
                       </div>
 
-                      {isSelected && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pl-6">
-                          <div className="space-y-2">
-                            <Label className="text-gray-800">本次入庫數量 (公斤)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max={remainingQuantity}
-                              value={selectedItem?.received_quantity || 0}
-                              onChange={(e) => updateItemQuantity(item.id, parseFloat(e.target.value) || 0)}
-                              className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            />
+                      {isSelected && selectedItem && (
+                        <div className="pl-6 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <Label className="text-gray-800">布卷明細</Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => addRollToItem(item.id)}
+                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              新增布卷
+                            </Button>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label className="text-gray-800">品質等級</Label>
-                            <Select 
-                              value={selectedItem?.quality || 'A'}
-                              onValueChange={(value) => updateItemQuality(item.id, value as 'A' | 'B' | 'C' | 'D' | 'defective')}
-                            >
-                              <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="A">A級</SelectItem>
-                                <SelectItem value="B">B級</SelectItem>
-                                <SelectItem value="C">C級</SelectItem>
-                                <SelectItem value="D">D級</SelectItem>
-                                <SelectItem value="defective">瑕疵品</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {selectedItem.rolls.map((roll, rollIndex) => (
+                            <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
+                              <div className="space-y-2">
+                                <Label className="text-gray-800">數量 (公斤)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max={remainingQuantity}
+                                  value={roll.received_quantity || 0}
+                                  onChange={(e) => updateRollQuantity(item.id, rollIndex, parseFloat(e.target.value) || 0)}
+                                  className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-gray-800">品質等級</Label>
+                                <Select 
+                                  value={roll.quality}
+                                  onValueChange={(value) => updateRollQuality(item.id, rollIndex, value as 'A' | 'B' | 'C' | 'D' | 'defective')}
+                                >
+                                  <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="A">A級</SelectItem>
+                                    <SelectItem value="B">B級</SelectItem>
+                                    <SelectItem value="C">C級</SelectItem>
+                                    <SelectItem value="D">D級</SelectItem>
+                                    <SelectItem value="defective">瑕疵品</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="flex items-end">
+                                {selectedItem.rolls.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => removeRollFromItem(item.id, rollIndex)}
+                                    className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
