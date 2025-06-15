@@ -22,7 +22,7 @@ interface InventoryRoll {
   shelf: string;
   roll_number: string;
   quantity: number;
-  quality: 'A' | 'B' | 'defective';
+  quality: 'A' | 'B' | 'C' | 'D' | 'defective';
   specifications: string;
 }
 
@@ -447,7 +447,7 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
                     <Label className="text-gray-700">品質等級 *</Label>
                     <Select 
                       value={roll.quality} 
-                      onValueChange={(value: 'A' | 'B' | 'defective') => updateInventoryRoll(index, 'quality', value)}
+                      onValueChange={(value: 'A' | 'B' | 'C' | 'D' | 'defective') => updateInventoryRoll(index, 'quality', value)}
                     >
                       <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                         <SelectValue />
@@ -455,6 +455,8 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
                       <SelectContent>
                         <SelectItem value="A">A級</SelectItem>
                         <SelectItem value="B">B級</SelectItem>
+                        <SelectItem value="C">C級</SelectItem>
+                        <SelectItem value="D">D級</SelectItem>
                         <SelectItem value="defective">次品</SelectItem>
                       </SelectContent>
                     </Select>

@@ -114,14 +114,20 @@ export const CreatePurchaseDialog = ({ open, onOpenChange }: CreatePurchaseDialo
       if (purchaseError) throw purchaseError;
 
       // 創建採購項目
-      const itemsData = purchaseItems.map(item => ({
-        purchase_order_id: purchase.id,
-        product_id: item.product_id,
-        specifications: item.specifications ? JSON.stringify({ specifications: item.specifications }) : null,
-        ordered_quantity: item.ordered_quantity,
-        ordered_rolls: item.ordered_rolls || null,
-        unit_price: item.unit_price
-      }));
+      const itemsData = purchaseItems
+        .filter(item => item.product_id && item.ordered_quantity > 0 && item.unit_price > 0)
+        .map(item => ({
+          purchase_order_id: purchase.id,
+          product_id: item.product_id,
+          specifications: item.specifications ? JSON.stringify({ specifications: item.specifications }) : null,
+          ordered_quantity: item.ordered_quantity,
+          ordered_rolls: item.ordered_rolls || null,
+          unit_price: item.unit_price
+        }));
+
+      if (itemsData.length === 0) {
+        throw new Error('請至少添加一個有效的採購項目');
+      }
 
       const { error: itemsError } = await supabase
         .from('purchase_order_items')
@@ -211,9 +217,13 @@ export const CreatePurchaseDialog = ({ open, onOpenChange }: CreatePurchaseDialo
       return;
     }
 
-    setPurchaseItems(validItems);
     createPurchaseMutation.mutate();
   };
+
+  const totalAmount = purchaseItems.reduce((total, item) => total + (item.ordered_quantity * item.unit_price), 0);
+  const totalQuantity = purchaseItems.reduce((total, item) => total + (item.ordered_quantity || 0), 0);
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,6 +291,20 @@ export const CreatePurchaseDialog = ({ open, onOpenChange }: CreatePurchaseDialo
               onChange={(e) => setFormData({...formData, note: e.target.value})}
               className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             />
+          </div>
+
+          {/* 統計資訊 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-medium text-blue-900">總數量：</span>
+                <span className="text-blue-800">{totalQuantity.toFixed(2)} 公斤</span>
+              </div>
+              <div>
+                <span className="font-medium text-blue-900">總金額：</span>
+                <span className="text-blue-800">${totalAmount.toFixed(2)}</span>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">

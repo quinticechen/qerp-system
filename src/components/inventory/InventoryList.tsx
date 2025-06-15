@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { SearchInput } from '@/components/ui/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Eye, Package } from 'lucide-react';
+import { Eye, Package, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewInventoryDialog } from './ViewInventoryDialog';
@@ -13,37 +13,58 @@ import { ViewInventoryDialog } from './ViewInventoryDialog';
 export const InventoryList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
-  const [viewingInventory, setViewingInventory] = useState(null);
+  const [selectedInventory, setSelectedInventory] = useState<string | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
-  // 獲取入庫記錄
-  const { data: inventories, isLoading, error } = useQuery({
-    queryKey: ['inventories'],
+  const { data: inventories, isLoading } = useQuery({
+    queryKey: ['inventories', searchTerm, warehouseFilter],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inventories')
         .select(`
           *,
-          factories:factory_id (
+          factories (name),
+          purchase_orders (po_number),
+          inventory_rolls (
             id,
-            name
-          ),
-          purchase_orders:purchase_order_id (
-            id,
-            po_number
-          ),
-          profiles:user_id (
-            id,
-            full_name
+            quantity,
+            current_quantity,
+            roll_number,
+            quality,
+            shelf,
+            products_new (name, color),
+            warehouses (name)
           )
         `)
         .order('created_at', { ascending: false });
-      
+
+      const { data, error } = await query;
       if (error) throw error;
-      return data;
+
+      // 客戶端篩選
+      let filteredData = data;
+
+      if (searchTerm) {
+        filteredData = data.filter((inventory: any) =>
+          inventory.purchase_orders?.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          inventory.factories?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          inventory.inventory_rolls?.some((roll: any) =>
+            roll.products_new?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            roll.roll_number?.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        );
+      }
+
+      if (warehouseFilter !== 'all') {
+        filteredData = filteredData.filter((inventory: any) =>
+          inventory.inventory_rolls?.some((roll: any) => roll.warehouses?.id === warehouseFilter)
+        );
+      }
+
+      return filteredData;
     }
   });
 
-  // 獲取倉庫列表用於篩選
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: async () => {
@@ -56,60 +77,52 @@ export const InventoryList = () => {
     }
   });
 
-  const filteredInventories = inventories?.filter(inventory => {
-    const matchesSearch = 
-      inventory.purchase_orders?.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inventory.factories?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesWarehouse = warehouseFilter === 'all' || inventory.factory_id === warehouseFilter;
-    return matchesSearch && matchesWarehouse;
-  });
+  const getQualityBadge = (quality: string) => {
+    const qualityMap = {
+      A: { label: 'A級', variant: 'default' as const },
+      B: { label: 'B級', variant: 'secondary' as const },
+      C: { label: 'C級', variant: 'outline' as const },
+      D: { label: 'D級', variant: 'outline' as const },
+      defective: { label: '次品', variant: 'destructive' as const }
+    };
+    
+    const config = qualityMap[quality as keyof typeof qualityMap] || { label: quality, variant: 'secondary' as const };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const handleView = (inventoryId: string) => {
+    setSelectedInventory(inventoryId);
+    setViewDialogOpen(true);
+  };
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-500">載入中...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-red-600">載入入庫記錄時發生錯誤</div>
-        </CardContent>
-      </Card>
-    );
+    return <div className="text-center py-8 text-gray-500">載入中...</div>;
   }
 
   return (
-    <>
+    <div className="space-y-6">
+      {/* 搜尋和篩選 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">入庫記錄</CardTitle>
-          <CardDescription className="text-gray-600">
-            管理所有入庫批次記錄，查看布卷明細和庫存狀況
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2 text-gray-900">
+            <Filter className="h-5 w-5" />
+            篩選條件
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="搜尋採購單編號或工廠名稱..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SearchInput
+              placeholder="搜尋採購單號、工廠、產品或布卷編號..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            
             <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="w-48 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="篩選倉庫" />
+              <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <SelectValue placeholder="選擇倉庫" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">所有倉庫</SelectItem>
+                <SelectItem value="all">全部倉庫</SelectItem>
                 {warehouses?.map((warehouse) => (
                   <SelectItem key={warehouse.id} value={warehouse.id}>
                     {warehouse.name}
@@ -118,65 +131,119 @@ export const InventoryList = () => {
               </SelectContent>
             </Select>
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">採購單編號</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">工廠</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">到貨日期</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">負責人</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">建立時間</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-900">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredInventories?.map((inventory) => (
-                  <tr key={inventory.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-gray-900">{inventory.purchase_orders?.po_number}</td>
-                    <td className="py-3 px-4 text-gray-700">{inventory.factories?.name}</td>
-                    <td className="py-3 px-4 text-gray-700">
-                      {new Date(inventory.arrival_date).toLocaleDateString('zh-TW')}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">{inventory.profiles?.full_name}</td>
-                    <td className="py-3 px-4 text-gray-700">
-                      {new Date(inventory.created_at).toLocaleDateString('zh-TW')}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewingInventory(inventory)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredInventories?.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              <Package className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-              <p>沒有找到符合條件的入庫記錄</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {viewingInventory && (
+      {/* 入庫記錄列表 */}
+      <div className="grid gap-4">
+        {inventories?.map((inventory) => {
+          const totalQuantity = inventory.inventory_rolls?.reduce(
+            (sum: number, roll: any) => sum + parseFloat(roll.current_quantity || 0), 
+            0
+          ) || 0;
+          
+          const totalRolls = inventory.inventory_rolls?.length || 0;
+
+          return (
+            <Card key={inventory.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      採購單：{inventory.purchase_orders?.po_number}
+                    </h3>
+                    <p className="text-gray-600">工廠：{inventory.factories?.name}</p>
+                    <p className="text-gray-600">
+                      到貨日期：{new Date(inventory.arrival_date).toLocaleDateString('zh-TW')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">
+                      建立時間：{new Date(inventory.created_at).toLocaleDateString('zh-TW')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-gray-500">總重量</p>
+                    <p className="font-medium text-gray-900">{totalQuantity.toFixed(2)} 公斤</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">總卷數</p>
+                    <p className="font-medium text-gray-900">{totalRolls} 卷</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">產品種類</p>
+                    <p className="font-medium text-gray-900">
+                      {new Set(inventory.inventory_rolls?.map((roll: any) => roll.products_new?.name)).size} 種
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">倉庫分布</p>
+                    <p className="font-medium text-gray-900">
+                      {new Set(inventory.inventory_rolls?.map((roll: any) => roll.warehouses?.name)).size} 個倉庫
+                    </p>
+                  </div>
+                </div>
+
+                {/* 顯示前幾個布卷概要 */}
+                <div className="space-y-2 mb-4">
+                  <p className="text-sm font-medium text-gray-700">布卷概要：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {inventory.inventory_rolls?.slice(0, 3).map((roll: any, index: number) => (
+                      <div key={index} className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-600">
+                          {roll.products_new?.name} {roll.products_new?.color && `- ${roll.products_new.color}`}
+                        </span>
+                        {getQualityBadge(roll.quality)}
+                        <span className="text-gray-500">
+                          {parseFloat(roll.current_quantity).toFixed(2)}kg
+                        </span>
+                      </div>
+                    ))}
+                    {inventory.inventory_rolls?.length > 3 && (
+                      <span className="text-gray-500 text-sm">
+                        等 {inventory.inventory_rolls.length - 3} 個...
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleView(inventory.id)}
+                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    查看詳細
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+
+        {inventories?.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">沒有找到入庫記錄</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* 查看對話框 */}
+      {selectedInventory && (
         <ViewInventoryDialog
-          inventory={viewingInventory}
-          open={!!viewingInventory}
-          onOpenChange={(open) => !open && setViewingInventory(null)}
+          open={viewDialogOpen}
+          onOpenChange={setViewDialogOpen}
+          inventoryId={selectedInventory}
         />
       )}
-    </>
+    </div>
   );
 };

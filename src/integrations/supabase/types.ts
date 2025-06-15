@@ -738,7 +738,7 @@ export type Database = {
       }
     }
     Enums: {
-      fabric_quality: "A" | "B" | "defective"
+      fabric_quality: "A" | "B" | "defective" | "C" | "D"
       order_status:
         | "pending"
         | "confirmed"
@@ -869,7 +869,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      fabric_quality: ["A", "B", "defective"],
+      fabric_quality: ["A", "B", "defective", "C", "D"],
       order_status: [
         "pending",
         "confirmed",
