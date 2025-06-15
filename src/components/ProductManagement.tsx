@@ -152,6 +152,30 @@ const ProductManagement = () => {
         throw new Error('產品名稱為必填欄位');
       }
 
+      // 確保用戶在 profiles 表中存在
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profileData) {
+        console.log('User profile not found, creating...');
+        // 創建用戶資料
+        const { error: createProfileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: user.id,
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || null,
+          }]);
+
+        if (createProfileError) {
+          console.error('Failed to create profile:', createProfileError);
+          throw new Error('無法創建用戶資料，請聯絡系統管理員');
+        }
+      }
+
       const productData = {
         name: data.name.trim(),
         category: data.category || '布料',
