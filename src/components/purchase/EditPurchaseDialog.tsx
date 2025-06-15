@@ -23,7 +23,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
   const [formData, setFormData] = useState({
     expected_arrival_date: '',
     note: '',
-    status: ''
+    status: 'pending' as 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled'
   });
 
   useEffect(() => {
@@ -87,7 +87,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="status" className="text-gray-700">狀態</Label>
-            <Select value={formData.status} onValueChange={(value) => setFormData({...formData, status: value})}>
+            <Select value={formData.status} onValueChange={(value: 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled') => setFormData({...formData, status: value})}>
               <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue />
               </SelectTrigger>

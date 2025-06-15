@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -13,8 +13,9 @@ interface ViewPurchaseDialogProps {
 }
 
 export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchaseDialogProps) => {
-  const { data: purchaseItems } = useQuery({
-    queryKey: ['purchase-items', purchase?.id],
+  // 獲取採購項目詳情
+  const { data: purchaseItems, isLoading } = useQuery({
+    queryKey: ['purchaseItems', purchase?.id],
     queryFn: async () => {
       if (!purchase?.id) return [];
       
@@ -36,7 +37,7 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchas
     enabled: !!purchase?.id && open
   });
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     const statusMap = {
       pending: { label: '待確認', color: 'bg-yellow-100 text-yellow-800' },
       confirmed: { label: '已下單', color: 'bg-blue-100 text-blue-800' },
@@ -45,7 +46,7 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchas
       cancelled: { label: '已取消', color: 'bg-red-100 text-red-800' }
     };
     
-    const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
+    const statusInfo = statusMap[status as keyof typeof statusMap] || { label: status, color: 'bg-gray-100 text-gray-800' };
     return (
       <Badge className={`${statusInfo.color} border-0`}>
         {statusInfo.label}
@@ -53,9 +54,11 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchas
     );
   };
 
-  const calculateTotal = () => {
-    if (!purchaseItems) return 0;
-    return purchaseItems.reduce((total, item) => total + (item.ordered_quantity * item.unit_price), 0);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('zh-TW', {
+      style: 'currency',
+      currency: 'TWD'
+    }).format(amount);
   };
 
   if (!purchase) return null;
@@ -72,110 +75,133 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchas
 
         <div className="space-y-6">
           {/* 基本資訊 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">採購單編號</label>
-              <p className="text-gray-900">{purchase.po_number}</p>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">採購單編號</label>
+                <p className="text-gray-900">{purchase.po_number}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">工廠</label>
+                <p className="text-gray-900">{purchase.factories?.name}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">關聯訂單</label>
+                <p className="text-gray-900">{purchase.orders?.order_number || '無'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">狀態</label>
+                <div className="mt-1">{getStatusBadge(purchase.status)}</div>
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">狀態</label>
-              <div className="mt-1">{getStatusBadge(purchase.status)}</div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">工廠</label>
-              <p className="text-gray-900">{purchase.factories?.name}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">關聯訂單</label>
-              <p className="text-gray-900">{purchase.orders?.order_number || '-'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">下單日期</label>
-              <p className="text-gray-900">
-                {new Date(purchase.order_date).toLocaleDateString('zh-TW')}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">預計到貨日期</label>
-              <p className="text-gray-900">
-                {purchase.expected_arrival_date 
-                  ? new Date(purchase.expected_arrival_date).toLocaleDateString('zh-TW')
-                  : '-'}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">負責人</label>
-              <p className="text-gray-900">{purchase.profiles?.full_name}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">建立時間</label>
-              <p className="text-gray-900">
-                {new Date(purchase.created_at).toLocaleDateString('zh-TW')} {new Date(purchase.created_at).toLocaleTimeString('zh-TW')}
-              </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">下單日期</label>
+                <p className="text-gray-900">
+                  {new Date(purchase.order_date).toLocaleDateString('zh-TW')}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">預計到貨日期</label>
+                <p className="text-gray-900">
+                  {purchase.expected_arrival_date 
+                    ? new Date(purchase.expected_arrival_date).toLocaleDateString('zh-TW')
+                    : '未設定'}
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">負責人</label>
+                <p className="text-gray-900">{purchase.profiles?.full_name}</p>
+              </div>
+              {purchase.note && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">備註</label>
+                  <p className="text-gray-900">{purchase.note}</p>
+                </div>
+              )}
             </div>
           </div>
 
-          {purchase.note && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">備註</label>
-              <p className="text-gray-900 mt-1">{purchase.note}</p>
-            </div>
-          )}
-
-          <Separator />
-
           {/* 採購項目 */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">採購項目</h3>
-            {purchaseItems && purchaseItems.length > 0 ? (
-              <div className="space-y-4">
-                {purchaseItems.map((item, index) => (
-                  <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">產品</label>
-                        <p className="text-gray-900">
-                          {item.products_new?.name} {item.products_new?.color && `- ${item.products_new.color}`}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">規格</label>
-                        <p className="text-gray-900">
-                          {item.specifications ? JSON.parse(item.specifications).specifications : '-'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">數量 (公斤)</label>
-                        <p className="text-gray-900">{item.ordered_quantity}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">卷數</label>
-                        <p className="text-gray-900">{item.ordered_rolls || '-'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">單價 (每公斤)</label>
-                        <p className="text-gray-900">${item.unit_price}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">小計</label>
-                        <p className="text-gray-900 font-semibold">
-                          ${(item.ordered_quantity * item.unit_price).toFixed(2)}
-                        </p>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900">採購項目</h3>
+            
+            {isLoading ? (
+              <div className="text-center py-4 text-gray-500">載入中...</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-900">產品</th>
+                      <th className="border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-900">規格</th>
+                      <th className="border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-900">數量 (公斤)</th>
+                      <th className="border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-900">卷數</th>
+                      <th className="border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-900">單價</th>
+                      <th className="border border-gray-200 px-4 py-3 text-right text-sm font-semibold text-gray-900">小計</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseItems?.map((item, index) => {
+                      const specifications = item.specifications ? 
+                        (typeof item.specifications === 'string' ? item.specifications : 
+                         JSON.stringify(item.specifications)) : '';
+                      
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-200 px-4 py-3 text-gray-900">
+                            {item.products_new?.name} {item.products_new?.color && `- ${item.products_new.color}`}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-gray-700">
+                            {specifications || '-'}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-right text-gray-900">
+                            {item.ordered_quantity}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-right text-gray-900">
+                            {item.ordered_rolls || '-'}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-right text-gray-900">
+                            {formatCurrency(item.unit_price)}
+                          </td>
+                          <td className="border border-gray-200 px-4 py-3 text-right text-gray-900 font-semibold">
+                            {formatCurrency(item.ordered_quantity * item.unit_price)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* 總計 */}
+                {purchaseItems && purchaseItems.length > 0 && (
+                  <div className="mt-4 flex justify-end">
+                    <div className="bg-gray-50 border border-gray-200 rounded px-4 py-3">
+                      <div className="flex justify-between items-center gap-8">
+                        <span className="font-semibold text-gray-900">總計：</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          {formatCurrency(
+                            purchaseItems.reduce((total, item) => 
+                              total + (item.ordered_quantity * item.unit_price), 0
+                            )
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
-                ))}
-                
-                <div className="flex justify-end pt-4 border-t border-gray-200">
-                  <div className="text-right">
-                    <label className="text-lg font-semibold text-gray-700">總金額</label>
-                    <p className="text-xl font-bold text-gray-900">${calculateTotal().toFixed(2)}</p>
-                  </div>
-                </div>
+                )}
               </div>
-            ) : (
-              <p className="text-gray-500">載入中...</p>
             )}
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={() => onOpenChange(false)}
+              className="bg-gray-600 text-white hover:bg-gray-700"
+            >
+              關閉
+            </Button>
           </div>
         </div>
       </DialogContent>
