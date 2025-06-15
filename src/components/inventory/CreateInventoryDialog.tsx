@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -48,7 +49,7 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
     }
   ]);
 
-  // 獲取採購單列表 - 修復查詢
+  // 獲取採購單列表
   const { data: purchaseOrders, isLoading: purchaseOrdersLoading } = useQuery({
     queryKey: ['purchaseOrders'],
     queryFn: async () => {
@@ -106,7 +107,7 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
     }
   });
 
-  // 獲取倉庫列表 - 修復查詢
+  // 獲取倉庫列表
   const { data: warehouses, isLoading: warehousesLoading } = useQuery({
     queryKey: ['warehouses'],
     queryFn: async () => {
@@ -125,11 +126,47 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
     }
   });
 
+  // 獲取現有的布卷編號來檢查重複
+  const { data: existingRollNumbers } = useQuery({
+    queryKey: ['existing-roll-numbers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_rolls')
+        .select('roll_number');
+      
+      if (error) throw error;
+      return data.map(item => item.roll_number);
+    }
+  });
+
   const createInventoryMutation = useMutation({
     mutationFn: async () => {
       // 獲取當前用戶
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('未找到用戶');
+
+      // 檢查布卷編號是否重複
+      const duplicateRolls = inventoryRolls.filter(roll => 
+        roll.roll_number && existingRollNumbers?.includes(roll.roll_number)
+      );
+
+      if (duplicateRolls.length > 0) {
+        const duplicateNumbers = duplicateRolls.map(roll => roll.roll_number).join(', ');
+        throw new Error(`以下布卷編號已存在：${duplicateNumbers}`);
+      }
+
+      // 檢查當前表單中是否有重複的布卷編號
+      const rollNumbers = inventoryRolls
+        .filter(roll => roll.roll_number)
+        .map(roll => roll.roll_number);
+      
+      const duplicatesInForm = rollNumbers.filter((num, index) => 
+        rollNumbers.indexOf(num) !== index
+      );
+
+      if (duplicatesInForm.length > 0) {
+        throw new Error(`表單中有重複的布卷編號：${duplicatesInForm.join(', ')}`);
+      }
 
       // 創建入庫記錄
       const inventoryData = {
@@ -191,33 +228,46 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
         description: "入庫記錄已建立"
       });
       queryClient.invalidateQueries({ queryKey: ['inventories'] });
+      queryClient.invalidateQueries({ queryKey: ['existing-roll-numbers'] });
       onOpenChange(false);
-      // 重置表單
-      setFormData({
-        purchase_order_id: '',
-        factory_id: '',
-        arrival_date: new Date().toISOString().split('T')[0],
-        note: ''
-      });
-      setInventoryRolls([{
-        product_id: '',
-        warehouse_id: '',
-        shelf: '',
-        roll_number: '',
-        quantity: 0,
-        quality: 'A',
-        specifications: ''
-      }]);
+      resetForm();
     },
     onError: (error: any) => {
       console.error('Error creating inventory:', error);
+      
+      let errorMessage = "建立入庫記錄失敗";
+      
+      if (error.code === '23505') {
+        errorMessage = "布卷編號已存在，請使用不同的編號";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "錯誤",
-        description: error.message || "建立入庫記錄失敗",
+        description: errorMessage,
         variant: "destructive"
       });
     }
   });
+
+  const resetForm = () => {
+    setFormData({
+      purchase_order_id: '',
+      factory_id: '',
+      arrival_date: new Date().toISOString().split('T')[0],
+      note: ''
+    });
+    setInventoryRolls([{
+      product_id: '',
+      warehouse_id: '',
+      shelf: '',
+      roll_number: '',
+      quantity: 0,
+      quality: 'A',
+      specifications: ''
+    }]);
+  };
 
   const addInventoryRoll = () => {
     setInventoryRolls([...inventoryRolls, {
@@ -278,8 +328,35 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
       return;
     }
 
+    // 檢查布卷編號是否有重複
+    const rollNumbers = validRolls.map(roll => roll.roll_number);
+    const duplicates = rollNumbers.filter((num, index) => rollNumbers.indexOf(num) !== index);
+    
+    if (duplicates.length > 0) {
+      toast({
+        title: "錯誤",
+        description: `表單中有重複的布卷編號：${duplicates.join(', ')}`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     setInventoryRolls(validRolls);
     createInventoryMutation.mutate();
+  };
+
+  const isRollNumberDuplicate = (rollNumber: string, currentIndex: number) => {
+    if (!rollNumber) return false;
+    
+    // 檢查是否與資料庫中現有的重複
+    const existsInDB = existingRollNumbers?.includes(rollNumber);
+    
+    // 檢查是否與表單中其他項目重複
+    const existsInForm = inventoryRolls.some((roll, index) => 
+      index !== currentIndex && roll.roll_number === rollNumber
+    );
+    
+    return existsInDB || existsInForm;
   };
 
   const totalQuantity = inventoryRolls.reduce((total, roll) => total + (roll.quantity || 0), 0);
@@ -411,140 +488,152 @@ export const CreateInventoryDialog = ({ open, onOpenChange }: CreateInventoryDia
               </Button>
             </div>
 
-            {inventoryRolls.map((roll, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-900">布卷 {index + 1}</span>
-                  {inventoryRolls.length > 1 && (
-                    <Button
-                      type="button"
-                      onClick={() => removeInventoryRoll(index)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
+            {inventoryRolls.map((roll, index) => {
+              const isDuplicate = isRollNumberDuplicate(roll.roll_number, index);
+              
+              return (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-gray-900">布卷 {index + 1}</span>
+                    {inventoryRolls.length > 1 && (
+                      <Button
+                        type="button"
+                        onClick={() => removeInventoryRoll(index)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">產品 *</Label>
-                    <Select 
-                      value={roll.product_id} 
-                      onValueChange={(value) => updateInventoryRoll(index, 'product_id', value)}
-                      disabled={productsLoading}
-                    >
-                      <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <SelectValue placeholder={productsLoading ? "載入中..." : "選擇產品"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products && products.length > 0 ? (
-                          products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} {product.color && `- ${product.color}`}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">產品 *</Label>
+                      <Select 
+                        value={roll.product_id} 
+                        onValueChange={(value) => updateInventoryRoll(index, 'product_id', value)}
+                        disabled={productsLoading}
+                      >
+                        <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                          <SelectValue placeholder={productsLoading ? "載入中..." : "選擇產品"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products && products.length > 0 ? (
+                            products.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} {product.color && `- ${product.color}`}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-data" disabled>
+                              {productsLoading ? "載入中..." : "沒有可用的產品"}
                             </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-data" disabled>
-                            {productsLoading ? "載入中..." : "沒有可用的產品"}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">倉庫 *</Label>
-                    <Select 
-                      value={roll.warehouse_id} 
-                      onValueChange={(value) => updateInventoryRoll(index, 'warehouse_id', value)}
-                      disabled={warehousesLoading}
-                    >
-                      <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <SelectValue placeholder={warehousesLoading ? "載入中..." : "選擇倉庫"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses && warehouses.length > 0 ? (
-                          warehouses.map((warehouse) => (
-                            <SelectItem key={warehouse.id} value={warehouse.id}>
-                              {warehouse.name}
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">倉庫 *</Label>
+                      <Select 
+                        value={roll.warehouse_id} 
+                        onValueChange={(value) => updateInventoryRoll(index, 'warehouse_id', value)}
+                        disabled={warehousesLoading}
+                      >
+                        <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                          <SelectValue placeholder={warehousesLoading ? "載入中..." : "選擇倉庫"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouses && warehouses.length > 0 ? (
+                            warehouses.map((warehouse) => (
+                              <SelectItem key={warehouse.id} value={warehouse.id}>
+                                {warehouse.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-data" disabled>
+                              {warehousesLoading ? "載入中..." : "沒有可用的倉庫"}
                             </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-data" disabled>
-                            {warehousesLoading ? "載入中..." : "沒有可用的倉庫"}
-                          </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">貨架位置</Label>
+                      <Input
+                        placeholder="例如：A-01-001"
+                        value={roll.shelf}
+                        onChange={(e) => updateInventoryRoll(index, 'shelf', e.target.value)}
+                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">布卷編號 *</Label>
+                      <div className="relative">
+                        <Input
+                          placeholder="輸入布卷編號..."
+                          value={roll.roll_number}
+                          onChange={(e) => updateInventoryRoll(index, 'roll_number', e.target.value)}
+                          className={`border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${isDuplicate ? 'border-red-500 pr-8' : ''}`}
+                        />
+                        {isDuplicate && (
+                          <AlertCircle className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-red-500" />
                         )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                      {isDuplicate && (
+                        <p className="text-xs text-red-500">此布卷編號已存在</p>
+                      )}
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">貨架位置</Label>
-                    <Input
-                      placeholder="例如：A-01-001"
-                      value={roll.shelf}
-                      onChange={(e) => updateInventoryRoll(index, 'shelf', e.target.value)}
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">重量 (公斤) *</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={roll.quantity || ''}
+                        onChange={(e) => updateInventoryRoll(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">布卷編號 *</Label>
-                    <Input
-                      placeholder="輸入布卷編號..."
-                      value={roll.roll_number}
-                      onChange={(e) => updateInventoryRoll(index, 'roll_number', e.target.value)}
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-700">品質等級 *</Label>
+                      <Select 
+                        value={roll.quality} 
+                        onValueChange={(value: 'A' | 'B' | 'C' | 'D' | 'defective') => updateInventoryRoll(index, 'quality', value)}
+                      >
+                        <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A">A級</SelectItem>
+                          <SelectItem value="B">B級</SelectItem>
+                          <SelectItem value="C">C級</SelectItem>
+                          <SelectItem value="D">D級</SelectItem>
+                          <SelectItem value="defective">次品</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">重量 (公斤) *</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={roll.quantity || ''}
-                      onChange={(e) => updateInventoryRoll(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-gray-700">品質等級 *</Label>
-                    <Select 
-                      value={roll.quality} 
-                      onValueChange={(value: 'A' | 'B' | 'C' | 'D' | 'defective') => updateInventoryRoll(index, 'quality', value)}
-                    >
-                      <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A">A級</SelectItem>
-                        <SelectItem value="B">B級</SelectItem>
-                        <SelectItem value="C">C級</SelectItem>
-                        <SelectItem value="D">D級</SelectItem>
-                        <SelectItem value="defective">次品</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="col-span-3 space-y-2">
-                    <Label className="text-gray-700">規格備註</Label>
-                    <Input
-                      placeholder="輸入布料規格或特殊說明..."
-                      value={roll.specifications}
-                      onChange={(e) => updateInventoryRoll(index, 'specifications', e.target.value)}
-                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    />
+                    <div className="col-span-3 space-y-2">
+                      <Label className="text-gray-700">規格備註</Label>
+                      <Input
+                        placeholder="輸入布料規格或特殊說明..."
+                        value={roll.specifications}
+                        onChange={(e) => updateInventoryRoll(index, 'specifications', e.target.value)}
+                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
