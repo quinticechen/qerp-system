@@ -30,7 +30,7 @@ interface Order {
       name: string;
       color: string;
     } | null;
-  }>;
+  }> | null;
 }
 
 export const OrderList = () => {
@@ -130,6 +130,11 @@ export const OrderList = () => {
   };
 
   const calculateOrderTotal = (order: Order) => {
+    // 添加安全檢查，防止 order_products 為 null 或 undefined
+    if (!order.order_products || !Array.isArray(order.order_products)) {
+      return 0;
+    }
+    
     return order.order_products.reduce((total, product) => 
       total + (product.quantity * product.unit_price), 0
     );
