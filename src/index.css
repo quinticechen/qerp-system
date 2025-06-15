@@ -26,9 +26,9 @@
     --secondary: 241 245 249; /* slate-100 */
     --secondary-foreground: 51 65 85; /* slate-600 */
 
-    /* Muted Blue-Gray */
+    /* Muted Blue-Gray - Updated for better visibility */
     --muted: 248 250 252; /* slate-50 */
-    --muted-foreground: 100 116 139; /* slate-500 */
+    --muted-foreground: 75 85 99; /* slate-600 - darker for better readability */
 
     /* Accent Blue */
     --accent: 219 234 254; /* blue-100 */
@@ -76,8 +76,8 @@
     --card: 30 41 59; /* slate-700 */
     --card-foreground: 248 250 252;
 
-    --popover: 30 41 59;
-    --popover-foreground: 248 250 252;
+    --popover: 255 255 255;
+    --popover-foreground: 15 23 42;
 
     --primary: 59 130 246; /* blue-500 */
     --primary-foreground: 15 23 42; /* slate-800 */
@@ -119,25 +119,25 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Typography Scale */
+  /* Typography Scale - Updated for better visibility */
   h1 {
-    @apply text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100;
+    @apply text-3xl font-bold tracking-tight text-gray-900 dark:text-slate-100;
   }
 
   h2 {
-    @apply text-2xl font-semibold tracking-tight text-slate-800 dark:text-slate-200;
+    @apply text-2xl font-semibold tracking-tight text-gray-800 dark:text-slate-200;
   }
 
   h3 {
-    @apply text-xl font-semibold text-slate-700 dark:text-slate-300;
+    @apply text-xl font-semibold text-gray-800 dark:text-slate-300;
   }
 
   h4 {
-    @apply text-lg font-medium text-slate-700 dark:text-slate-300;
+    @apply text-lg font-medium text-gray-800 dark:text-slate-300;
   }
 
   p {
-    @apply text-sm text-slate-600 dark:text-slate-400 leading-relaxed;
+    @apply text-sm text-gray-700 dark:text-slate-400 leading-relaxed;
   }
 
   /* Focus styles */
@@ -172,30 +172,30 @@
     @apply card-elevated hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer;
   }
 
-  /* Status Indicators */
+  /* Status Indicators - Updated for better visibility */
   .status-success {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800;
+    @apply bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800;
   }
 
   .status-warning {
-    @apply bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800;
+    @apply bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800;
   }
 
   .status-error {
-    @apply bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800;
+    @apply bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800;
   }
 
   .status-info {
-    @apply bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800;
+    @apply bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800;
   }
 
-  /* Form Elements */
+  /* Form Elements - Updated for better visibility */
   .form-input {
-    @apply w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800;
+    @apply w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-800 text-gray-900 placeholder:text-gray-600;
   }
 
   .form-label {
-    @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1;
+    @apply block text-sm font-medium text-gray-800 dark:text-slate-300 mb-1;
   }
 
   /* Layout Utilities */
@@ -207,9 +207,9 @@
     @apply border-b border-slate-200 dark:border-slate-700 pb-4 mb-6;
   }
 
-  /* Navigation */
+  /* Navigation - Updated for better visibility */
   .nav-link {
-    @apply text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors duration-200;
+    @apply text-gray-700 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors duration-200;
   }
 
   .nav-link-active {
@@ -225,7 +225,7 @@
     @apply border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-150;
   }
 
-  /* Badges and Tags */
+  /* Badges and Tags - Updated for better visibility */
   .badge-blue {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300;
   }
