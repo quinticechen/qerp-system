@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -105,6 +106,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           order_id: purchaseData.order_id || null,
           expected_arrival_date: purchaseData.expected_arrival_date || null,
           note: purchaseData.note || null,
+          po_number: 'TEMP', // Temporary value, will be overwritten by trigger
           user_id: user.id
         })
         .select()

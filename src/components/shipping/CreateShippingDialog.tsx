@@ -117,6 +117,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_quantity: totalShippedQuantity,
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
+          shipping_number: 'TEMP', // Temporary value, will be overwritten by trigger
           user_id: user.id
         })
         .select()
