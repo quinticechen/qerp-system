@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 interface Order {
   id: string;
   order_number: string;
+  note?: string;
 }
 
 interface OrderSelectorProps {
@@ -63,7 +64,12 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
                         onSelect={() => handleOrderSelection(order.id)}
                         className="cursor-pointer hover:bg-gray-100"
                       >
-                        {order.order_number}
+                        <div className="flex flex-col flex-1">
+                          <span>{order.order_number}</span>
+                          {order.note && (
+                            <span className="text-xs text-gray-500">{order.note}</span>
+                          )}
+                        </div>
                         <Check
                           className={cn(
                             "ml-auto h-4 w-4",
@@ -85,7 +91,12 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
             const order = orders?.find(o => o.id === orderId);
             return (
               <div key={orderId} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                <span className="text-gray-800">{order?.order_number}</span>
+                <div>
+                  <span className="text-gray-800 font-medium">{order?.order_number}</span>
+                  {order?.note && (
+                    <div className="text-sm text-gray-600 mt-1">{order.note}</div>
+                  )}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"

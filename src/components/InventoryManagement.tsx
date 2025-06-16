@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { InventoryList } from './inventory/InventoryList';
 import { InventorySummary } from './inventory/InventorySummary';
+import { PendingInventorySection } from './inventory/PendingInventorySection';
+import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
 
 const InventoryManagement = () => {
@@ -25,13 +27,23 @@ const InventoryManagement = () => {
       </div>
       
       <Tabs defaultValue="summary" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="summary" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">庫存統計</TabsTrigger>
+          <TabsTrigger value="pending-inventory" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">待入庫</TabsTrigger>
+          <TabsTrigger value="pending-shipping" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">待出貨</TabsTrigger>
           <TabsTrigger value="records" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">入庫記錄</TabsTrigger>
         </TabsList>
         
         <TabsContent value="summary">
           <InventorySummary />
+        </TabsContent>
+        
+        <TabsContent value="pending-inventory">
+          <PendingInventorySection />
+        </TabsContent>
+        
+        <TabsContent value="pending-shipping">
+          <PendingShippingSection />
         </TabsContent>
         
         <TabsContent value="records">

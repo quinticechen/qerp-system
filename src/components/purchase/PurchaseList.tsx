@@ -63,10 +63,21 @@ export const PurchaseList = () => {
     
     if (!debouncedSearchTerm) return purchases;
     
-    return purchases.filter(purchase => 
-      purchase.po_number?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      purchase.factories?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-    );
+    return purchases.filter(purchase => {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      
+      // 搜尋採購單號
+      if (purchase.po_number?.toLowerCase().includes(searchLower)) return true;
+      
+      // 搜尋工廠名稱
+      if (purchase.factories?.name?.toLowerCase().includes(searchLower)) return true;
+      
+      // 搜尋關聯訂單號
+      const relatedOrders = purchase.purchase_order_relations?.map((rel: any) => rel.orders) || [];
+      return relatedOrders.some((order: any) => 
+        order?.order_number?.toLowerCase().includes(searchLower)
+      );
+    });
   }, [purchases, debouncedSearchTerm]);
 
   const getStatusBadge = (status: string) => {
@@ -109,7 +120,7 @@ export const PurchaseList = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SearchInput
-              placeholder="搜尋採購單號或工廠名稱..."
+              placeholder="搜尋採購單號、工廠名稱或訂單號..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -159,9 +170,14 @@ export const PurchaseList = () => {
                         <p className="text-gray-600 font-medium">關聯訂單：</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {relatedOrders.map((order: any, index: number) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {order.order_number}
-                            </Badge>
+                            <div key={index} className="flex items-center">
+                              <Badge variant="outline" className="text-xs">
+                                {order.order_number}
+                              </Badge>
+                              {order.note && (
+                                <span className="text-xs text-gray-500 ml-1">({order.note})</span>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>

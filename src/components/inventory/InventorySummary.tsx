@@ -100,9 +100,20 @@ export const InventorySummary: React.FC = () => {
       return acc;
     }, {} as Record<string, number[]>);
 
-    return Object.entries(qualityGroups).map(([quality, quantities]) => 
-      `${quality}級: ${quantities.length}卷 (${quantities.reduce((sum, q) => sum + q, 0).toFixed(2)}kg)`
-    ).join('\n');
+    return Object.entries(qualityGroups).map(([quality, quantities]) => {
+      const totalWeight = quantities.reduce((sum, q) => sum + q, 0);
+      const rollsText = quantities.map(q => q.toFixed(2)).join('+');
+      return `${quality}級: ${quantities.length}卷 (${rollsText}=${totalWeight.toFixed(2)}kg)`;
+    }).join('\n');
+  };
+
+  const formatGradeDetails = (rolls: RollDetail[], targetGrade: string) => {
+    const gradeRolls = rolls.filter(roll => roll.quality === targetGrade);
+    if (gradeRolls.length === 0) return '';
+    
+    const quantities = gradeRolls.map(roll => roll.quantity.toFixed(2));
+    const total = gradeRolls.reduce((sum, roll) => sum + roll.quantity, 0);
+    return `${quantities.join('+')}=${total.toFixed(2)}kg`;
   };
 
   return (
@@ -173,19 +184,64 @@ export const InventorySummary: React.FC = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        {item.a_grade_stock.toFixed(2)} kg
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600">
+                              {item.a_grade_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {formatGradeDetails(rollDetailsForProduct, 'A')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        {item.b_grade_stock.toFixed(2)} kg
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600">
+                              {item.b_grade_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {formatGradeDetails(rollDetailsForProduct, 'B')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        {item.c_grade_stock.toFixed(2)} kg
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600">
+                              {item.c_grade_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {formatGradeDetails(rollDetailsForProduct, 'C')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        {item.d_grade_stock.toFixed(2)} kg
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600">
+                              {item.d_grade_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {formatGradeDetails(rollDetailsForProduct, 'D')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        {item.defective_stock.toFixed(2)} kg
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600">
+                              {item.defective_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {formatGradeDetails(rollDetailsForProduct, 'defective')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );

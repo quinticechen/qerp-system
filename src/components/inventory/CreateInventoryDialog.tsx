@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash } from 'lucide-react';
+import { Combobox } from '@/components/ui/combobox';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,6 +28,7 @@ interface PurchaseOrderItem {
   products_new: {
     name: string;
     color?: string;
+    color_code?: string;
   };
 }
 
@@ -87,7 +89,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           ordered_quantity,
           received_quantity,
           unit_price,
-          products_new (name, color)
+          products_new (name, color, color_code)
         `)
         .eq('purchase_order_id', purchaseOrderId)
         .neq('status', 'received'); // 只顯示未完全收貨的項目
@@ -111,6 +113,17 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       return data;
     }
   });
+
+  // 準備採購單選項
+  const purchaseOrderOptions = purchaseOrders?.map(po => ({
+    value: po.id,
+    label: po.po_number,
+    extra: (
+      <div className="text-xs text-gray-500">
+        {po.factories?.name} - {po.status === 'confirmed' ? '已確認' : '部分收貨'}
+      </div>
+    )
+  })) || [];
 
   const createInventoryMutation = useMutation({
     mutationFn: async (inventoryData: {
@@ -303,18 +316,15 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="purchase_order" className="text-gray-800">採購單 *</Label>
-              <Select value={purchaseOrderId} onValueChange={setPurchaseOrderId}>
-                <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇採購單" />
-                </SelectTrigger>
-                <SelectContent>
-                  {purchaseOrders?.map((po) => (
-                    <SelectItem key={po.id} value={po.id}>
-                      {po.po_number} - {po.factories?.name} ({po.status === 'confirmed' ? '已確認' : '部分收貨'})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={purchaseOrderOptions}
+                value={purchaseOrderId}
+                onValueChange={setPurchaseOrderId}
+                placeholder="搜尋並選擇採購單..."
+                searchPlaceholder="搜尋採購單編號..."
+                emptyText="未找到採購單"
+                className="w-full"
+              />
             </div>
 
             <div className="space-y-2">
@@ -361,13 +371,28 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                         />
                         <div>
                           <h4 className="font-medium text-gray-900">
-                            {item.products_new.name} {item.products_new.color && `(${item.products_new.color})`}
+                            {item.products_new.name}
+                            {item.products_new.color && (
+                              <span className="text-gray-600"> - {item.products_new.color}</span>
+                            )}
+                            {item.products_new.color_code && (
+                              <span className="text-gray-600"> ({item.products_new.color_code})</span>
+                            )}
                           </h4>
-                          <p className="text-sm text-gray-600">
-                            訂購數量: {item.ordered_quantity}kg | 
-                            已收貨: {item.received_quantity || 0}kg | 
-                            待收貨: {remainingQuantity}kg
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-sm text-gray-600">
+                              訂購數量: {item.ordered_quantity}kg | 
+                              已收貨: {item.received_quantity || 0}kg | 
+                              待收貨: {remainingQuantity}kg
+                            </p>
+                            {item.products_new.color_code && (
+                              <div 
+                                className="w-4 h-4 rounded border border-gray-400"
+                                style={{ backgroundColor: item.products_new.color_code }}
+                                title={`色碼: ${item.products_new.color_code}`}
+                              ></div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
