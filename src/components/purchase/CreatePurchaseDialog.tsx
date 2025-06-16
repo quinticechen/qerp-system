@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -97,7 +98,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // 建立採購單，設置狀態為已下單，po_number 留空讓觸發器生成
+      // 建立採購單，設置狀態為已下單，po_number 設為空字串讓觸發器生成
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert({
@@ -105,9 +106,9 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           order_id: purchaseData.order_id || null,
           expected_arrival_date: purchaseData.expected_arrival_date || null,
           note: purchaseData.note || null,
+          po_number: '', // 設為空字串，讓資料庫觸發器自動生成
           status: 'confirmed', // 設置狀態為已下單
           user_id: user.id
-          // 移除 po_number，讓資料庫觸發器自動生成
         })
         .select()
         .single();
