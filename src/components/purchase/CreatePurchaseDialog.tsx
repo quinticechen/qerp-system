@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -227,18 +228,23 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   };
 
   const addItem = () => {
-    setItems([...items, {
+    const newItems = [...items, {
       product_id: '',
       ordered_quantity: 0,
       unit_price: 0,
       specifications: '',
       selected_product_name: ''
-    }]);
+    }];
+    console.log('CreatePurchaseDialog - Adding new item, new items array:', newItems);
+    setItems(newItems);
   };
 
   const removeItem = (index: number) => {
     if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+      const newItems = items.filter((_, i) => i !== index);
+      console.log('CreatePurchaseDialog - Removing item at index', index, 'new items array:', newItems);
+      setItems(newItems);
+      
       // Clean up UI state
       const newProductNameOpens = { ...productNameOpens };
       const newColorOpens = { ...colorOpens };
@@ -250,14 +256,24 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   };
 
   const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
-    console.log('updateItem called:', { index, field, value });
-    console.log('Current items before update:', items);
+    console.log('CreatePurchaseDialog - updateItem called:', { index, field, value });
+    console.log('CreatePurchaseDialog - Current items before update:', items);
     
-    const updatedItems = [...items];
-    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    // Create a completely new array with immutable updates
+    const newItems = items.map((item, i) => {
+      if (i === index) {
+        const updatedItem = { ...item, [field]: value };
+        console.log('CreatePurchaseDialog - Updated item at index', index, ':', updatedItem);
+        return updatedItem;
+      }
+      return item;
+    });
     
-    console.log('Updated items:', updatedItems);
-    setItems(updatedItems);
+    console.log('CreatePurchaseDialog - New items array after update:', newItems);
+    setItems(newItems);
+    
+    // Force re-render by updating a timestamp or counter if needed
+    console.log('CreatePurchaseDialog - setItems called with new array');
   };
 
   const handleSubmit = () => {

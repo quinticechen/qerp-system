@@ -45,6 +45,11 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
   colorOpen,
   setColorOpen,
 }) => {
+  // Debug logging to track prop changes
+  console.log(`PurchaseItemForm ${index} - Received item prop:`, item);
+  console.log(`PurchaseItemForm ${index} - selected_product_name from prop:`, item.selected_product_name);
+  console.log(`PurchaseItemForm ${index} - product_id from prop:`, item.product_id);
+
   // Get available color variants for the selected product
   const availableColorVariants = item.selected_product_name 
     ? getColorVariants(item.selected_product_name) 
@@ -55,15 +60,13 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
     ? products?.find(p => p.id === item.product_id)
     : null;
 
-  console.log(`PurchaseItemForm ${index} - Current item:`, item);
-  console.log(`PurchaseItemForm ${index} - Available products:`, uniqueProductNames);
   console.log(`PurchaseItemForm ${index} - Available color variants:`, availableColorVariants);
   console.log(`PurchaseItemForm ${index} - Selected product:`, selectedProduct);
 
   const handleProductNameSelect = (productName: string) => {
     console.log(`PurchaseItemForm ${index} - Selecting product name:`, productName);
     
-    // Update the selected product name and clear the product_id
+    // Update the selected product name and clear the product_id in separate calls
     updateItem(index, 'selected_product_name', productName);
     updateItem(index, 'product_id', '');
     
@@ -119,7 +122,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
               <Command>
                 <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
                 <CommandList>
@@ -182,7 +185,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
               <Command>
                 <CommandInput placeholder="搜尋顏色..." className="h-9" />
                 <CommandList>
