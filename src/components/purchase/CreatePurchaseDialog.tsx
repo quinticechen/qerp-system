@@ -110,18 +110,24 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   const { data: products } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
+      console.log('Fetching products...');
       const { data, error } = await supabase
         .from('products_new')
         .select('id, name, color, color_code')
         .order('name, color');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching products:', error);
+        throw error;
+      }
+      console.log('Products fetched:', data?.length || 0, 'products');
       return data;
     }
   });
 
   // Get unique product names
   const uniqueProductNames = [...new Set(products?.map(p => p.name) || [])];
+  console.log('Unique product names:', uniqueProductNames.length, uniqueProductNames);
 
   // Get color variants for a specific product name
   const getColorVariants = (productName: string) => {

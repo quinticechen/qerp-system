@@ -47,6 +47,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 }) => {
   const colorVariants = getColorVariants(item.selected_product_name || '');
 
+  console.log('PurchaseItemForm - uniqueProductNames:', uniqueProductNames);
+  console.log('PurchaseItemForm - products:', products?.length || 0);
+
   return (
     <div className="border border-gray-200 rounded p-4 space-y-4">
       <div className="flex justify-between items-center">
@@ -78,11 +81,13 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200">
               <Command>
                 <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
                 <CommandList>
-                  <CommandEmpty>未找到產品。</CommandEmpty>
+                  <CommandEmpty>
+                    {uniqueProductNames.length === 0 ? "無產品資料，請先在產品管理中新增產品" : "未找到產品。"}
+                  </CommandEmpty>
                   <CommandGroup>
                     {uniqueProductNames.map((name) => (
                       <CommandItem
@@ -93,7 +98,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                           updateItem(index, 'product_id', '');
                           setProductNameOpen(false);
                         }}
-                        className="cursor-pointer hover:bg-gray-100"
+                        className="cursor-pointer hover:bg-blue-50 hover:text-blue-900 text-gray-900"
                       >
                         {name}
                         <Check
@@ -142,7 +147,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200">
               <Command>
                 <CommandInput placeholder="搜尋顏色..." className="h-9" />
                 <CommandList>
@@ -156,7 +161,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                           updateItem(index, 'product_id', variant.id);
                           setColorOpen(false);
                         }}
-                        className="cursor-pointer hover:bg-gray-100"
+                        className="cursor-pointer hover:bg-blue-50 hover:text-blue-900 text-gray-900"
                       >
                         <div className="flex items-center space-x-2">
                           {variant.color_code && (
