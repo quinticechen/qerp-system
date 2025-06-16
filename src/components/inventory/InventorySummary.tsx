@@ -1,5 +1,5 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,8 @@ interface RollDetail {
   product_id: string;
   quality: string;
   quantity: number;
+  current_quantity: number;
+  roll_number: string;
   products_new: {
     name: string;
     color: string | null;
@@ -39,10 +41,47 @@ interface PendingData {
 }
 
 export const InventorySummary: React.FC = () => {
+  const queryClient = useQueryClient();
+
+  // 監聽庫存變化並自動刷新
+  React.useEffect(() => {
+    const channel = supabase
+      .channel('inventory-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventory_rolls'
+      }, () => {
+        // 當庫存卷數據變化時，刷新相關查詢
+        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'inventories'
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'shipping_items'
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary'],
     queryFn: async () => {
-      // 直接從 products_new 和 inventory_rolls 查詢，而不是依賴視圖
       const { data, error } = await supabase
         .from('products_new')
         .select(`
@@ -59,11 +98,10 @@ export const InventorySummary: React.FC = () => {
       
       if (error) throw error;
 
-      // 處理數據以生成庫存統計
       const processedData = data.map(product => {
         const rolls = product.inventory_rolls || [];
         const totalStock = rolls.reduce((sum, roll) => sum + (roll.current_quantity || 0), 0);
-        const totalRolls = rolls.length;
+        const totalRolls = rolls.filter(roll => (roll.current_quantity || 0) > 0).length;
         
         const gradeStocks = {
           a_grade_stock: rolls.filter(r => r.quality === 'A').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
@@ -82,10 +120,11 @@ export const InventorySummary: React.FC = () => {
           total_rolls: totalRolls,
           ...gradeStocks
         };
-      }).filter(item => item.total_rolls > 0); // 只顯示有庫存的產品
+      }).filter(item => item.total_rolls > 0);
 
       return processedData as InventorySummaryItem[];
-    }
+    },
+    refetchInterval: 30000, // 每30秒自動刷新
   });
 
   const { data: rollDetails } = useQuery({
@@ -97,18 +136,21 @@ export const InventorySummary: React.FC = () => {
           product_id,
           quality,
           quantity,
+          current_quantity,
+          roll_number,
           products_new!inner(name, color, color_code)
-        `);
+        `)
+        .gt('current_quantity', 0); // 只取當前數量大於0的卷
       
       if (error) throw error;
       return data as RollDetail[];
-    }
+    },
+    refetchInterval: 30000,
   });
 
   const { data: pendingData } = useQuery({
     queryKey: ['pending-data'],
     queryFn: async () => {
-      // 獲取待入庫數據
       const { data: pendingInventory, error: pendingInventoryError } = await supabase
         .from('purchase_order_items')
         .select(`
@@ -121,7 +163,6 @@ export const InventorySummary: React.FC = () => {
       
       if (pendingInventoryError) throw pendingInventoryError;
 
-      // 獲取待出貨數據
       const { data: pendingShipping, error: pendingShippingError } = await supabase
         .from('order_products')
         .select(`
@@ -134,10 +175,8 @@ export const InventorySummary: React.FC = () => {
       
       if (pendingShippingError) throw pendingShippingError;
 
-      // 處理數據
       const pendingMap = new Map<string, PendingData>();
 
-      // 處理待入庫
       pendingInventory.forEach(item => {
         const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
         const pending = (item.ordered_quantity || 0) - (item.received_quantity || 0);
@@ -155,7 +194,6 @@ export const InventorySummary: React.FC = () => {
         existing.pending_inventory += pending > 0 ? pending : 0;
       });
 
-      // 處理待出貨
       pendingShipping.forEach(item => {
         const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
         const pending = (item.quantity || 0) - (item.shipped_quantity || 0);
@@ -202,7 +240,8 @@ export const InventorySummary: React.FC = () => {
     
     return rollDetails.filter(roll => 
       roll.product_id === productId && 
-      roll.products_new.color === color
+      roll.products_new.color === color &&
+      roll.current_quantity > 0 // 確保只顯示有庫存的卷
     );
   };
 
@@ -210,24 +249,27 @@ export const InventorySummary: React.FC = () => {
     const qualityGroups = rolls.reduce((acc, roll) => {
       const quality = roll.quality;
       if (!acc[quality]) acc[quality] = [];
-      acc[quality].push(roll.quantity);
+      acc[quality].push({
+        rollNumber: roll.roll_number,
+        quantity: roll.current_quantity, // 使用當前數量而非原始數量
+      });
       return acc;
-    }, {} as Record<string, number[]>);
+    }, {} as Record<string, Array<{rollNumber: string, quantity: number}>>);
 
-    return Object.entries(qualityGroups).map(([quality, quantities]) => {
-      const totalWeight = quantities.reduce((sum, q) => sum + q, 0);
-      const rollsText = quantities.map(q => q.toFixed(2)).join('+');
-      return `${quality}級: ${quantities.length}卷 (${rollsText}=${totalWeight.toFixed(2)}kg)`;
-    }).join('\n');
+    return Object.entries(qualityGroups).map(([quality, rollsData]) => {
+      const totalWeight = rollsData.reduce((sum, r) => sum + r.quantity, 0);
+      const rollsText = rollsData.map(r => `${r.rollNumber}:${r.quantity.toFixed(2)}kg`).join(', ');
+      return `${quality}級: ${rollsData.length}卷\n${rollsText}\n總計=${totalWeight.toFixed(2)}kg`;
+    }).join('\n\n');
   };
 
   const formatGradeDetails = (rolls: RollDetail[], targetGrade: string) => {
-    const gradeRolls = rolls.filter(roll => roll.quality === targetGrade);
+    const gradeRolls = rolls.filter(roll => roll.quality === targetGrade && roll.current_quantity > 0);
     if (gradeRolls.length === 0) return '';
     
-    const quantities = gradeRolls.map(roll => roll.quantity.toFixed(2));
-    const total = gradeRolls.reduce((sum, roll) => sum + roll.quantity, 0);
-    return `${quantities.join('+')}=${total.toFixed(2)}kg`;
+    const rollsText = gradeRolls.map(roll => `${roll.roll_number}:${roll.current_quantity.toFixed(2)}kg`).join(', ');
+    const total = gradeRolls.reduce((sum, roll) => sum + roll.current_quantity, 0);
+    return `${gradeRolls.length}卷\n${rollsText}\n總計=${total.toFixed(2)}kg`;
   };
 
   const getPendingDataForProduct = (productId: string, color: string | null) => {
@@ -302,12 +344,12 @@ export const InventorySummary: React.FC = () => {
                       <TableCell className="text-gray-700">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
                               {item.total_rolls} 卷
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="whitespace-pre-line">
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
                               {formatRollDetails(rollDetailsForProduct)}
                             </div>
                           </TooltipContent>
@@ -316,64 +358,72 @@ export const InventorySummary: React.FC = () => {
                       <TableCell className="text-gray-700">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
                               {item.a_grade_stock.toFixed(2)} kg
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {formatGradeDetails(rollDetailsForProduct, 'A')}
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
+                              {formatGradeDetails(rollDetailsForProduct, 'A')}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
                               {item.b_grade_stock.toFixed(2)} kg
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {formatGradeDetails(rollDetailsForProduct, 'B')}
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
+                              {formatGradeDetails(rollDetailsForProduct, 'B')}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
                               {item.c_grade_stock.toFixed(2)} kg
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {formatGradeDetails(rollDetailsForProduct, 'C')}
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
+                              {formatGradeDetails(rollDetailsForProduct, 'C')}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
                               {item.d_grade_stock.toFixed(2)} kg
                             </span>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {formatGradeDetails(rollDetailsForProduct, 'D')}
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
+                              {formatGradeDetails(rollDetailsForProduct, 'D')}
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        <div className="space-y-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:text-blue-600">
-                                {item.defective_stock.toFixed(2)} kg
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
+                              {item.defective_stock.toFixed(2)} kg
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-md">
+                            <div className="whitespace-pre-line text-sm">
                               {formatGradeDetails(rollDetailsForProduct, 'defective')}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                       <TableCell>
                         {pendingInfo.pending_inventory > 0 && (
