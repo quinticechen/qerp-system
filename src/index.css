@@ -39,7 +39,7 @@
     --destructive-foreground: 255 255 255; /* white */
 
     /* Border and Input - Subtle */
-    --border: 226 232 240; /* slate-200 */
+    --border: 226 232 240; /* slate-200 - 正確的 HSL 值 */
     --input: 226 232 240; /* slate-200 */
     --ring: 29 78 216; /* blue-700 - consistent with primary */
 
@@ -87,7 +87,7 @@
     --destructive-foreground: 248 250 252; /* slate-50 */
 
     /* Border and Input */
-    --border: 30 41 59; /* slate-700 */
+    --border: 51 65 85; /* slate-600 - 正確的深色模式 HSL 值 */
     --input: 30 41 59; /* slate-700 */
     --ring: 96 165 250; /* blue-400 */
 
@@ -98,7 +98,7 @@
     --sidebar-primary-foreground: 2 6 23; /* very dark background */
     --sidebar-accent: 30 58 138; /* blue-900 */
     --sidebar-accent-foreground: 191 219 254; /* blue-200 */
-    --sidebar-border: 30 41 59; /* slate-700 */
+    --sidebar-border: 51 65 85; /* slate-600 - 正確的深色模式 HSL 值 */
     --sidebar-ring: 96 165 250; /* blue-400 */
   }
 }
