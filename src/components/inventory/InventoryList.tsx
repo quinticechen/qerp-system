@@ -98,7 +98,7 @@ export const InventoryList = () => {
             placeholder="搜尋採購單號、工廠、產品或布卷編號..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-md"
+            className="w-full"
           />
         </CardContent>
       </Card>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -67,7 +66,16 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      
+      // 過濾掉沒有待入庫項目的採購單
+      const filteredData = data?.filter(po => 
+        po.purchase_order_items && 
+        po.purchase_order_items.some(item => 
+          (item.ordered_quantity || 0) > (item.received_quantity || 0)
+        )
+      ) || [];
+      
+      return filteredData;
     }
   });
 

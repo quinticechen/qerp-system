@@ -325,7 +325,7 @@ export const InventorySummary: React.FC = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        <div className="flex items-center space-x-2">
+                        <div className="space-y-1">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="cursor-help hover:text-blue-600">
@@ -338,16 +338,16 @@ export const InventorySummary: React.FC = () => {
                           </Tooltip>
                           
                           {(pendingInfo.pending_inventory > 0 || pendingInfo.pending_shipping > 0) && (
-                            <div className="text-xs text-gray-500">
+                            <div className="flex gap-1 text-xs">
                               {pendingInfo.pending_inventory > 0 && (
-                                <span className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded mr-1">
+                                <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
                                   待入庫: {pendingInfo.pending_inventory.toFixed(2)}kg
-                                </span>
+                                </Badge>
                               )}
                               {pendingInfo.pending_shipping > 0 && (
-                                <span className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded">
+                                <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
                                   待出貨: {pendingInfo.pending_shipping.toFixed(2)}kg
-                                </span>
+                                </Badge>
                               )}
                             </div>
                           )}
