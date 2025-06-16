@@ -377,14 +377,14 @@ export const InventorySummary: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         {pendingInfo.pending_inventory > 0 && (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
+                          <Badge className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
                             {pendingInfo.pending_inventory.toFixed(2)}kg
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         {pendingInfo.pending_shipping > 0 && (
-                          <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
+                          <Badge className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
                             {pendingInfo.pending_shipping.toFixed(2)}kg
                           </Badge>
                         )}
