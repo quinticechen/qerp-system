@@ -26,8 +26,8 @@ const InventoryManagement = () => {
       
       <Tabs defaultValue="summary" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="summary">庫存統計</TabsTrigger>
-          <TabsTrigger value="records">入庫記錄</TabsTrigger>
+          <TabsTrigger value="summary" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">庫存統計</TabsTrigger>
+          <TabsTrigger value="records" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">入庫記錄</TabsTrigger>
         </TabsList>
         
         <TabsContent value="summary">

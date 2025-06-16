@@ -22,7 +22,7 @@ const productSchema = z.object({
   name: z.string().min(1, '產品名稱為必填'),
   category: z.string().default('布料'),
   color: z.string().optional(),
-  color_code: z.string().optional(),
+  color_code: z.string().optional().transform(val => val ? val.toUpperCase() : val), // 自動轉大寫
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -180,7 +180,7 @@ const ProductManagement = () => {
         name: data.name.trim(),
         category: data.category || '布料',
         color: data.color && data.color.trim() !== '' ? data.color.trim() : null,
-        color_code: data.color_code && data.color_code.trim() !== '' ? data.color_code.trim() : null,
+        color_code: data.color_code && data.color_code.trim() !== '' ? data.color_code.trim().toUpperCase() : null, // 確保大寫
         unit_of_measure: 'KG', // 固定為 KG
         user_id: user.id,
       };
@@ -399,7 +399,12 @@ const ProductManagement = () => {
                           <Input 
                             placeholder="如：#FFFFFF" 
                             className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            {...field} 
+                            {...field}
+                            onChange={(e) => {
+                              // 在輸入時即時轉換為大寫
+                              const value = e.target.value.toUpperCase();
+                              field.onChange(value);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
