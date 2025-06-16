@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +9,7 @@ import { Eye, Edit, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewShippingDialog } from './ViewShippingDialog';
 import { EditShippingDialog } from './EditShippingDialog';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const ShippingList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,8 +18,11 @@ export const ShippingList = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
+  // 使用防抖動，延遲 500ms
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const { data: shippings, isLoading } = useQuery({
-    queryKey: ['shippings', searchTerm, customerFilter],
+    queryKey: ['shippings', debouncedSearchTerm, customerFilter],
     queryFn: async () => {
       let query = supabase
         .from('shippings')
@@ -38,8 +41,8 @@ export const ShippingList = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (searchTerm) {
-        query = query.or(`shipping_number.ilike.%${searchTerm}%,customers.name.ilike.%${searchTerm}%`);
+      if (debouncedSearchTerm) {
+        query = query.or(`shipping_number.ilike.%${debouncedSearchTerm}%,customers.name.ilike.%${debouncedSearchTerm}%`);
       }
 
       if (customerFilter !== 'all') {

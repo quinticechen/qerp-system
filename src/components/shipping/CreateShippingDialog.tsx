@@ -146,6 +146,31 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     enabled: !!orderId && !!orderProducts && orderProducts.length > 0
   });
 
+  // 生成唯一的出貨單號
+  const generateUniqueShippingNumber = async () => {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const baseNumber = `SHIP-${year}${month}${day}`;
+    
+    // 查詢今天已有的出貨單號
+    const { data: existingShippings } = await supabase
+      .from('shippings')
+      .select('shipping_number')
+      .like('shipping_number', `${baseNumber}%`)
+      .order('shipping_number', { ascending: false });
+    
+    let sequence = 1;
+    if (existingShippings && existingShippings.length > 0) {
+      const lastNumber = existingShippings[0].shipping_number;
+      const lastSequence = parseInt(lastNumber.split('-').pop() || '0');
+      sequence = lastSequence + 1;
+    }
+    
+    return `${baseNumber}-${sequence.toString().padStart(3, '0')}`;
+  };
+
   const createShippingMutation = useMutation({
     mutationFn: async (shippingData: {
       customer_id: string;
@@ -161,6 +186,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       const totalShippedQuantity = allRolls.reduce((sum, roll) => sum + roll.shipped_quantity, 0);
       const totalShippedRolls = allRolls.length;
 
+      // 生成唯一的出貨單號
+      const uniqueShippingNumber = await generateUniqueShippingNumber();
+
       const { data: shipping, error: shippingError } = await supabase
         .from('shippings')
         .insert({
@@ -171,7 +199,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
           user_id: user.id,
-          shipping_number: ''
+          shipping_number: uniqueShippingNumber
         } as any)
         .select()
         .single();
