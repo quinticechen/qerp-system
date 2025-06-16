@@ -70,9 +70,9 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
             removeItem={removeItem}
             canRemove={items.length > 1}
             productNameOpen={productNameOpens[index] || false}
-            setProductNameOpen={(open) => setProductNameOpens(prev => ({ ...prev, [index]: open }))}
+            setProductNameOpen={(open) => setProductNameOpens({ ...productNameOpens, [index]: open })}
             colorOpen={colorOpens[index] || false}
-            setColorOpen={(open) => setColorOpens(prev => ({ ...prev, [index]: open }))}
+            setColorOpen={(open) => setColorOpens({ ...colorOpens, [index]: open })}
           />
         ))}
       </CardContent>
