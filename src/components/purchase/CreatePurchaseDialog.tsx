@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
@@ -74,6 +75,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   // UI state for comboboxes
   const [factoryOpen, setFactoryOpen] = useState(false);
   const [orderSearchOpen, setOrderSearchOpen] = useState(false);
+  const [productNameOpens, setProductNameOpens] = useState<Record<number, boolean>>({});
+  const [colorOpens, setColorOpens] = useState<Record<number, boolean>>({});
 
   // Fetch factories for selection
   const { data: factories } = useQuery({
@@ -153,7 +156,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   });
 
   // Get unique product names
-  const uniqueProductNames = [...new Set(products?.map(p => p.name))];
+  const uniqueProductNames = [...new Set(products?.map(p => p.name) || [])];
 
   // Get color variants for a specific product name
   const getColorVariants = (productName: string) => {
@@ -248,6 +251,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       specifications: '',
       selected_product_name: ''
     }]);
+    setProductNameOpens({});
+    setColorOpens({});
   };
 
   const handleOrderSelection = (orderId: string, checked: boolean) => {
@@ -271,6 +276,13 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   const removeItem = (index: number) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
+      // Clean up UI state
+      const newProductNameOpens = { ...productNameOpens };
+      const newColorOpens = { ...colorOpens };
+      delete newProductNameOpens[index];
+      delete newColorOpens[index];
+      setProductNameOpens(newProductNameOpens);
+      setColorOpens(newColorOpens);
     }
   };
 
@@ -343,7 +355,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                   <Command>
                     <CommandInput placeholder="搜尋工廠..." className="h-9" />
                     <CommandList>
@@ -357,6 +369,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                               setFactoryId(factory.id);
                               setFactoryOpen(false);
                             }}
+                            className="cursor-pointer"
                           >
                             {factory.name}
                             <Check
@@ -414,6 +427,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                                 }
                                 setOrderSearchOpen(false);
                               }}
+                              className="cursor-pointer"
                             >
                               {order.order_number}
                               <Check
@@ -560,7 +574,10 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label className="text-gray-800">產品名稱 *</Label>
-                        <Popover>
+                        <Popover 
+                          open={productNameOpens[index] || false} 
+                          onOpenChange={(open) => setProductNameOpens(prev => ({ ...prev, [index]: open }))}
+                        >
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -571,7 +588,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-full p-0">
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                             <Command>
                               <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
                               <CommandList>
@@ -584,7 +601,9 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                                       onSelect={(currentValue) => {
                                         updateItem(index, 'selected_product_name', currentValue);
                                         updateItem(index, 'product_id', '');
+                                        setProductNameOpens(prev => ({ ...prev, [index]: false }));
                                       }}
+                                      className="cursor-pointer"
                                     >
                                       {name}
                                       <Check
@@ -604,7 +623,10 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
                       <div className="space-y-2">
                         <Label className="text-gray-800">顏色/色碼 *</Label>
-                        <Popover>
+                        <Popover 
+                          open={colorOpens[index] || false} 
+                          onOpenChange={(open) => setColorOpens(prev => ({ ...prev, [index]: open }))}
+                        >
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -633,7 +655,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-full p-0">
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                             <Command>
                               <CommandInput placeholder="搜尋顏色..." className="h-9" />
                               <CommandList>
@@ -645,7 +667,9 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                                       value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
                                       onSelect={() => {
                                         updateItem(index, 'product_id', variant.id);
+                                        setColorOpens(prev => ({ ...prev, [index]: false }));
                                       }}
+                                      className="cursor-pointer"
                                     >
                                       <div className="flex items-center space-x-2">
                                         {variant.color_code && (
