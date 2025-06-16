@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -6,51 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { FactorySelector } from './FactorySelector';
+import { OrderSelector } from './OrderSelector';
+import { OrderProductsDisplay } from './OrderProductsDisplay';
+import { PurchaseItemsSection } from './PurchaseItemsSection';
+import { OrderProduct, InventoryInfo, PurchaseItem } from './types';
 
 interface CreatePurchaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-interface OrderProduct {
-  id: string;
-  quantity: number;
-  products_new: {
-    id: string;
-    name: string;
-    color: string | null;
-    color_code: string | null;
-  };
-  orders: {
-    id: string;
-    order_number: string;
-  };
-}
-
-interface InventoryInfo {
-  product_id: string;
-  total_stock: number;
-  a_grade_stock: number;
-  b_grade_stock: number;
-  c_grade_stock: number;
-  d_grade_stock: number;
-  defective_stock: number;
-}
-
-interface PurchaseItem {
-  product_id: string;
-  ordered_quantity: number;
-  unit_price: number;
-  specifications?: string;
-  selected_product_name?: string;
 }
 
 export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
@@ -255,14 +220,6 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     setColorOpens({});
   };
 
-  const handleOrderSelection = (orderId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedOrderIds(prev => [...prev, orderId]);
-    } else {
-      setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
-    }
-  };
-
   const addItem = () => {
     setItems([...items, {
       product_id: '',
@@ -339,53 +296,13 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
         <div className="space-y-6">
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="factory" className="text-gray-800">工廠 *</Label>
-              <Popover open={factoryOpen} onOpenChange={setFactoryOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={factoryOpen}
-                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
-                  >
-                    {factoryId
-                      ? factories?.find((factory) => factory.id === factoryId)?.name
-                      : "選擇工廠..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="搜尋工廠..." className="h-9" />
-                    <CommandList>
-                      <CommandEmpty>未找到工廠。</CommandEmpty>
-                      <CommandGroup>
-                        {factories?.map((factory) => (
-                          <CommandItem
-                            key={factory.id}
-                            value={factory.name}
-                            onSelect={() => {
-                              setFactoryId(factory.id);
-                              setFactoryOpen(false);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            {factory.name}
-                            <Check
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                factoryId === factory.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <FactorySelector
+              factories={factories}
+              factoryId={factoryId}
+              setFactoryId={setFactoryId}
+              factoryOpen={factoryOpen}
+              setFactoryOpen={setFactoryOpen}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="arrival_date" className="text-gray-800">預計到貨日期</Label>
@@ -400,336 +317,34 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           </div>
 
           {/* Order Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-gray-900 flex items-center justify-between">
-                關聯訂單 (可選擇多個)
-                <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="ml-2">
-                      <Plus className="h-4 w-4 mr-1" />
-                      搜尋並添加訂單
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0">
-                    <Command>
-                      <CommandInput placeholder="搜尋訂單編號..." className="h-9" />
-                      <CommandList>
-                        <CommandEmpty>未找到訂單。</CommandEmpty>
-                        <CommandGroup>
-                          {orders?.map((order) => (
-                            <CommandItem
-                              key={order.id}
-                              value={order.order_number}
-                              onSelect={() => {
-                                if (!selectedOrderIds.includes(order.id)) {
-                                  setSelectedOrderIds(prev => [...prev, order.id]);
-                                }
-                                setOrderSearchOpen(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              {order.order_number}
-                              <Check
-                                className={cn(
-                                  "ml-auto h-4 w-4",
-                                  selectedOrderIds.includes(order.id) ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {selectedOrderIds.length > 0 ? (
-                selectedOrderIds.map((orderId) => {
-                  const order = orders?.find(o => o.id === orderId);
-                  return (
-                    <div key={orderId} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                      <span className="text-gray-800">{order?.order_number}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedOrderIds(prev => prev.filter(id => id !== orderId))}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        移除
-                      </Button>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-gray-500 text-sm">尚未選擇訂單</div>
-              )}
-            </CardContent>
-          </Card>
+          <OrderSelector
+            orders={orders}
+            selectedOrderIds={selectedOrderIds}
+            setSelectedOrderIds={setSelectedOrderIds}
+            orderSearchOpen={orderSearchOpen}
+            setOrderSearchOpen={setOrderSearchOpen}
+          />
 
           {/* Order Products Display */}
-          {orderProducts && orderProducts.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-gray-900">關聯訂單產品資訊</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {orderProducts.map((orderProduct) => {
-                    const inventory = getInventoryInfo(orderProduct.products_new.id);
-                    
-                    return (
-                      <div key={orderProduct.id} className="border border-gray-200 rounded p-3">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <div className="font-medium text-gray-900">
-                              {orderProduct.products_new.name}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              {orderProduct.products_new.color && (
-                                <span className="flex items-center space-x-2">
-                                  {orderProduct.products_new.color_code && (
-                                    <div 
-                                      className="w-4 h-4 rounded border border-gray-400"
-                                      style={{ backgroundColor: orderProduct.products_new.color_code }}
-                                    ></div>
-                                  )}
-                                  <span>{orderProduct.products_new.color} {orderProduct.products_new.color_code}</span>
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              訂單: {orderProduct.orders.order_number}
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <div className="text-sm text-gray-600">訂單數量</div>
-                            <div className="font-medium text-gray-900">{orderProduct.quantity} kg</div>
-                          </div>
-                          
-                          <div>
-                            <div className="text-sm text-gray-600">庫存資訊</div>
-                            {inventory ? (
-                              <div className="text-sm">
-                                <div>總庫存: {inventory.total_stock.toFixed(2)} kg</div>
-                                <div className="text-xs text-gray-500">
-                                  A:{inventory.a_grade_stock.toFixed(2)} B:{inventory.b_grade_stock.toFixed(2)} 
-                                  C:{inventory.c_grade_stock.toFixed(2)} D:{inventory.d_grade_stock.toFixed(2)}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-sm text-red-600">無庫存</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <OrderProductsDisplay
+            orderProducts={orderProducts}
+            getInventoryInfo={getInventoryInfo}
+          />
 
           {/* Manual Items Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-gray-900 flex items-center justify-between">
-                採購項目
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addItem}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  新增項目
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {items.map((item, index) => {
-                const colorVariants = getColorVariants(item.selected_product_name || '');
-                
-                return (
-                  <div key={index} className="border border-gray-200 rounded p-4 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-medium text-gray-900">項目 {index + 1}</h4>
-                      {items.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeItem(index)}
-                          className="border-red-300 text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-gray-800">產品名稱 *</Label>
-                        <Popover 
-                          open={productNameOpens[index] || false} 
-                          onOpenChange={(open) => setProductNameOpens(prev => ({ ...prev, [index]: open }))}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
-                            >
-                              {item.selected_product_name || "選擇產品名稱..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                            <Command>
-                              <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
-                              <CommandList>
-                                <CommandEmpty>未找到產品。</CommandEmpty>
-                                <CommandGroup>
-                                  {uniqueProductNames.map((name) => (
-                                    <CommandItem
-                                      key={name}
-                                      value={name}
-                                      onSelect={(currentValue) => {
-                                        updateItem(index, 'selected_product_name', currentValue);
-                                        updateItem(index, 'product_id', '');
-                                        setProductNameOpens(prev => ({ ...prev, [index]: false }));
-                                      }}
-                                      className="cursor-pointer"
-                                    >
-                                      {name}
-                                      <Check
-                                        className={cn(
-                                          "ml-auto h-4 w-4",
-                                          item.selected_product_name === name ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-gray-800">顏色/色碼 *</Label>
-                        <Popover 
-                          open={colorOpens[index] || false} 
-                          onOpenChange={(open) => setColorOpens(prev => ({ ...prev, [index]: open }))}
-                        >
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              disabled={!item.selected_product_name}
-                              className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
-                            >
-                              {item.product_id ? (
-                                (() => {
-                                  const selectedVariant = colorVariants.find(v => v.id === item.product_id);
-                                  return selectedVariant ? (
-                                    <div className="flex items-center space-x-2">
-                                      {selectedVariant.color_code && (
-                                        <div 
-                                          className="w-4 h-4 rounded border border-gray-400"
-                                          style={{ backgroundColor: selectedVariant.color_code }}
-                                        ></div>
-                                      )}
-                                      <span>
-                                        {selectedVariant.color || '無顏色'} {selectedVariant.color_code ? `(${selectedVariant.color_code})` : ''}
-                                      </span>
-                                    </div>
-                                  ) : "選擇顏色...";
-                                })()
-                              ) : "選擇顏色..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                            <Command>
-                              <CommandInput placeholder="搜尋顏色..." className="h-9" />
-                              <CommandList>
-                                <CommandEmpty>未找到顏色。</CommandEmpty>
-                                <CommandGroup>
-                                  {colorVariants.map((variant) => (
-                                    <CommandItem
-                                      key={variant.id}
-                                      value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
-                                      onSelect={() => {
-                                        updateItem(index, 'product_id', variant.id);
-                                        setColorOpens(prev => ({ ...prev, [index]: false }));
-                                      }}
-                                      className="cursor-pointer"
-                                    >
-                                      <div className="flex items-center space-x-2">
-                                        {variant.color_code && (
-                                          <div 
-                                            className="w-4 h-4 rounded border border-gray-400"
-                                            style={{ backgroundColor: variant.color_code }}
-                                          ></div>
-                                        )}
-                                        <span>
-                                          {variant.color || '無顏色'} {variant.color_code ? `(${variant.color_code})` : ''}
-                                        </span>
-                                      </div>
-                                      <Check
-                                        className={cn(
-                                          "ml-auto h-4 w-4",
-                                          item.product_id === variant.id ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-gray-800">訂購數量 (公斤) *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.ordered_quantity}
-                          onChange={(e) => updateItem(index, 'ordered_quantity', parseFloat(e.target.value) || 0)}
-                          className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-gray-800">單價 *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.unit_price}
-                          onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-gray-600">
-                      小計: ${(item.ordered_quantity * item.unit_price).toFixed(2)}
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
+          <PurchaseItemsSection
+            items={items}
+            products={products}
+            uniqueProductNames={uniqueProductNames}
+            getColorVariants={getColorVariants}
+            addItem={addItem}
+            removeItem={removeItem}
+            updateItem={updateItem}
+            productNameOpens={productNameOpens}
+            setProductNameOpens={setProductNameOpens}
+            colorOpens={colorOpens}
+            setColorOpens={setColorOpens}
+          />
 
           {/* Note */}
           <div className="space-y-2">
