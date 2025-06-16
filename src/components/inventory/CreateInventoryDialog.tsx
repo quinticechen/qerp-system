@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -110,13 +109,31 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
   const selectedPurchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
 
-  const generateRollNumber = () => {
-    const date = new Date();
-    const year = date.getFullYear().toString().slice(-2);
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const timestamp = Date.now().toString().slice(-6);
-    return `R${year}${month}${day}${timestamp}`;
+  const generateRollNumber = async () => {
+    // 使用更精確的時間戳和隨機數來避免重複
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const timestamp = now.getTime().toString();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    let rollNumber = `R${year}${month}${day}${timestamp.slice(-6)}${random}`;
+    
+    // 檢查是否已存在，如果存在則重新生成
+    const { data: existingRoll } = await supabase
+      .from('inventory_rolls')
+      .select('id')
+      .eq('roll_number', rollNumber)
+      .single();
+    
+    if (existingRoll) {
+      // 如果存在重複，加上更多隨機數
+      const extraRandom = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      rollNumber = `R${year}${month}${day}${timestamp.slice(-4)}${extraRandom}`;
+    }
+    
+    return rollNumber;
   };
 
   const toggleProductSelection = (orderItem: PurchaseOrderItem, checked: boolean) => {
@@ -196,6 +213,12 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         throw new Error('請確保所有布卷都有完整的資訊（倉庫、重量）');
       }
 
+      console.log('Creating inventory with data:', {
+        selectedPurchaseOrderId,
+        purchaseOrder,
+        selectedProducts
+      });
+
       // 創建庫存記錄
       const { data: inventory, error: inventoryError } = await supabase
         .from('inventories')
@@ -209,28 +232,46 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .select()
         .single();
 
-      if (inventoryError) throw inventoryError;
+      if (inventoryError) {
+        console.error('Inventory creation error:', inventoryError);
+        throw inventoryError;
+      }
 
-      // 創建所有布卷記錄
-      const allRolls = selectedProducts.flatMap(product => 
-        product.rolls.map(roll => ({
-          inventory_id: inventory.id,
-          product_id: roll.productId,
-          roll_number: generateRollNumber(),
-          quantity: roll.quantity,
-          current_quantity: roll.quantity,
-          quality: roll.quality,
-          warehouse_id: roll.warehouseId,
-          shelf: roll.shelf || null
-        }))
-      );
+      console.log('Inventory created successfully:', inventory);
 
-      const { error: rollsError } = await supabase
-        .from('inventory_rolls')
-        .insert(allRolls);
+      // 為每個布卷生成唯一編號並創建記錄
+      const allRolls = [];
+      for (const product of selectedProducts) {
+        for (const roll of product.rolls) {
+          const rollNumber = await generateRollNumber();
+          allRolls.push({
+            inventory_id: inventory.id,
+            product_id: roll.productId,
+            roll_number: rollNumber,
+            quantity: roll.quantity,
+            current_quantity: roll.quantity,
+            quality: roll.quality,
+            warehouse_id: roll.warehouseId,
+            shelf: roll.shelf || null
+          });
+        }
+      }
 
-      if (rollsError) throw rollsError;
+      console.log('Creating rolls with data:', allRolls);
 
+      // 逐個插入布卷記錄以避免編號衝突
+      for (const rollData of allRolls) {
+        const { error: rollError } = await supabase
+          .from('inventory_rolls')
+          .insert(rollData);
+
+        if (rollError) {
+          console.error('Roll creation error:', rollError, 'Roll data:', rollData);
+          throw rollError;
+        }
+      }
+
+      console.log('All rolls created successfully');
       return inventory;
     },
     onSuccess: () => {
@@ -245,6 +286,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       resetForm();
     },
     onError: (error: any) => {
+      console.error('Inventory creation failed:', error);
       toast({
         title: "入庫失敗",
         description: error.message,
