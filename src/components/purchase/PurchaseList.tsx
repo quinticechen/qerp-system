@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Search, Filter } from 'lucide-react';
+import { Eye, Edit, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewPurchaseDialog } from './ViewPurchaseDialog';
@@ -143,111 +144,114 @@ export const PurchaseList = () => {
       </Card>
 
       {/* 採購單列表 */}
-      <div className="grid gap-4">
-        {filteredPurchases?.map((purchase) => {
-          const totalAmount = purchase.purchase_order_items?.reduce(
-            (sum: number, item: any) => sum + (item.ordered_quantity * item.unit_price), 
-            0
-          ) || 0;
-          
-          const totalQuantity = purchase.purchase_order_items?.reduce(
-            (sum: number, item: any) => sum + item.ordered_quantity, 
-            0
-          ) || 0;
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-gray-900">採購單列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-gray-900">採購單號</TableHead>
+                  <TableHead className="text-gray-900">工廠</TableHead>
+                  <TableHead className="text-gray-900">狀態</TableHead>
+                  <TableHead className="text-gray-900">總數量</TableHead>
+                  <TableHead className="text-gray-900">總金額</TableHead>
+                  <TableHead className="text-gray-900">項目數</TableHead>
+                  <TableHead className="text-gray-900">預計到貨</TableHead>
+                  <TableHead className="text-gray-900">關聯訂單</TableHead>
+                  <TableHead className="text-gray-900">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPurchases?.map((purchase) => {
+                  const totalAmount = purchase.purchase_order_items?.reduce(
+                    (sum: number, item: any) => sum + (item.ordered_quantity * item.unit_price), 
+                    0
+                  ) || 0;
+                  
+                  const totalQuantity = purchase.purchase_order_items?.reduce(
+                    (sum: number, item: any) => sum + item.ordered_quantity, 
+                    0
+                  ) || 0;
 
-          // 獲取關聯訂單
-          const relatedOrders = purchase.purchase_order_relations?.map((rel: any) => rel.orders) || [];
+                  // 獲取關聯訂單
+                  const relatedOrders = purchase.purchase_order_relations?.map((rel: any) => rel.orders) || [];
 
-          return (
-            <Card key={purchase.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{purchase.po_number}</h3>
-                    <p className="text-gray-600">工廠：{purchase.factories?.name}</p>
-                    {relatedOrders.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-gray-600 font-medium">關聯訂單：</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {relatedOrders.map((order: any, index: number) => (
-                            <div key={index} className="flex items-center">
-                              <Badge variant="outline" className="text-xs">
+                  return (
+                    <TableRow key={purchase.id}>
+                      <TableCell className="font-medium text-gray-900">
+                        {purchase.po_number}
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        {purchase.factories?.name}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(purchase.status)}
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        {totalQuantity.toFixed(2)} 公斤
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        ${totalAmount.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        {purchase.purchase_order_items?.length || 0}
+                      </TableCell>
+                      <TableCell className="text-gray-700">
+                        {purchase.expected_arrival_date 
+                          ? new Date(purchase.expected_arrival_date).toLocaleDateString('zh-TW')
+                          : '未設定'
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {relatedOrders.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {relatedOrders.map((order: any, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs">
                                 {order.order_number}
                               </Badge>
-                              {order.note && (
-                                <span className="text-xs text-gray-500 ml-1">({order.note})</span>
-                              )}
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleView(purchase)}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(purchase)}
+                            className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    {getStatusBadge(purchase.status)}
-                    <p className="text-sm text-gray-500 mt-1">
-                      {new Date(purchase.order_date).toLocaleDateString('zh-TW')}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500">總數量</p>
-                    <p className="font-medium text-gray-900">{totalQuantity.toFixed(2)} 公斤</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">總金額</p>
-                    <p className="font-medium text-gray-900">${totalAmount.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">項目數</p>
-                    <p className="font-medium text-gray-900">{purchase.purchase_order_items?.length || 0}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">預計到貨</p>
-                    <p className="font-medium text-gray-900">
-                      {purchase.expected_arrival_date 
-                        ? new Date(purchase.expected_arrival_date).toLocaleDateString('zh-TW')
-                        : '未設定'
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleView(purchase)}
-                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    查看
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(purchase)}
-                    className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    編輯
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-
-        {filteredPurchases?.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500">沒有找到採購單</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {filteredPurchases?.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              沒有找到採購單
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 對話框 */}
       {selectedPurchase && (

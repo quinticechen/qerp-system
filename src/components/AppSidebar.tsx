@@ -1,0 +1,73 @@
+
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader
+} from '@/components/ui/sidebar';
+import { 
+  Package, 
+  Users, 
+  Factory, 
+  Warehouse, 
+  ShoppingCart, 
+  BarChart3,
+  Settings,
+  User,
+  ClipboardList,
+  Truck
+} from 'lucide-react';
+
+export function AppSidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const menuItems = [
+    { id: 'dashboard', label: '儀表板', icon: BarChart3, path: '/dashboard' },
+    { id: 'product', label: '產品管理', icon: Package, path: '/product' },
+    { id: 'order', label: '訂單管理', icon: ShoppingCart, path: '/order' },
+    { id: 'purchase', label: '採購管理', icon: ClipboardList, path: '/purchase' },
+    { id: 'inventory', label: '庫存管理', icon: Warehouse, path: '/inventory' },
+    { id: 'shipping', label: '出貨管理', icon: Truck, path: '/shipping' },
+    { id: 'factory', label: '工廠管理', icon: Factory, path: '/factory' },
+    { id: 'customer', label: '客戶管理', icon: Users, path: '/customer' },
+    { id: 'user', label: '用戶管理', icon: User, path: '/user' },
+    { id: 'system', label: '系統設定', icon: Settings, path: '/system' }
+  ];
+
+  return (
+    <Sidebar className="border-r border-slate-200">
+      <SidebarHeader className="p-4">
+        <h2 className="text-lg font-semibold text-gray-900">管理系統</h2>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>主要功能</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    onClick={() => navigate(item.path)}
+                    isActive={location.pathname === item.path}
+                    className="w-full"
+                  >
+                    <item.icon size={20} />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
+}

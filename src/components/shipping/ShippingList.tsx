@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -118,78 +119,82 @@ export const ShippingList = () => {
       </Card>
 
       {/* 出貨單列表 */}
-      <div className="grid gap-4">
-        {shippings?.map((shipping) => (
-          <Card key={shipping.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{shipping.shipping_number}</h3>
-                  <p className="text-gray-600">客戶：{shipping.customers?.name}</p>
-                  {shipping.orders && (
-                    <p className="text-gray-600">關聯訂單：{shipping.orders.order_number}</p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">
-                    {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div>
-                  <p className="text-sm text-gray-500">總重量</p>
-                  <p className="font-medium text-gray-900">{shipping.total_shipped_quantity} 公斤</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">總卷數</p>
-                  <p className="font-medium text-gray-900">{shipping.total_shipped_rolls}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">項目數</p>
-                  <p className="font-medium text-gray-900">{shipping.shipping_items?.length || 0}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">出貨日期</p>
-                  <p className="font-medium text-gray-900">
-                    {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleView(shipping)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  查看
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(shipping)}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  編輯
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {shippings?.length === 0 && (
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-gray-500">沒有找到出貨單</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-gray-900">出貨單列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-gray-900">出貨單號</TableHead>
+                  <TableHead className="text-gray-900">客戶</TableHead>
+                  <TableHead className="text-gray-900">關聯訂單</TableHead>
+                  <TableHead className="text-gray-900">總重量</TableHead>
+                  <TableHead className="text-gray-900">總卷數</TableHead>
+                  <TableHead className="text-gray-900">項目數</TableHead>
+                  <TableHead className="text-gray-900">出貨日期</TableHead>
+                  <TableHead className="text-gray-900">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shippings?.map((shipping) => (
+                  <TableRow key={shipping.id}>
+                    <TableCell className="font-medium text-gray-900">
+                      {shipping.shipping_number}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {shipping.customers?.name}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {shipping.orders?.order_number || '-'}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {shipping.total_shipped_quantity} 公斤
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {shipping.total_shipped_rolls}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {shipping.shipping_items?.length || 0}
+                    </TableCell>
+                    <TableCell className="text-gray-700">
+                      {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleView(shipping)}
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(shipping)}
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {shippings?.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              沒有找到出貨單
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 對話框 */}
       {selectedShipping && (
