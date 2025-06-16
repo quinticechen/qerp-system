@@ -113,7 +113,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   const selectedPurchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
 
   const generateRollNumber = async () => {
-    // 使用更精確的時間戳和隨機數來避免重複
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -123,7 +122,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
     
     let rollNumber = `R${year}${month}${day}${timestamp.slice(-6)}${random}`;
     
-    // 檢查是否已存在，如果存在則重新生成
     const { data: existingRoll } = await supabase
       .from('inventory_rolls')
       .select('id')
@@ -131,7 +129,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       .single();
     
     if (existingRoll) {
-      // 如果存在重複，加上更多隨機數
       const extraRandom = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       rollNumber = `R${year}${month}${day}${timestamp.slice(-4)}${extraRandom}`;
     }
@@ -139,7 +136,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
     return rollNumber;
   };
 
-  // 檢查布卷重量是否超過叫貨數量
   const checkWeightExceedsOrdered = () => {
     const purchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
     if (!purchaseOrder) return false;
@@ -226,7 +222,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         throw new Error('找不到選中的採購單');
       }
 
-      // 驗證所有布卷都有完整資訊
       const invalidRolls = selectedProducts.some(product => 
         product.rolls.some(roll => !roll.warehouseId || roll.quantity <= 0)
       );
@@ -235,13 +230,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         throw new Error('請確保所有布卷都有完整的資訊（倉庫、重量）');
       }
 
-      console.log('Creating inventory with data:', {
-        selectedPurchaseOrderId,
-        purchaseOrder,
-        selectedProducts
-      });
-
-      // 創建庫存記錄
       const { data: inventory, error: inventoryError } = await supabase
         .from('inventories')
         .insert({
@@ -255,13 +243,9 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .single();
 
       if (inventoryError) {
-        console.error('Inventory creation error:', inventoryError);
         throw inventoryError;
       }
 
-      console.log('Inventory created successfully:', inventory);
-
-      // 為每個布卷生成唯一編號並創建記錄
       const allRolls = [];
       for (const product of selectedProducts) {
         for (const roll of product.rolls) {
@@ -279,21 +263,16 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         }
       }
 
-      console.log('Creating rolls with data:', allRolls);
-
-      // 逐個插入布卷記錄以避免編號衝突
       for (const rollData of allRolls) {
         const { error: rollError } = await supabase
           .from('inventory_rolls')
           .insert(rollData);
 
         if (rollError) {
-          console.error('Roll creation error:', rollError, 'Roll data:', rollData);
           throw rollError;
         }
       }
 
-      console.log('All rolls created successfully');
       return inventory;
     },
     onSuccess: () => {
@@ -308,7 +287,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       resetForm();
     },
     onError: (error: any) => {
-      console.error('Inventory creation failed:', error);
       toast({
         title: "入庫失敗",
         description: error.message,
@@ -326,7 +304,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   };
 
   const handleSubmit = () => {
-    // 檢查是否有重量超過的情況
     if (checkWeightExceedsOrdered() && !forceCreateInventory) {
       setShowWeightWarning(true);
       return;
@@ -365,7 +342,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           </DialogHeader>
           
           <div className="space-y-6">
-            {/* 採購單選擇 */}
             <div className="space-y-2">
               <Label className="text-gray-800">採購單 *</Label>
               <Popover open={purchaseOrderSearchOpen} onOpenChange={setPurchaseOrderSearchOpen}>
@@ -428,7 +404,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
               </Popover>
             </div>
 
-            {/* 到貨日期 */}
             <div className="space-y-2">
               <Label className="text-gray-800">到貨日期 *</Label>
               <Input
@@ -438,196 +413,192 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                 className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          {/* 備註 */}
-          <div className="space-y-2">
-            <Label className="text-gray-800">備註</Label>
-            <Textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="輸入備註..."
-              className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label className="text-gray-800">備註</Label>
+              <Textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="輸入備註..."
+                className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
 
-          {/* 採購單產品列表 */}
-          {selectedPurchaseOrder && selectedPurchaseOrder.purchase_order_items && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-gray-900">採購單項目</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selectedPurchaseOrder.purchase_order_items.map((item) => {
-                  const isSelected = selectedProducts.some(sp => sp.orderItemId === item.id);
-                  const selectedProduct = selectedProducts.find(sp => sp.orderItemId === item.id);
-                  const remainingQuantity = item.ordered_quantity - (item.received_quantity || 0);
+            {selectedPurchaseOrder && selectedPurchaseOrder.purchase_order_items && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-gray-900">採購單項目</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedPurchaseOrder.purchase_order_items.map((item) => {
+                    const isSelected = selectedProducts.some(sp => sp.orderItemId === item.id);
+                    const selectedProduct = selectedProducts.find(sp => sp.orderItemId === item.id);
+                    const remainingQuantity = item.ordered_quantity - (item.received_quantity || 0);
 
-                  return (
-                    <div key={item.id} className="border border-gray-200 rounded p-4 space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={(checked) => toggleProductSelection(item, checked as boolean)}
-                          className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            {item.products_new.color_code && (
-                              <div 
-                                className="w-6 h-6 rounded border border-gray-400 flex-shrink-0"
-                                style={{ backgroundColor: item.products_new.color_code }}
-                              />
-                            )}
-                            <div>
-                              <h4 className="font-medium text-gray-900">
-                                {item.products_new.name}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                {item.products_new.color && `顏色: ${item.products_new.color}`}
-                                {item.products_new.color_code && ` (${item.products_new.color_code})`}
-                              </p>
+                    return (
+                      <div key={item.id} className="border border-gray-200 rounded p-4 space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => toggleProductSelection(item, checked as boolean)}
+                            className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3">
+                              {item.products_new.color_code && (
+                                <div 
+                                  className="w-6 h-6 rounded border border-gray-400 flex-shrink-0"
+                                  style={{ backgroundColor: item.products_new.color_code }}
+                                />
+                              )}
+                              <div>
+                                <h4 className="font-medium text-gray-900">
+                                  {item.products_new.name}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  {item.products_new.color && `顏色: ${item.products_new.color}`}
+                                  {item.products_new.color_code && ` (${item.products_new.color_code})`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex space-x-2 mt-2">
+                              <Badge variant="outline">
+                                叫貨: {item.ordered_quantity.toFixed(2)} kg
+                              </Badge>
+                              <Badge variant="secondary">
+                                已收: {(item.received_quantity || 0).toFixed(2)} kg
+                              </Badge>
+                              <Badge variant="default">
+                                待收: {remainingQuantity.toFixed(2)} kg
+                              </Badge>
                             </div>
                           </div>
-                          <div className="flex space-x-2 mt-2">
-                            <Badge variant="outline">
-                              叫貨: {item.ordered_quantity.toFixed(2)} kg
-                            </Badge>
-                            <Badge variant="secondary">
-                              已收: {(item.received_quantity || 0).toFixed(2)} kg
-                            </Badge>
-                            <Badge variant="default">
-                              待收: {remainingQuantity.toFixed(2)} kg
-                            </Badge>
-                          </div>
                         </div>
-                      </div>
 
-                      {isSelected && selectedProduct && (
-                        <div className="pl-6 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <Label className="text-gray-800">布卷記錄</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addRollToProduct(item.id, item.product_id)}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              新增布卷
-                            </Button>
-                          </div>
+                        {isSelected && selectedProduct && (
+                          <div className="pl-6 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <Label className="text-gray-800">布卷記錄</Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addRollToProduct(item.id, item.product_id)}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                新增布卷
+                              </Button>
+                            </div>
 
-                          {selectedProduct.rolls.map((roll, rollIndex) => (
-                            <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-3 border border-gray-100 rounded">
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">重量 (kg)</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={roll.quantity || 0}
-                                  onChange={(e) => {
-                                    const value = parseFloat(e.target.value) || 0;
-                                    updateRoll(item.id, rollIndex, 'quantity', value);
-                                  }}
-                                  className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">品級</Label>
-                                <Select
-                                  value={roll.quality}
-                                  onValueChange={(value) => updateRoll(item.id, rollIndex, 'quality', value)}
-                                >
-                                  <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="A">A級</SelectItem>
-                                    <SelectItem value="B">B級</SelectItem>
-                                    <SelectItem value="C">C級</SelectItem>
-                                    <SelectItem value="D">D級</SelectItem>
-                                    <SelectItem value="defective">瑕疵品</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">倉庫 *</Label>
-                                <Select
-                                  value={roll.warehouseId}
-                                  onValueChange={(value) => updateRoll(item.id, rollIndex, 'warehouseId', value)}
-                                >
-                                  <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                                    <SelectValue placeholder="選擇倉庫" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {warehouses?.map((warehouse) => (
-                                      <SelectItem key={warehouse.id} value={warehouse.id}>
-                                        {warehouse.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">貨架位置</Label>
-                                <div className="flex space-x-2">
+                            {selectedProduct.rolls.map((roll, rollIndex) => (
+                              <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-3 border border-gray-100 rounded">
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">重量 (kg)</Label>
                                   <Input
-                                    value={roll.shelf || ''}
-                                    onChange={(e) => updateRoll(item.id, rollIndex, 'shelf', e.target.value)}
-                                    placeholder="選填"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={roll.quantity || 0}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value) || 0;
+                                      updateRoll(item.id, rollIndex, 'quantity', value);
+                                    }}
                                     className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                                   />
-                                  {selectedProduct.rolls.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => removeRollFromProduct(item.id, rollIndex)}
-                                      className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">品級</Label>
+                                  <Select
+                                    value={roll.quality}
+                                    onValueChange={(value) => updateRoll(item.id, rollIndex, 'quality', value)}
+                                  >
+                                    <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="A">A級</SelectItem>
+                                      <SelectItem value="B">B級</SelectItem>
+                                      <SelectItem value="C">C級</SelectItem>
+                                      <SelectItem value="D">D級</SelectItem>
+                                      <SelectItem value="defective">瑕疵品</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">倉庫 *</Label>
+                                  <Select
+                                    value={roll.warehouseId}
+                                    onValueChange={(value) => updateRoll(item.id, rollIndex, 'warehouseId', value)}
+                                  >
+                                    <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                      <SelectValue placeholder="選擇倉庫" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {warehouses?.map((warehouse) => (
+                                        <SelectItem key={warehouse.id} value={warehouse.id}>
+                                          {warehouse.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">貨架位置</Label>
+                                  <div className="flex space-x-2">
+                                    <Input
+                                      value={roll.shelf || ''}
+                                      onChange={(e) => updateRoll(item.id, rollIndex, 'shelf', e.target.value)}
+                                      placeholder="選填"
+                                      className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                    />
+                                    {selectedProduct.rolls.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeRollFromProduct(item.id, rollIndex)}
+                                        className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="text-gray-700 border-gray-300 hover:bg-gray-50"
-          >
-            取消
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={createInventoryMutation.isPending || !selectedPurchaseOrderId || selectedProducts.length === 0}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {createInventoryMutation.isPending ? '處理中...' : '確認入庫'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="text-gray-700 border-gray-300 hover:bg-gray-50"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createInventoryMutation.isPending || !selectedPurchaseOrderId || selectedProducts.length === 0}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {createInventoryMutation.isPending ? '處理中...' : '確認入庫'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* 重量超過警告對話框 */}
       <AlertDialog open={showWeightWarning} onOpenChange={setShowWeightWarning}>
         <AlertDialogContent>
           <AlertDialogHeader>
