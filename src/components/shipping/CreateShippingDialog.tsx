@@ -5,11 +5,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown, Plus, Trash } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +28,7 @@ interface OrderProduct {
   products_new: {
     name: string;
     color?: string;
+    color_code?: string;
   };
 }
 
@@ -51,6 +54,11 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   const [shippingDate, setShippingDate] = useState(new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [selectedItems, setSelectedItems] = useState<ShippingItem[]>([]);
+  
+  // UI state for popovers
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const [rollSelectors, setRollSelectors] = useState<{[key: string]: boolean}>({});
 
   // 獲取客戶
   const { data: customers } = useQuery({
@@ -98,10 +106,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           product_id,
           quantity,
           shipped_quantity,
-          products_new (name, color)
+          products_new (name, color, color_code)
         `)
         .eq('order_id', orderId)
-        .neq('status', 'shipped'); // 只顯示未完全出貨的項目
+        .neq('status', 'shipped');
       
       if (error) throw error;
       return data as OrderProduct[];
@@ -130,7 +138,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           current_quantity,
           quality,
           product_id,
-          products_new (name, color)
+          products_new (name, color, color_code)
         `)
         .in('product_id', productIds)
         .eq('is_allocated', false)
@@ -154,12 +162,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // 計算總計
       const allRolls = shippingData.items.flatMap(item => item.rolls);
       const totalShippedQuantity = allRolls.reduce((sum, roll) => sum + roll.shipped_quantity, 0);
       const totalShippedRolls = allRolls.length;
 
-      // 建立出貨記錄
       const { data: shipping, error: shippingError } = await supabase
         .from('shippings')
         .insert({
@@ -170,14 +176,13 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
           user_id: user.id,
-          shipping_number: '' // 由觸發器自動生成
+          shipping_number: ''
         } as any)
         .select()
         .single();
 
       if (shippingError) throw shippingError;
 
-      // 建立出貨項目
       const itemsToInsert = allRolls.map(roll => ({
         shipping_id: shipping.id,
         inventory_roll_id: roll.inventory_roll_id,
@@ -190,7 +195,6 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
       if (itemsError) throw itemsError;
 
-      // 更新庫存布卷數量
       for (const roll of allRolls) {
         const inventoryRoll = availableRolls?.find(r => r.id === roll.inventory_roll_id);
         if (inventoryRoll) {
@@ -237,15 +241,17 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     setShippingDate(new Date().toISOString().split('T')[0]);
     setNote('');
     setSelectedItems([]);
+    setRollSelectors({});
   };
 
   const toggleProductSelection = (orderProduct: OrderProduct, checked: boolean) => {
     if (checked) {
+      const remainingQuantity = orderProduct.quantity - (orderProduct.shipped_quantity || 0);
       setSelectedItems(prev => [...prev, {
         order_product_id: orderProduct.id,
         rolls: [{
           inventory_roll_id: '',
-          shipped_quantity: orderProduct.quantity - (orderProduct.shipped_quantity || 0)
+          shipped_quantity: remainingQuantity
         }]
       }]);
     } else {
@@ -331,6 +337,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     });
   };
 
+  const selectedCustomer = customers?.find(c => c.id === customerId);
+  const selectedOrder = orders?.find(o => o.id === orderId);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -343,42 +352,109 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 客戶選擇 */}
             <div className="space-y-2">
-              <Label htmlFor="customer" className="text-gray-800">客戶 *</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇客戶" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers?.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-gray-800">客戶 *</Label>
+              <Popover open={customerOpen} onOpenChange={setCustomerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                  >
+                    <span className="truncate">
+                      {selectedCustomer ? selectedCustomer.name : "選擇客戶..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+                  <Command>
+                    <CommandInput placeholder="搜尋客戶..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>未找到客戶。</CommandEmpty>
+                      <CommandGroup>
+                        {customers?.map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={customer.name}
+                            onSelect={() => {
+                              setCustomerId(customer.id);
+                              setOrderId('');
+                              setSelectedItems([]);
+                              setCustomerOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1">{customer.name}</span>
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                customerId === customer.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* 訂單選擇 */}
+            <div className="space-y-2">
+              <Label className="text-gray-800">訂單 *</Label>
+              <Popover open={orderOpen} onOpenChange={setOrderOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    disabled={!customerId}
+                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <span className="truncate">
+                      {selectedOrder ? selectedOrder.order_number : "選擇訂單..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+                  <Command>
+                    <CommandInput placeholder="搜尋訂單..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>未找到訂單。</CommandEmpty>
+                      <CommandGroup>
+                        {orders?.map((order) => (
+                          <CommandItem
+                            key={order.id}
+                            value={order.order_number}
+                            onSelect={() => {
+                              setOrderId(order.id);
+                              setSelectedItems([]);
+                              setOrderOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <span className="flex-1">{order.order_number}</span>
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                orderId === order.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="order" className="text-gray-800">訂單 *</Label>
-              <Select value={orderId} onValueChange={setOrderId} disabled={!customerId}>
-                <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇訂單" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orders?.map((order) => (
-                    <SelectItem key={order.id} value={order.id}>
-                      {order.order_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shipping_date" className="text-gray-800">出貨日期 *</Label>
+              <Label className="text-gray-800">出貨日期 *</Label>
               <Input
-                id="shipping_date"
                 type="date"
                 value={shippingDate}
                 onChange={(e) => setShippingDate(e.target.value)}
@@ -387,9 +463,8 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="note" className="text-gray-800">備註</Label>
+              <Label className="text-gray-800">備註</Label>
               <Textarea
-                id="note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="輸入備註..."
@@ -418,19 +493,36 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                           onCheckedChange={(checked) => toggleProductSelection(product, checked as boolean)}
                           className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                         />
-                        <div>
-                          <h4 className="font-medium text-gray-900">
-                            {product.products_new.name} {product.products_new.color && `(${product.products_new.color})`}
-                          </h4>
-                          <p className="text-sm text-gray-600">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3">
+                            {product.products_new.color_code && (
+                              <div 
+                                className="w-6 h-6 rounded border border-gray-400 flex-shrink-0"
+                                style={{ backgroundColor: product.products_new.color_code }}
+                              />
+                            )}
+                            <div>
+                              <h4 className="font-medium text-gray-900">
+                                {product.products_new.name}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {product.products_new.color && `顏色: ${product.products_new.color}`}
+                                {product.products_new.color_code && ` (${product.products_new.color_code})`}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
                             訂單數量: {product.quantity}kg | 
                             已出貨: {product.shipped_quantity || 0}kg | 
                             待出貨: {remainingQuantity}kg
                           </p>
+                          {availableRollsForProduct.length === 0 && (
+                            <p className="text-sm text-red-600 mt-1">⚠️ 無庫存</p>
+                          )}
                         </div>
                       </div>
 
-                      {isSelected && selectedItem && (
+                      {isSelected && selectedItem && availableRollsForProduct.length > 0 && (
                         <div className="pl-6 space-y-3">
                           <div className="flex justify-between items-center">
                             <Label className="text-gray-800">選擇布卷</Label>
@@ -446,58 +538,102 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                             </Button>
                           </div>
 
-                          {selectedItem.rolls.map((roll, rollIndex) => (
-                            <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">選擇布卷</Label>
-                                <Select 
-                                  value={roll.inventory_roll_id}
-                                  onValueChange={(value) => updateRollSelection(product.id, rollIndex, value)}
-                                >
-                                  <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                                    <SelectValue placeholder="選擇布卷" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableRollsForProduct.map((availableRoll) => (
-                                      <SelectItem key={availableRoll.id} value={availableRoll.id}>
-                                        {availableRoll.roll_number} - 庫存: {availableRoll.current_quantity}kg - {availableRoll.quality}級
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="text-gray-800">出貨數量 (公斤)</Label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  max={Math.min(
-                                    remainingQuantity,
-                                    availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.current_quantity || 0
-                                  )}
-                                  value={roll.shipped_quantity || 0}
-                                  onChange={(e) => updateRollQuantity(product.id, rollIndex, parseFloat(e.target.value) || 0)}
-                                  className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                                />
-                              </div>
-
-                              <div className="flex items-end">
-                                {selectedItem.rolls.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => removeRollFromItem(product.id, rollIndex)}
-                                    className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                          {selectedItem.rolls.map((roll, rollIndex) => {
+                            const rollSelectorKey = `${product.id}-${rollIndex}`;
+                            return (
+                              <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">選擇布卷</Label>
+                                  <Popover 
+                                    open={rollSelectors[rollSelectorKey] || false} 
+                                    onOpenChange={(open) => setRollSelectors(prev => ({...prev, [rollSelectorKey]: open}))}
                                   >
-                                    <Trash className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                                      >
+                                        <span className="truncate">
+                                          {roll.inventory_roll_id ? 
+                                            availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.roll_number || "選擇布卷" 
+                                            : "選擇布卷"
+                                          }
+                                        </span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+                                      <Command>
+                                        <CommandInput placeholder="搜尋布卷..." className="h-9" />
+                                        <CommandList>
+                                          <CommandEmpty>未找到布卷。</CommandEmpty>
+                                          <CommandGroup>
+                                            {availableRollsForProduct.map((availableRoll) => (
+                                              <CommandItem
+                                                key={availableRoll.id}
+                                                value={`${availableRoll.roll_number} ${availableRoll.quality}`}
+                                                onSelect={() => {
+                                                  updateRollSelection(product.id, rollIndex, availableRoll.id);
+                                                  setRollSelectors(prev => ({...prev, [rollSelectorKey]: false}));
+                                                }}
+                                                className="cursor-pointer"
+                                              >
+                                                <div className="flex-1">
+                                                  <div className="font-medium">
+                                                    {availableRoll.roll_number}
+                                                  </div>
+                                                  <div className="text-sm text-gray-600">
+                                                    庫存: {availableRoll.current_quantity}kg - {availableRoll.quality}級
+                                                  </div>
+                                                </div>
+                                                <Check
+                                                  className={cn(
+                                                    "ml-auto h-4 w-4",
+                                                    roll.inventory_roll_id === availableRoll.id ? "opacity-100" : "opacity-0"
+                                                  )}
+                                                />
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-gray-800">出貨數量 (公斤)</Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max={Math.min(
+                                      remainingQuantity,
+                                      availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.current_quantity || 0
+                                    )}
+                                    value={roll.shipped_quantity || 0}
+                                    onChange={(e) => updateRollQuantity(product.id, rollIndex, parseFloat(e.target.value) || 0)}
+                                    className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                  />
+                                </div>
+
+                                <div className="flex items-end">
+                                  {selectedItem.rolls.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => removeRollFromItem(product.id, rollIndex)}
+                                      className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                                    >
+                                      <Trash className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
