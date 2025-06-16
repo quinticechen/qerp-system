@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -62,6 +61,7 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
                     key={factory.id}
                     value={factory.name}
                     onSelect={() => {
+                      console.log("Selected factory ID:", factory.id);
                       setFactoryId(factory.id);
                       setFactoryOpen(false);
                     }}
