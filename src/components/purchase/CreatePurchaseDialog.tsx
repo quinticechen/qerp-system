@@ -255,24 +255,23 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     }
   };
 
-  const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
-    console.log('CreatePurchaseDialog - updateItem called:', { index, field, value });
-    console.log('CreatePurchaseDialog - Current items before update:', items);
-    
-    // Create a completely new array with immutable updates
-    const newItems = items.map((item, i) => {
-      if (i === index) {
-        const updatedItem = { ...item, [field]: value };
-        console.log('CreatePurchaseDialog - Updated item at index', index, ':', updatedItem);
-        return updatedItem;
+  const updateItem = (index: number, field: keyof PurchaseItem | Partial<PurchaseItem>, value?: any) => {
+    setItems(prevItems => {
+      const newItems = [...prevItems];
+      if (typeof field === 'string') {
+        // 單一欄位更新
+        const updatedItem = { ...newItems[index], [field]: value };
+        console.log('CreatePurchaseDialog - Updated single item field at index', index, ':', updatedItem);
+        newItems[index] = updatedItem;
+      } else {
+        // 多個欄位更新 (field 是一個 Partial<PurchaseItem> 物件)
+        const updatedItem = { ...newItems[index], ...field };
+        console.log('CreatePurchaseDialog - Updated multiple item fields at index', index, ':', updatedItem);
+        newItems[index] = updatedItem;
       }
-      return item;
+      console.log('CreatePurchaseDialog - New items array after update:', newItems);
+      return newItems;
     });
-    
-    console.log('CreatePurchaseDialog - New items array after update:', newItems);
-    setItems(newItems);
-    
-    // Force re-render by updating a timestamp or counter if needed
     console.log('CreatePurchaseDialog - setItems called with new array');
   };
 
