@@ -29,27 +29,34 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
 }) => {
   return (
     <div className="space-y-2">
-      <Label htmlFor="factory" className="text-gray-800">工廠 *</Label>
+      <Label htmlFor="factory" className="text-gray-800 font-medium">工廠 *</Label>
       <Popover open={factoryOpen} onOpenChange={setFactoryOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             role="combobox"
             aria-expanded={factoryOpen}
-            className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+            className="w-full justify-between bg-white border-gray-300 text-gray-900 hover:bg-gray-50 focus:border-blue-500 focus:ring-blue-500"
           >
-            {factoryId
-              ? factories?.find((factory) => factory.id === factoryId)?.name
-              : "選擇工廠..."}
+            <span className="text-gray-900 opacity-100">
+              {factoryId
+                ? factories?.find((factory) => factory.id === factoryId)?.name
+                : "選擇工廠..."}
+            </span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-          <Command>
-            <CommandInput placeholder="搜尋工廠..." className="h-9" />
-            <CommandList>
-              <CommandEmpty>未找到工廠。</CommandEmpty>
-              <CommandGroup>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white border-gray-200 shadow-lg z-50">
+          <Command className="bg-white">
+            <CommandInput 
+              placeholder="搜尋工廠..." 
+              className="h-9 border-0 text-gray-900 placeholder:text-gray-500" 
+            />
+            <CommandList className="bg-white">
+              <CommandEmpty className="text-gray-500 text-sm py-6 text-center">
+                未找到工廠。
+              </CommandEmpty>
+              <CommandGroup className="bg-white">
                 {factories?.map((factory) => (
                   <CommandItem
                     key={factory.id}
@@ -58,12 +65,12 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
                       setFactoryId(factory.id);
                       setFactoryOpen(false);
                     }}
-                    className="cursor-pointer hover:bg-gray-100"
+                    className="cursor-pointer text-gray-900 hover:bg-blue-50 hover:text-blue-900 data-[selected]:bg-blue-50 data-[selected]:text-blue-900"
                   >
-                    {factory.name}
+                    <span className="text-gray-900">{factory.name}</span>
                     <Check
                       className={cn(
-                        "ml-auto h-4 w-4",
+                        "ml-auto h-4 w-4 text-blue-600",
                         factoryId === factory.id ? "opacity-100" : "opacity-0"
                       )}
                     />
