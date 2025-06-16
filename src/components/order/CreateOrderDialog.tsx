@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -57,21 +58,35 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       // 獲取下一個訂單編號的預覽
       const fetchNextOrderNumber = async () => {
         try {
-          const { data: seqData } = await supabase.rpc('nextval', { 
-            sequence_name: 'order_daily_seq' 
-          });
-          
+          // 獲取今日最新的訂單編號來計算下一個序號
           const now = new Date();
           const year = now.getFullYear().toString().slice(-2);
           const month = String(now.getMonth() + 1).padStart(2, '0');
           const day = String(now.getDate()).padStart(2, '0');
-          const seqNum = seqData || 1;
-          const formattedSeq = String(seqNum).padStart(3, '0');
-          const preview = `${year}K${month}${day}-${formattedSeq}`;
+          const todayPrefix = `${year}K${month}${day}-`;
+          
+          const { data: latestOrders } = await supabase
+            .from('orders')
+            .select('order_number')
+            .like('order_number', `${todayPrefix}%`)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          let nextSeq = 1;
+          if (latestOrders && latestOrders.length > 0) {
+            const latestNumber = latestOrders[0].order_number;
+            const seqPart = latestNumber.split('-')[1];
+            if (seqPart) {
+              nextSeq = parseInt(seqPart) + 1;
+            }
+          }
+          
+          const formattedSeq = String(nextSeq).padStart(3, '0');
+          const preview = `${todayPrefix}${formattedSeq}`;
           
           setGeneratedOrderNumber(preview);
         } catch (error) {
-          // 如果無法獲取序列，使用預設預覽
+          // 如果無法獲取，使用預設預覽
           const now = new Date();
           const year = now.getFullYear().toString().slice(-2);
           const month = String(now.getMonth() + 1).padStart(2, '0');
