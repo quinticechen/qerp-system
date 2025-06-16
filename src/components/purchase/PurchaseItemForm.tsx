@@ -94,11 +94,11 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={name}
                         value={name}
                         onSelect={(currentValue) => {
+                          console.log('Selected product name:', currentValue);
                           updateItem(index, 'selected_product_name', currentValue);
                           updateItem(index, 'product_id', '');
                           setProductNameOpen(false);
                         }}
-                        className="cursor-pointer hover:bg-blue-50 hover:text-blue-900 text-gray-900"
                       >
                         {name}
                         <Check
@@ -161,7 +161,6 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                           updateItem(index, 'product_id', variant.id);
                           setColorOpen(false);
                         }}
-                        className="cursor-pointer hover:bg-blue-50 hover:text-blue-900 text-gray-900"
                       >
                         <div className="flex items-center space-x-2">
                           {variant.color_code && (
