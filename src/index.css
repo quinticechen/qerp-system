@@ -108,22 +108,13 @@
     @apply border-border;
   }
 
-  /* 強制設定所有基礎元素的背景為白色 */
   html {
-    @apply bg-white text-slate-900;
-    background-color: white !important;
+    @apply bg-background text-foreground;
   }
 
   body {
-    @apply bg-white text-slate-900 antialiased;
-    background-color: white !important;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
-  }
-
-  /* 確保主要容器也是白色背景 */
-  #root {
-    @apply bg-white;
-    background-color: white !important;
   }
 
   /* Typography Scale - Clear Hierarchy */
@@ -267,29 +258,9 @@
   animation: fadeIn 0.2s ease-out;
 }
 
-/* 移動端樣式 - 徹底移除任何黃色背景設定 */
-@media (max-width: 768px) {
-  html, body, #root, main, div {
-    background-color: white !important;
-  }
-  
+/* Responsive utilities */
+@media (max-width: 640px) {
   .container-app {
     @apply px-3;
   }
-}
-
-/* 桌面端也確保白色背景 */
-@media (min-width: 769px) {
-  html, body, #root, main, div {
-    background-color: white !important;
-  }
-}
-
-/* 強制移除任何可能的黃色背景 */
-* {
-  background-color: inherit;
-}
-
-*:not(.bg-yellow-100):not(.bg-yellow-200):not(.bg-yellow-300):not(.bg-yellow-400):not(.bg-yellow-500):not(.bg-amber-100):not(.bg-amber-200):not(.bg-amber-300):not(.bg-amber-400):not(.bg-amber-500) {
-  background-color: inherit !important;
 }
