@@ -13,16 +13,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Search, Package, Clock, User } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Package, Clock, User, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-// 產品表單驗證模式 - 移除 unit_of_measure，固定為 'KG'
+// 顏色項目類型
+type ColorVariant = {
+  color: string;
+  color_code: string;
+};
+
+// 產品表單驗證模式 - 支援多個顏色變體
 const productSchema = z.object({
   name: z.string().min(1, '產品名稱為必填'),
   category: z.string().default('布料'),
-  color: z.string().optional(),
-  color_code: z.string().optional().transform(val => val ? val.toUpperCase() : val), // 自動轉大寫
+  colorVariants: z.array(z.object({
+    color: z.string().optional(),
+    color_code: z.string().optional().transform(val => val ? val.toUpperCase() : val), // 自動轉大寫
+  })).min(1, '至少需要一個顏色變體'),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -61,8 +69,7 @@ const ProductManagement = () => {
     defaultValues: {
       name: '',
       category: '布料',
-      color: '',
-      color_code: '',
+      colorVariants: [{ color: '', color_code: '' }],
     },
   });
 
@@ -130,6 +137,20 @@ const ProductManagement = () => {
     loadProducts();
   }, []);
 
+  // 新增顏色變體
+  const addColorVariant = () => {
+    const currentVariants = form.getValues('colorVariants');
+    form.setValue('colorVariants', [...currentVariants, { color: '', color_code: '' }]);
+  };
+
+  // 移除顏色變體
+  const removeColorVariant = (index: number) => {
+    const currentVariants = form.getValues('colorVariants');
+    if (currentVariants.length > 1) {
+      form.setValue('colorVariants', currentVariants.filter((_, i) => i !== index));
+    }
+  };
+
   // 新增或更新產品
   const onSubmit = async (data: ProductFormData) => {
     if (!user) {
@@ -176,19 +197,18 @@ const ProductManagement = () => {
         }
       }
 
-      const productData = {
-        name: data.name.trim(),
-        category: data.category || '布料',
-        color: data.color && data.color.trim() !== '' ? data.color.trim() : null,
-        color_code: data.color_code && data.color_code.trim() !== '' ? data.color_code.trim().toUpperCase() : null, // 確保大寫
-        unit_of_measure: 'KG', // 固定為 KG
-        user_id: user.id,
-      };
-
-      console.log('Final product data to submit:', productData);
-
       if (editingProduct) {
-        // 更新產品
+        // 更新產品 - 只更新第一個顏色變體
+        const firstVariant = data.colorVariants[0];
+        const productData = {
+          name: data.name.trim(),
+          category: data.category || '布料',
+          color: firstVariant.color && firstVariant.color.trim() !== '' ? firstVariant.color.trim() : null,
+          color_code: firstVariant.color_code && firstVariant.color_code.trim() !== '' ? firstVariant.color_code.trim().toUpperCase() : null,
+          unit_of_measure: 'KG',
+          user_id: user.id,
+        };
+
         console.log('Updating product with ID:', editingProduct.id);
         const { error } = await supabase
           .from('products_new')
@@ -205,11 +225,34 @@ const ProductManagement = () => {
           description: `產品「${data.name}」已更新`,
         });
       } else {
-        // 新增產品
-        console.log('Inserting new product...');
+        // 新增產品 - 為每個顏色變體創建一個產品記錄
+        const productsToInsert = data.colorVariants
+          .filter(variant => variant.color || variant.color_code) // 只有顏色或顏色代碼不為空的才創建
+          .map(variant => ({
+            name: data.name.trim(),
+            category: data.category || '布料',
+            color: variant.color && variant.color.trim() !== '' ? variant.color.trim() : null,
+            color_code: variant.color_code && variant.color_code.trim() !== '' ? variant.color_code.trim().toUpperCase() : null,
+            unit_of_measure: 'KG',
+            user_id: user.id,
+          }));
+
+        // 如果沒有任何顏色變體，創建一個基本產品
+        if (productsToInsert.length === 0) {
+          productsToInsert.push({
+            name: data.name.trim(),
+            category: data.category || '布料',
+            color: null,
+            color_code: null,
+            unit_of_measure: 'KG',
+            user_id: user.id,
+          });
+        }
+
+        console.log('Inserting products:', productsToInsert);
         const { data: insertedData, error } = await supabase
           .from('products_new')
-          .insert([productData])
+          .insert(productsToInsert)
           .select();
 
         if (error) {
@@ -217,11 +260,11 @@ const ProductManagement = () => {
           throw error;
         }
 
-        console.log('Product inserted successfully:', insertedData);
+        console.log('Products inserted successfully:', insertedData);
 
         toast({
           title: "新增成功",
-          description: `產品「${data.name}」已新增`,
+          description: `產品「${data.name}」已新增 ${productsToInsert.length} 個變體`,
         });
       }
 
@@ -279,8 +322,10 @@ const ProductManagement = () => {
     form.reset({
       name: product.name,
       category: product.category,
-      color: product.color || '',
-      color_code: product.color_code || '',
+      colorVariants: [{
+        color: product.color || '',
+        color_code: product.color_code || '',
+      }],
     });
     setIsDialogOpen(true);
   };
@@ -291,8 +336,7 @@ const ProductManagement = () => {
     form.reset({
       name: '',
       category: '布料',
-      color: '',
-      color_code: '',
+      colorVariants: [{ color: '', color_code: '' }],
     });
     setIsDialogOpen(true);
   };
@@ -318,13 +362,13 @@ const ProductManagement = () => {
               新增產品
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-white border border-gray-200">
+          <DialogContent className="sm:max-w-[600px] bg-white border border-gray-200 max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-gray-900">
                 {editingProduct ? '編輯產品' : '新增產品'}
               </DialogTitle>
               <DialogDescription className="text-gray-700">
-                {editingProduct ? '修改產品資訊' : '建立新的布料產品型號'}
+                {editingProduct ? '修改產品資訊' : '建立新的布料產品型號，可一次新增多個顏色變體'}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -370,47 +414,89 @@ const ProductManagement = () => {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="color"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-900 font-medium">顏色</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="如：米白、深藍" 
-                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                {/* 顏色變體區域 */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-gray-900 font-medium">
+                      顏色變體 {!editingProduct && '(可新增多個)'}
+                    </Label>
+                    {!editingProduct && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addColorVariant}
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      >
+                        <Plus size={14} className="mr-1" />
+                        新增變體
+                      </Button>
                     )}
-                  />
+                  </div>
+                  
+                  {form.watch('colorVariants').map((_, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          變體 {index + 1}
+                        </span>
+                        {!editingProduct && form.watch('colorVariants').length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeColorVariant(index)}
+                            className="text-red-600 hover:bg-red-50 p-1"
+                          >
+                            <X size={14} />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`colorVariants.${index}.color`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-gray-900 text-sm">顏色</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="如：米白、深藍" 
+                                  className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                  <FormField
-                    control={form.control}
-                    name="color_code"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-gray-900 font-medium">顏色代碼</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="如：#FFFFFF" 
-                            className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                            {...field}
-                            onChange={(e) => {
-                              // 在輸入時即時轉換為大寫
-                              const value = e.target.value.toUpperCase();
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                        <FormField
+                          control={form.control}
+                          name={`colorVariants.${index}.color_code`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-gray-900 text-sm">顏色代碼</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="如：#FFFFFF" 
+                                  className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                  {...field}
+                                  onChange={(e) => {
+                                    // 在輸入時即時轉換為大寫
+                                    const value = e.target.value.toUpperCase();
+                                    field.onChange(value);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="bg-blue-50 p-3 rounded border border-blue-200">
