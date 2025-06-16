@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
@@ -41,6 +43,50 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     setShippingStatus(order.shipping_status);
     setNote(order.note || '');
   }, [order]);
+
+  // Fetch related purchase orders and shipping information
+  const { data: relatedData } = useQuery({
+    queryKey: ['order-related-data', order.id],
+    queryFn: async () => {
+      // Fetch purchase orders related to this order
+      const { data: purchaseOrders, error: poError } = await supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          factories (name),
+          purchase_order_items (
+            *,
+            products_new (name, color)
+          )
+        `)
+        .eq('order_id', order.id);
+
+      if (poError) throw poError;
+
+      // Fetch shipping records for this order
+      const { data: shippings, error: shippingError } = await supabase
+        .from('shippings')
+        .select(`
+          *,
+          shipping_items (
+            *,
+            inventory_rolls (
+              *,
+              products_new (name, color)
+            )
+          )
+        `)
+        .eq('order_id', order.id);
+
+      if (shippingError) throw shippingError;
+
+      return {
+        purchaseOrders: purchaseOrders || [],
+        shippings: shippings || []
+      };
+    },
+    enabled: open
+  });
 
   const updateOrderMutation = useMutation({
     mutationFn: async (updateData: {
@@ -88,7 +134,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     switch (status) {
       case 'pending': return '待處理';
       case 'confirmed': return '已確認';
-      case 'partial_shipped': return '部分出貨';
+      case 'factory_ordered': return '已向工廠下單';
       case 'completed': return '已完成';
       case 'cancelled': return '已取消';
       default: return status;
@@ -113,6 +159,19 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     }
   };
 
+  const getPurchaseStatusBadge = (poStatus: string) => {
+    const statusMap = {
+      pending: { label: '待確認', variant: 'secondary' as const },
+      confirmed: { label: '已確認', variant: 'default' as const },
+      partial_received: { label: '部分到貨', variant: 'outline' as const },
+      completed: { label: '已完成', variant: 'default' as const },
+      cancelled: { label: '已取消', variant: 'destructive' as const }
+    };
+    
+    const config = statusMap[poStatus as keyof typeof statusMap] || { label: poStatus, variant: 'secondary' as const };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
   const calculateOrderTotal = () => {
     return order.order_products.reduce((total: number, product: any) => 
       total + (product.quantity * product.unit_price), 0
@@ -121,7 +180,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-900">編輯訂單</DialogTitle>
           <DialogDescription className="text-gray-700">
@@ -143,6 +202,61 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             </div>
           </div>
 
+          {/* Purchase Status Section */}
+          {relatedData?.purchaseOrders && relatedData.purchaseOrders.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-gray-900">關聯採購單狀態</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {relatedData.purchaseOrders.map((po: any) => (
+                  <div key={po.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div>
+                      <div className="font-medium text-gray-900">{po.po_number}</div>
+                      <div className="text-sm text-gray-600">工廠: {po.factories?.name}</div>
+                      <div className="text-sm text-gray-600">
+                        項目數: {po.purchase_order_items?.length || 0}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {getPurchaseStatusBadge(po.status)}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {new Date(po.order_date).toLocaleDateString('zh-TW')}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Shipping Status Section */}
+          {relatedData?.shippings && relatedData.shippings.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-gray-900">出貨記錄</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {relatedData.shippings.map((shipping: any) => (
+                  <div key={shipping.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div>
+                      <div className="font-medium text-gray-900">{shipping.shipping_number}</div>
+                      <div className="text-sm text-gray-600">
+                        數量: {shipping.total_shipped_quantity}kg
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        布卷數: {shipping.total_shipped_rolls}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {new Date(shipping.shipping_date).toLocaleDateString('zh-TW')}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Product Details */}
           <div className="space-y-2">
             <Label className="text-gray-800">訂單產品</Label>
@@ -156,6 +270,11 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
                   <div className="text-sm text-gray-700">
                     數量: {product.quantity}kg | 單價: ${product.unit_price} | 
                     小計: ${(product.quantity * product.unit_price).toLocaleString()}
+                    {product.shipped_quantity > 0 && (
+                      <span className="ml-2 text-blue-600">
+                        | 已出貨: {product.shipped_quantity}kg
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -173,7 +292,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
                 <SelectContent>
                   <SelectItem value="pending">待處理</SelectItem>
                   <SelectItem value="confirmed">已確認</SelectItem>
-                  <SelectItem value="partial_shipped">部分出貨</SelectItem>
+                  <SelectItem value="factory_ordered">已向工廠下單</SelectItem>
                   <SelectItem value="completed">已完成</SelectItem>
                   <SelectItem value="cancelled">已取消</SelectItem>
                 </SelectContent>

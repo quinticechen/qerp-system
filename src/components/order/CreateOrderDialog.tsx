@@ -1,14 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Combobox } from '@/components/ui/combobox';
+import { FactorySelector } from './FactorySelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,7 +41,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const queryClient = useQueryClient();
   
   const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [selectedFactoryIds, setSelectedFactoryIds] = useState<string[]>([]);
   const [note, setNote] = useState('');
+  const [generatedOrderNumber, setGeneratedOrderNumber] = useState('');
   const [products, setProducts] = useState<OrderProduct[]>([{
     base_product_name: '',
     product_id: '',
@@ -48,6 +51,18 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     unit_price: 0,
     specifications: {}
   }]);
+
+  // Generate preview order number when dialog opens
+  useEffect(() => {
+    if (open) {
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const preview = `${year}K${month}${day}-xxx`;
+      setGeneratedOrderNumber(preview);
+    }
+  }, [open]);
 
   // Fetch customers
   const { data: customers } = useQuery({
@@ -88,6 +103,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: {
       customer_id: string;
+      factory_ids: string[];
       note: string;
       products: OrderProduct[];
     }) => {
@@ -95,10 +111,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('使用者未登入');
 
-      // Generate a unique temporary order number using timestamp and random number
-      const tempOrderNumber = `TEMP-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      // Create order with unique temporary order number
+      // Create order (order number will be auto-generated)
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -107,8 +120,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           note: orderData.note,
           status: 'pending',
           payment_status: 'unpaid',
-          shipping_status: 'not_started',
-          order_number: tempOrderNumber
+          shipping_status: 'not_started'
         })
         .select()
         .single();
@@ -136,12 +148,29 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         throw productsError;
       }
 
+      // Create factory associations if any
+      if (orderData.factory_ids.length > 0) {
+        const factoryAssociations = orderData.factory_ids.map(factoryId => ({
+          order_id: order.id,
+          factory_id: factoryId,
+        }));
+
+        const { error: factoriesError } = await supabase
+          .from('order_factories')
+          .insert(factoryAssociations);
+
+        if (factoriesError) {
+          console.error('Order factories creation error:', factoriesError);
+          throw factoriesError;
+        }
+      }
+
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       toast({
         title: "成功",
-        description: "訂單已成功建立",
+        description: `訂單 ${order.order_number} 已成功建立`,
       });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       onOpenChange(false);
@@ -159,7 +188,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
   const resetForm = () => {
     setSelectedCustomer('');
+    setSelectedFactoryIds([]);
     setNote('');
+    setGeneratedOrderNumber('');
     setProducts([{
       base_product_name: '',
       product_id: '',
@@ -219,14 +250,27 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
     createOrderMutation.mutate({
       customer_id: selectedCustomer,
+      factory_ids: selectedFactoryIds,
       note,
       products: validProducts,
     });
   };
 
+  // Prepare customer options for combobox
+  const customerOptions = customers?.map(customer => ({
+    value: customer.id,
+    label: customer.name,
+  })) || [];
+
+  // Prepare product name options for combobox
+  const productNameOptions = uniqueProductNames.map(name => ({
+    value: name,
+    label: name,
+  }));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-900">新增訂單</DialogTitle>
           <DialogDescription className="text-gray-700">
@@ -235,22 +279,32 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Order Number Preview */}
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <Label className="text-gray-800 font-semibold">訂單編號 (自動生成)</Label>
+            <div className="text-lg font-mono text-blue-800 mt-1">{generatedOrderNumber}</div>
+            <div className="text-xs text-gray-600 mt-1">格式：年份K月份日期-流水號</div>
+          </div>
+
           {/* Customer Selection */}
           <div className="space-y-2">
-            <Label htmlFor="customer" className="text-gray-800">客戶 *</Label>
-            <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-              <SelectTrigger className="border-gray-200">
-                <SelectValue placeholder="選擇客戶..." />
-              </SelectTrigger>
-              <SelectContent>
-                {customers?.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-gray-800">客戶 *</Label>
+            <Combobox
+              options={customerOptions}
+              value={selectedCustomer}
+              onValueChange={setSelectedCustomer}
+              placeholder="選擇客戶..."
+              searchPlaceholder="搜尋客戶..."
+              emptyText="未找到客戶"
+              className="w-full"
+            />
           </div>
+
+          {/* Factory Selection */}
+          <FactorySelector 
+            selectedFactoryIds={selectedFactoryIds}
+            onFactoriesChange={setSelectedFactoryIds}
+          />
 
           {/* Products Section */}
           <div className="space-y-4">
@@ -264,6 +318,19 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
             {products.map((product, index) => {
               const colorVariants = getColorVariants(product.base_product_name);
+              const colorOptions = colorVariants.map(variant => ({
+                value: variant.id,
+                label: variant.color || '無顏色',
+                extra: variant.color_code ? (
+                  <div className="flex items-center space-x-2">
+                    <div 
+                      className="w-3 h-3 rounded border border-gray-400"
+                      style={{ backgroundColor: variant.color_code }}
+                    ></div>
+                    <span>{variant.color_code}</span>
+                  </div>
+                ) : null,
+              }));
               
               return (
                 <Card key={index} className="border-gray-200">
@@ -271,51 +338,29 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label className="text-gray-800">產品名稱 *</Label>
-                        <Select
+                        <Combobox
+                          options={productNameOptions}
                           value={product.base_product_name}
                           onValueChange={(value) => updateProduct(index, 'base_product_name', value)}
-                        >
-                          <SelectTrigger className="border-gray-200">
-                            <SelectValue placeholder="選擇產品..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {uniqueProductNames.map((name) => (
-                              <SelectItem key={name} value={name}>
-                                {name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="選擇產品..."
+                          searchPlaceholder="搜尋產品..."
+                          emptyText="未找到產品"
+                          className="w-full"
+                        />
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-gray-800">顏色/色碼 *</Label>
-                        <Select
+                        <Combobox
+                          options={colorOptions}
                           value={product.product_id}
                           onValueChange={(value) => updateProduct(index, 'product_id', value)}
+                          placeholder="選擇顏色..."
+                          searchPlaceholder="搜尋顏色..."
+                          emptyText="未找到顏色"
                           disabled={!product.base_product_name}
-                        >
-                          <SelectTrigger className="border-gray-200">
-                            <SelectValue placeholder="選擇顏色..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {colorVariants.map((variant) => (
-                              <SelectItem key={variant.id} value={variant.id}>
-                                <div className="flex items-center space-x-2">
-                                  {variant.color_code && (
-                                    <div 
-                                      className="w-4 h-4 rounded border border-gray-400"
-                                      style={{ backgroundColor: variant.color_code }}
-                                    ></div>
-                                  )}
-                                  <span>
-                                    {variant.color || '無顏色'} {variant.color_code ? `(${variant.color_code})` : ''}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          className="w-full"
+                        />
                       </div>
 
                       <div className="space-y-2">

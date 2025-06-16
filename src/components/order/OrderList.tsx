@@ -50,7 +50,12 @@ export const OrderList = () => {
             id,
             quantity,
             unit_price,
+            shipped_quantity,
             products_new (name, color)
+          ),
+          order_factories (
+            id,
+            factories (name)
           )
         `)
         .order('created_at', { ascending: false });
@@ -104,7 +109,7 @@ export const OrderList = () => {
     switch (status) {
       case 'pending': return '待處理';
       case 'confirmed': return '已確認';
-      case 'partial_shipped': return '部分出貨';
+      case 'factory_ordered': return '已向工廠下單';
       case 'completed': return '已完成';
       case 'cancelled': return '已取消';
       default: return status;
@@ -186,6 +191,7 @@ export const OrderList = () => {
             <TableRow>
               <TableHead className="text-gray-900 font-semibold">訂單編號</TableHead>
               <TableHead className="text-gray-900 font-semibold">客戶</TableHead>
+              <TableHead className="text-gray-900 font-semibold">關聯工廠</TableHead>
               <TableHead className="text-gray-900 font-semibold">訂單狀態</TableHead>
               <TableHead className="text-gray-900 font-semibold">付款狀態</TableHead>
               <TableHead className="text-gray-900 font-semibold">出貨狀態</TableHead>
@@ -202,6 +208,19 @@ export const OrderList = () => {
                 </TableCell>
                 <TableCell className="text-gray-800">
                   {order.customers?.name || '未知客戶'}
+                </TableCell>
+                <TableCell className="text-gray-800">
+                  {order.order_factories && order.order_factories.length > 0 ? (
+                    <div className="space-y-1">
+                      {order.order_factories.map((of: any, index: number) => (
+                        <div key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {of.factories?.name}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-500 text-sm">無關聯工廠</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge className={getStatusColor(order.status)}>

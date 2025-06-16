@@ -207,6 +207,42 @@ export type Database = {
           },
         ]
       }
+      order_factories: {
+        Row: {
+          created_at: string
+          factory_id: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          created_at?: string
+          factory_id: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          created_at?: string
+          factory_id?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_factories_factory_id_fkey"
+            columns: ["factory_id"]
+            isOneToOne: false
+            referencedRelation: "factories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_factories_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_products: {
         Row: {
           created_at: string
@@ -803,7 +839,7 @@ export type Database = {
       order_status:
         | "pending"
         | "confirmed"
-        | "partial_shipped"
+        | "factory_ordered"
         | "completed"
         | "cancelled"
       payment_status: "unpaid" | "partial_paid" | "paid"
@@ -935,7 +971,7 @@ export const Constants = {
       order_status: [
         "pending",
         "confirmed",
-        "partial_shipped",
+        "factory_ordered",
         "completed",
         "cancelled",
       ],
