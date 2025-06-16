@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .select(`
           id,
           po_number,
+          factory_id,
           factories (name),
           purchase_order_items (
             id,
@@ -162,7 +164,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .from('inventories')
         .insert({
           purchase_order_id: selectedPurchaseOrderId,
-          factory_id: purchaseOrder.factories?.id || '',
+          factory_id: purchaseOrder.factory_id,
           arrival_date: arrivalDate,
           note,
           user_id: (await supabase.auth.getUser()).data.user?.id || ''
