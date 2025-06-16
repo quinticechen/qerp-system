@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -48,6 +47,7 @@ interface PurchaseItem {
   ordered_quantity: number;
   unit_price: number;
   specifications?: string;
+  selected_product_name?: string;
 }
 
 export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
@@ -65,7 +65,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     product_id: '',
     ordered_quantity: 0,
     unit_price: 0,
-    specifications: ''
+    specifications: '',
+    selected_product_name: ''
   }]);
 
   // Fetch factories for selection
@@ -238,7 +239,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       product_id: '',
       ordered_quantity: 0,
       unit_price: 0,
-      specifications: ''
+      specifications: '',
+      selected_product_name: ''
     }]);
   };
 
@@ -255,7 +257,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       product_id: '',
       ordered_quantity: 0,
       unit_price: 0,
-      specifications: ''
+      specifications: '',
+      selected_product_name: ''
     }]);
   };
 
@@ -448,8 +451,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
             </CardHeader>
             <CardContent className="space-y-4">
               {items.map((item, index) => {
-                const [selectedProductName, setSelectedProductName] = useState('');
-                const colorVariants = getColorVariants(selectedProductName);
+                const colorVariants = getColorVariants(item.selected_product_name || '');
                 
                 return (
                   <div key={index} className="border border-gray-200 rounded p-4 space-y-4">
@@ -472,9 +474,9 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                       <div className="space-y-2">
                         <Label className="text-gray-800">產品名稱 *</Label>
                         <Select 
-                          value={selectedProductName}
+                          value={item.selected_product_name || ''}
                           onValueChange={(value) => {
-                            setSelectedProductName(value);
+                            updateItem(index, 'selected_product_name', value);
                             updateItem(index, 'product_id', '');
                           }}
                         >
@@ -496,7 +498,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                         <Select 
                           value={item.product_id} 
                           onValueChange={(value) => updateItem(index, 'product_id', value)}
-                          disabled={!selectedProductName}
+                          disabled={!item.selected_product_name}
                         >
                           <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
                             <SelectValue placeholder="選擇顏色" />
