@@ -117,18 +117,13 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     enabled: !!orderId
   });
 
-  // 獲取可用的庫存布卷
+  // 獲取所有可用的庫存布卷（只有在有訂單產品時才查詢）
   const { data: availableRolls } = useQuery({
-    queryKey: ['available-rolls', selectedItems],
+    queryKey: ['available-rolls', orderId],
     queryFn: async () => {
-      if (selectedItems.length === 0) return [];
+      if (!orderId || !orderProducts || orderProducts.length === 0) return [];
       
-      const productIds = [...new Set(selectedItems.map(item => {
-        const orderProduct = orderProducts?.find(op => op.id === item.order_product_id);
-        return orderProduct?.product_id;
-      }).filter(Boolean))];
-
-      if (productIds.length === 0) return [];
+      const productIds = orderProducts.map(op => op.product_id);
 
       const { data, error } = await supabase
         .from('inventory_rolls')
@@ -148,7 +143,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       if (error) throw error;
       return data;
     },
-    enabled: selectedItems.length > 0 && !!orderProducts
+    enabled: !!orderId && !!orderProducts && orderProducts.length > 0
   });
 
   const createShippingMutation = useMutation({
@@ -516,124 +511,143 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                             已出貨: {product.shipped_quantity || 0}kg | 
                             待出貨: {remainingQuantity}kg
                           </p>
-                          {availableRollsForProduct.length === 0 && (
+                          {!isSelected && availableRollsForProduct.length === 0 && (
                             <p className="text-sm text-red-600 mt-1">⚠️ 無庫存</p>
                           )}
                         </div>
                       </div>
 
-                      {isSelected && selectedItem && availableRollsForProduct.length > 0 && (
+                      {isSelected && selectedItem && (
                         <div className="pl-6 space-y-3">
                           <div className="flex justify-between items-center">
                             <Label className="text-gray-800">選擇布卷</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addRollToItem(product.id)}
-                              className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              新增布卷
-                            </Button>
+                            {availableRollsForProduct.length > 0 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addRollToItem(product.id)}
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                新增布卷
+                              </Button>
+                            )}
                           </div>
 
-                          {selectedItem.rolls.map((roll, rollIndex) => {
-                            const rollSelectorKey = `${product.id}-${rollIndex}`;
-                            return (
-                              <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
-                                <div className="space-y-2">
-                                  <Label className="text-gray-800">選擇布卷</Label>
-                                  <Popover 
-                                    open={rollSelectors[rollSelectorKey] || false} 
-                                    onOpenChange={(open) => setRollSelectors(prev => ({...prev, [rollSelectorKey]: open}))}
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
-                                      >
-                                        <span className="truncate">
-                                          {roll.inventory_roll_id ? 
-                                            availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.roll_number || "選擇布卷" 
-                                            : "選擇布卷"
-                                          }
-                                        </span>
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
-                                      <Command>
-                                        <CommandInput placeholder="搜尋布卷..." className="h-9" />
-                                        <CommandList>
-                                          <CommandEmpty>未找到布卷。</CommandEmpty>
-                                          <CommandGroup>
-                                            {availableRollsForProduct.map((availableRoll) => (
-                                              <CommandItem
-                                                key={availableRoll.id}
-                                                value={`${availableRoll.roll_number} ${availableRoll.quality}`}
-                                                onSelect={() => {
-                                                  updateRollSelection(product.id, rollIndex, availableRoll.id);
-                                                  setRollSelectors(prev => ({...prev, [rollSelectorKey]: false}));
-                                                }}
-                                                className="cursor-pointer"
-                                              >
-                                                <div className="flex-1">
-                                                  <div className="font-medium">
-                                                    {availableRoll.roll_number}
-                                                  </div>
-                                                  <div className="text-sm text-gray-600">
-                                                    庫存: {availableRoll.current_quantity}kg - {availableRoll.quality}級
-                                                  </div>
-                                                </div>
-                                                <Check
-                                                  className={cn(
-                                                    "ml-auto h-4 w-4",
-                                                    roll.inventory_roll_id === availableRoll.id ? "opacity-100" : "opacity-0"
-                                                  )}
-                                                />
-                                              </CommandItem>
-                                            ))}
-                                          </CommandGroup>
-                                        </CommandList>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label className="text-gray-800">出貨數量 (公斤)</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max={Math.min(
-                                      remainingQuantity,
-                                      availableRollsForProduct.find(r => r.id === roll.inventory_roll_id)?.current_quantity || 0
-                                    )}
-                                    value={roll.shipped_quantity || 0}
-                                    onChange={(e) => updateRollQuantity(product.id, rollIndex, parseFloat(e.target.value) || 0)}
-                                    className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                                  />
-                                </div>
-
-                                <div className="flex items-end">
-                                  {selectedItem.rolls.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => removeRollFromItem(product.id, rollIndex)}
-                                      className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                          {availableRollsForProduct.length === 0 ? (
+                            <p className="text-sm text-red-600">⚠️ 此產品無庫存布卷可供出貨</p>
+                          ) : (
+                            selectedItem.rolls.map((roll, rollIndex) => {
+                              const rollSelectorKey = `${product.id}-${rollIndex}`;
+                              const selectedRoll = availableRollsForProduct.find(r => r.id === roll.inventory_roll_id);
+                              const maxQuantity = selectedRoll ? selectedRoll.current_quantity : 0;
+                              
+                              return (
+                                <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
+                                  <div className="space-y-2">
+                                    <Label className="text-gray-800">選擇布卷</Label>
+                                    <Popover 
+                                      open={rollSelectors[rollSelectorKey] || false} 
+                                      onOpenChange={(open) => setRollSelectors(prev => ({...prev, [rollSelectorKey]: open}))}
                                     >
-                                      <Trash className="h-4 w-4" />
-                                    </Button>
-                                  )}
+                                      <PopoverTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                                        >
+                                          <span className="truncate">
+                                            {selectedRoll ? 
+                                              `${selectedRoll.quality}級 ${selectedRoll.current_quantity}kg ${selectedRoll.roll_number}` 
+                                              : "選擇布卷"
+                                            }
+                                          </span>
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+                                        <Command>
+                                          <CommandInput placeholder="搜尋布卷..." className="h-9" />
+                                          <CommandList>
+                                            <CommandEmpty>未找到布卷。</CommandEmpty>
+                                            <CommandGroup>
+                                              {availableRollsForProduct.map((availableRoll) => (
+                                                <CommandItem
+                                                  key={availableRoll.id}
+                                                  value={`${availableRoll.quality} ${availableRoll.current_quantity} ${availableRoll.roll_number}`}
+                                                  onSelect={() => {
+                                                    updateRollSelection(product.id, rollIndex, availableRoll.id);
+                                                    setRollSelectors(prev => ({...prev, [rollSelectorKey]: false}));
+                                                  }}
+                                                  className="cursor-pointer"
+                                                >
+                                                  <div className="flex-1">
+                                                    <div className="font-medium">
+                                                      {availableRoll.quality}級 {availableRoll.current_quantity}kg {availableRoll.roll_number}
+                                                    </div>
+                                                  </div>
+                                                  <Check
+                                                    className={cn(
+                                                      "ml-auto h-4 w-4",
+                                                      roll.inventory_roll_id === availableRoll.id ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                  />
+                                                </CommandItem>
+                                              ))}
+                                            </CommandGroup>
+                                          </CommandList>
+                                        </Command>
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <Label className="text-gray-800">
+                                      出貨數量 (公斤)
+                                      {selectedRoll && (
+                                        <span className="text-xs text-gray-500 ml-1">
+                                          (最多 {selectedRoll.current_quantity}kg)
+                                        </span>
+                                      )}
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max={maxQuantity}
+                                      value={roll.shipped_quantity || 0}
+                                      onChange={(e) => {
+                                        const inputValue = parseFloat(e.target.value) || 0;
+                                        const validValue = Math.min(inputValue, maxQuantity);
+                                        updateRollQuantity(product.id, rollIndex, validValue);
+                                      }}
+                                      className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                    />
+                                    {roll.shipped_quantity > maxQuantity && (
+                                      <p className="text-xs text-red-600">
+                                        出貨數量不能超過布卷庫存 ({maxQuantity}kg)
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-end">
+                                    {selectedItem.rolls.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => removeRollFromItem(product.id, rollIndex)}
+                                        className="text-red-600 hover:text-red-800 border-red-300 hover:bg-red-50"
+                                      >
+                                        <Trash className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          )}
                         </div>
                       )}
                     </div>
