@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -45,37 +44,50 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   const [showQuantityWarning, setShowQuantityWarning] = useState(false);
   const [warningCallback, setWarningCallback] = useState<(() => void) | null>(null);
 
-  const { data: purchaseOrders } = useQuery({
+  const { data: purchaseOrders, isLoading: isPurchaseOrdersLoading, error: purchaseOrdersError } = useQuery({
     queryKey: ['purchase-orders-for-inventory'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      console.log('開始查詢採購單...');
+      
+      // 先查詢所有採購單和其項目
+      const { data: allPurchaseOrders, error } = await supabase
         .from('purchase_orders')
         .select(`
           id,
           po_number,
           factory_id,
+          status,
           factories (name),
           purchase_order_items (
             id,
             product_id,
             ordered_quantity,
             received_quantity,
+            status,
             products_new (name, color, color_code)
           )
         `)
-        .in('status', ['pending', 'partial_received'])
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching purchase orders:', error);
+        console.error('查詢採購單錯誤:', error);
         throw error;
       }
       
-      console.log('Raw purchase orders data:', data);
+      console.log('查詢到的所有採購單:', allPurchaseOrders?.length || 0);
+      console.log('採購單詳細資料:', allPurchaseOrders);
       
-      // 更詳細的過濾邏輯，確保我們能看到所有相關的採購單
-      const filteredData = data?.filter(po => {
+      if (!allPurchaseOrders || allPurchaseOrders.length === 0) {
+        console.log('沒有找到任何採購單');
+        return [];
+      }
+
+      // 過濾出有待入庫項目的採購單
+      const filteredData = allPurchaseOrders.filter(po => {
+        console.log(`檢查採購單 ${po.po_number} (狀態: ${po.status})`);
+        
         if (!po.purchase_order_items || po.purchase_order_items.length === 0) {
+          console.log(`採購單 ${po.po_number} 沒有項目`);
           return false;
         }
         
@@ -84,15 +96,23 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           const ordered = item.ordered_quantity || 0;
           const received = item.received_quantity || 0;
           const remaining = ordered - received;
-          console.log(`Product ${item.product_id}: ordered=${ordered}, received=${received}, remaining=${remaining}`);
+          
+          console.log(`  產品 ${item.products_new?.name}: 叫貨=${ordered}, 已收=${received}, 剩餘=${remaining}`);
+          
           return remaining > 0;
         });
         
-        console.log(`PO ${po.po_number} has pending items:`, hasPendingItems);
+        console.log(`採購單 ${po.po_number} 有待入庫項目: ${hasPendingItems}`);
         return hasPendingItems;
-      }) || [];
+      });
       
-      console.log('Filtered purchase orders:', filteredData);
+      console.log('過濾後的採購單數量:', filteredData.length);
+      console.log('可用的採購單:', filteredData.map(po => ({
+        po_number: po.po_number,
+        status: po.status,
+        itemsCount: po.purchase_order_items?.length || 0
+      })));
+      
       return filteredData;
     }
   });
@@ -227,6 +247,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       });
       queryClient.invalidateQueries({ queryKey: ['inventories'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders-for-inventory'] });
       onOpenChange(false);
       resetForm();
     },
@@ -282,6 +303,12 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (purchaseOrdersError) {
+      console.error('採購單查詢錯誤:', purchaseOrdersError);
+    }
+  }, [purchaseOrdersError]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -297,6 +324,14 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
             {/* 採購單選擇 */}
             <div className="space-y-2">
               <Label className="text-gray-900">採購單</Label>
+              {isPurchaseOrdersLoading && (
+                <div className="text-sm text-gray-500">載入採購單中...</div>
+              )}
+              {purchaseOrdersError && (
+                <div className="text-sm text-red-500">
+                  載入採購單失敗: {purchaseOrdersError.message}
+                </div>
+              )}
               <Popover open={purchaseOrderSearchOpen} onOpenChange={setPurchaseOrderSearchOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -304,6 +339,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                     role="combobox"
                     aria-expanded={purchaseOrderSearchOpen}
                     className="w-full justify-between border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    disabled={isPurchaseOrdersLoading}
                   >
                     {selectedPurchaseOrderId
                       ? `${selectedPurchaseOrder?.po_number} - ${selectedPurchaseOrder?.factories?.name}`
@@ -315,35 +351,46 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                     <CommandInput placeholder="搜尋採購單號或工廠..." className="h-9" />
                     <CommandList>
                       <CommandEmpty>
-                        {purchaseOrders && purchaseOrders.length === 0 
-                          ? "目前沒有待入庫的採購單。所有採購單可能已完成入庫。" 
+                        {isPurchaseOrdersLoading 
+                          ? "載入中..." 
+                          : purchaseOrders && purchaseOrders.length === 0 
+                          ? "目前沒有待入庫的採購單。請檢查採購單狀態或新增採購單。" 
                           : "未找到採購單。"}
+                        {purchaseOrders && purchaseOrders.length === 0 && (
+                          <div className="text-xs text-gray-500 mt-2">
+                            提示：只顯示有待入庫項目的採購單
+                          </div>
+                        )}
                       </CommandEmpty>
                       <CommandGroup>
-                        {purchaseOrders?.map((po) => (
-                          <CommandItem
-                            key={po.id}
-                            value={`${po.po_number} ${po.factories?.name}`}
-                            onSelect={() => handlePurchaseOrderSelection(po.id)}
-                            className="cursor-pointer hover:bg-gray-100"
-                          >
-                            <div className="flex flex-col flex-1">
-                              <span className="font-medium">{po.po_number}</span>
-                              <span className="text-sm text-gray-500">{po.factories?.name}</span>
-                              <div className="text-xs text-blue-600">
-                                {po.purchase_order_items?.filter(item => 
-                                  (item.ordered_quantity || 0) > (item.received_quantity || 0)
-                                ).length} 項待入庫
+                        {purchaseOrders?.map((po) => {
+                          const pendingItemsCount = po.purchase_order_items?.filter(item => 
+                            (item.ordered_quantity || 0) > (item.received_quantity || 0)
+                          ).length || 0;
+                          
+                          return (
+                            <CommandItem
+                              key={po.id}
+                              value={`${po.po_number} ${po.factories?.name}`}
+                              onSelect={() => handlePurchaseOrderSelection(po.id)}
+                              className="cursor-pointer hover:bg-gray-100"
+                            >
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium">{po.po_number}</span>
+                                <span className="text-sm text-gray-500">{po.factories?.name}</span>
+                                <div className="text-xs text-blue-600">
+                                  {pendingItemsCount} 項待入庫 (狀態: {po.status})
+                                </div>
                               </div>
-                            </div>
-                            <Check
-                              className={cn(
-                                "ml-auto h-4 w-4",
-                                selectedPurchaseOrderId === po.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                          </CommandItem>
-                        ))}
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  selectedPurchaseOrderId === po.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          );
+                        })}
                       </CommandGroup>
                     </CommandList>
                   </Command>
@@ -359,42 +406,46 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {selectedPurchaseOrder.purchase_order_items?.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <div className="flex items-center space-x-3">
-                          <span className="font-medium text-gray-900">
-                            {item.products_new?.name}
-                          </span>
-                          {item.products_new?.color && (
-                            <span className="text-gray-600">
-                              {item.products_new.color}
+                    {selectedPurchaseOrder.purchase_order_items?.map((item) => {
+                      const remainingQuantity = item.ordered_quantity - (item.received_quantity || 0);
+                      
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex items-center space-x-3">
+                            <span className="font-medium text-gray-900">
+                              {item.products_new?.name}
                             </span>
-                          )}
-                          {item.products_new?.color_code && (
-                            <div className="flex items-center space-x-1">
-                              <div 
-                                className="w-4 h-4 rounded border border-gray-400"
-                                style={{ backgroundColor: item.products_new.color_code }}
-                              ></div>
-                              <span className="text-sm text-gray-600">
-                                {item.products_new.color_code}
+                            {item.products_new?.color && (
+                              <span className="text-gray-600">
+                                {item.products_new.color}
                               </span>
-                            </div>
-                          )}
+                            )}
+                            {item.products_new?.color_code && (
+                              <div className="flex items-center space-x-1">
+                                <div 
+                                  className="w-4 h-4 rounded border border-gray-400"
+                                  style={{ backgroundColor: item.products_new.color_code }}
+                                ></div>
+                                <span className="text-sm text-gray-600">
+                                  {item.products_new.color_code}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex space-x-2">
+                            <Badge variant="outline">
+                              叫貨: {item.ordered_quantity.toFixed(2)} kg
+                            </Badge>
+                            <Badge variant="secondary">
+                              已收: {(item.received_quantity || 0).toFixed(2)} kg
+                            </Badge>
+                            <Badge variant={remainingQuantity > 0 ? "default" : "outline"}>
+                              待收: {remainingQuantity.toFixed(2)} kg
+                            </Badge>
+                          </div>
                         </div>
-                        <div className="flex space-x-2">
-                          <Badge variant="outline">
-                            叫貨: {item.ordered_quantity.toFixed(2)} kg
-                          </Badge>
-                          <Badge variant="secondary">
-                            已收: {(item.received_quantity || 0).toFixed(2)} kg
-                          </Badge>
-                          <Badge variant="default">
-                            待收: {(item.ordered_quantity - (item.received_quantity || 0)).toFixed(2)} kg
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
