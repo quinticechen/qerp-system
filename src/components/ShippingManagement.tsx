@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { ShippingList } from './shipping/ShippingList';
 import { CreateShippingDialog } from './shipping/CreateShippingDialog';
+import { PendingShippingSection } from './inventory/PendingShippingSection';
 
 const ShippingManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -22,7 +24,20 @@ const ShippingManagement = () => {
         </Button>
       </div>
       
-      <ShippingList />
+      <Tabs defaultValue="shippings" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="shippings" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">出貨單</TabsTrigger>
+          <TabsTrigger value="pending-shipping" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">待出貨</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="shippings">
+          <ShippingList />
+        </TabsContent>
+        
+        <TabsContent value="pending-shipping">
+          <PendingShippingSection />
+        </TabsContent>
+      </Tabs>
       
       <CreateShippingDialog 
         open={isCreateDialogOpen}

@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Check, ChevronsUpDown, AlertTriangle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -59,6 +60,8 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   const [note, setNote] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [purchaseOrderSearchOpen, setPurchaseOrderSearchOpen] = useState(false);
+  const [showWeightWarning, setShowWeightWarning] = useState(false);
+  const [forceCreateInventory, setForceCreateInventory] = useState(false);
 
   const { data: purchaseOrders, isLoading: isPurchaseOrdersLoading } = useQuery({
     queryKey: ['purchase-orders-for-inventory'],
@@ -134,6 +137,25 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
     }
     
     return rollNumber;
+  };
+
+  // 檢查布卷重量是否超過叫貨數量
+  const checkWeightExceedsOrdered = () => {
+    const purchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
+    if (!purchaseOrder) return false;
+
+    for (const selectedProduct of selectedProducts) {
+      const orderItem = purchaseOrder.purchase_order_items?.find(item => item.id === selectedProduct.orderItemId);
+      if (!orderItem) continue;
+
+      const totalRollWeight = selectedProduct.rolls.reduce((sum, roll) => sum + roll.quantity, 0);
+      const remainingQuantity = orderItem.ordered_quantity - (orderItem.received_quantity || 0);
+      
+      if (totalRollWeight > remainingQuantity) {
+        return true;
+      }
+    }
+    return false;
   };
 
   const toggleProductSelection = (orderItem: PurchaseOrderItem, checked: boolean) => {
@@ -300,9 +322,22 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
     setArrivalDate(new Date().toISOString().split('T')[0]);
     setNote('');
     setSelectedProducts([]);
+    setForceCreateInventory(false);
   };
 
   const handleSubmit = () => {
+    // 檢查是否有重量超過的情況
+    if (checkWeightExceedsOrdered() && !forceCreateInventory) {
+      setShowWeightWarning(true);
+      return;
+    }
+    
+    createInventoryMutation.mutate();
+  };
+
+  const handleForceCreate = () => {
+    setForceCreateInventory(true);
+    setShowWeightWarning(false);
     createInventoryMutation.mutate();
   };
 
@@ -319,17 +354,17 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">新增入庫</DialogTitle>
-          <DialogDescription className="text-gray-700">
-            選擇採購單並確認要入庫的產品項目
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-gray-900">新增入庫</DialogTitle>
+            <DialogDescription className="text-gray-700">
+              選擇採購單並確認要入庫的產品項目
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
             {/* 採購單選擇 */}
             <div className="space-y-2">
               <Label className="text-gray-800">採購單 *</Label>
@@ -591,5 +626,34 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+      {/* 重量超過警告對話框 */}
+      <AlertDialog open={showWeightWarning} onOpenChange={setShowWeightWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              重量超過叫貨數量
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              部分產品的布卷重量總和超過了剩餘的叫貨數量。這可能會導致庫存數據不一致。
+              <br /><br />
+              您是否要繼續進行入庫？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowWeightWarning(false)}>
+              取消，讓我重新調整
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleForceCreate}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              確認繼續入庫
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
