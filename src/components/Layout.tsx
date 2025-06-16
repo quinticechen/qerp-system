@@ -8,11 +8,11 @@ import Header from '@/components/Header';
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-white" style={{ backgroundColor: 'white' }}>
         <AppSidebar />
-        <SidebarInset className="bg-background">
+        <SidebarInset className="bg-white" style={{ backgroundColor: 'white' }}>
           <Header />
-          <main className="flex-1 p-6 bg-background">
+          <main className="flex-1 p-6 bg-white" style={{ backgroundColor: 'white' }}>
             {children || <Outlet />}
           </main>
         </SidebarInset>

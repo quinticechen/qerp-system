@@ -1,8 +1,15 @@
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  background-color: white !important;
+}
+
+/* 確保沒有任何黃色背景 */
+html, body {
+  background-color: white !important;
 }
 
 .logo {
@@ -39,4 +46,11 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* 移動端強制白色背景 */
+@media (max-width: 768px) {
+  html, body, #root {
+    background-color: white !important;
+  }
 }
