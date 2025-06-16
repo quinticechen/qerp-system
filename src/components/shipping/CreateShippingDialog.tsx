@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +13,7 @@ import { Check, ChevronsUpDown, Plus, Trash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface CreateShippingDialogProps {
   open: boolean;
@@ -300,6 +300,13 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     return availableRolls?.filter(roll => roll.product_id === productId) || [];
   };
 
+  const getProductStockInfo = (productId: string) => {
+    const productRolls = getAvailableRollsForProduct(productId);
+    const totalStock = productRolls.reduce((sum, roll) => sum + roll.current_quantity, 0);
+    const totalRolls = productRolls.length;
+    return { totalStock, totalRolls };
+  };
+
   const handleSubmit = () => {
     if (!customerId || !orderId) {
       toast({
@@ -479,6 +486,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                   const selectedItem = selectedItems.find(si => si.order_product_id === product.id);
                   const remainingQuantity = product.quantity - (product.shipped_quantity || 0);
                   const availableRollsForProduct = getAvailableRollsForProduct(product.product_id);
+                  const { totalStock, totalRolls } = getProductStockInfo(product.product_id);
 
                   return (
                     <div key={product.id} className="border border-gray-200 rounded p-4 space-y-3">
@@ -511,9 +519,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                             已出貨: {product.shipped_quantity || 0}kg | 
                             待出貨: {remainingQuantity}kg
                           </p>
-                          {!isSelected && availableRollsForProduct.length === 0 && (
-                            <p className="text-sm text-red-600 mt-1">⚠️ 無庫存</p>
-                          )}
+                          <p className="text-sm text-blue-600 mt-1">
+                            庫存: {totalStock}kg ({totalRolls} 卷)
+                          </p>
                         </div>
                       </div>
 
@@ -542,6 +550,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                               const rollSelectorKey = `${product.id}-${rollIndex}`;
                               const selectedRoll = availableRollsForProduct.find(r => r.id === roll.inventory_roll_id);
                               const maxQuantity = selectedRoll ? selectedRoll.current_quantity : 0;
+                              const showQuantityValidation = selectedRoll && roll.shipped_quantity > 0;
                               
                               return (
                                 <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 border border-gray-100 rounded">
@@ -569,34 +578,36 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
                                         <Command>
                                           <CommandInput placeholder="搜尋布卷..." className="h-9" />
-                                          <CommandList>
-                                            <CommandEmpty>未找到布卷。</CommandEmpty>
-                                            <CommandGroup>
-                                              {availableRollsForProduct.map((availableRoll) => (
-                                                <CommandItem
-                                                  key={availableRoll.id}
-                                                  value={`${availableRoll.quality} ${availableRoll.current_quantity} ${availableRoll.roll_number}`}
-                                                  onSelect={() => {
-                                                    updateRollSelection(product.id, rollIndex, availableRoll.id);
-                                                    setRollSelectors(prev => ({...prev, [rollSelectorKey]: false}));
-                                                  }}
-                                                  className="cursor-pointer"
-                                                >
-                                                  <div className="flex-1">
-                                                    <div className="font-medium">
-                                                      {availableRoll.quality}級 {availableRoll.current_quantity}kg {availableRoll.roll_number}
+                                          <ScrollArea className="max-h-60">
+                                            <CommandList>
+                                              <CommandEmpty>未找到布卷。</CommandEmpty>
+                                              <CommandGroup>
+                                                {availableRollsForProduct.map((availableRoll) => (
+                                                  <CommandItem
+                                                    key={availableRoll.id}
+                                                    value={`${availableRoll.quality} ${availableRoll.current_quantity} ${availableRoll.roll_number}`}
+                                                    onSelect={() => {
+                                                      updateRollSelection(product.id, rollIndex, availableRoll.id);
+                                                      setRollSelectors(prev => ({...prev, [rollSelectorKey]: false}));
+                                                    }}
+                                                    className="cursor-pointer"
+                                                  >
+                                                    <div className="flex-1">
+                                                      <div className="font-medium">
+                                                        {availableRoll.quality}級 {availableRoll.current_quantity}kg {availableRoll.roll_number}
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                  <Check
-                                                    className={cn(
-                                                      "ml-auto h-4 w-4",
-                                                      roll.inventory_roll_id === availableRoll.id ? "opacity-100" : "opacity-0"
-                                                    )}
-                                                  />
-                                                </CommandItem>
-                                              ))}
-                                            </CommandGroup>
-                                          </CommandList>
+                                                    <Check
+                                                      className={cn(
+                                                        "ml-auto h-4 w-4",
+                                                        roll.inventory_roll_id === availableRoll.id ? "opacity-100" : "opacity-0"
+                                                      )}
+                                                    />
+                                                  </CommandItem>
+                                                ))}
+                                              </CommandGroup>
+                                            </CommandList>
+                                          </ScrollArea>
                                         </Command>
                                       </PopoverContent>
                                     </Popover>
@@ -624,7 +635,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                       }}
                                       className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                                     />
-                                    {roll.shipped_quantity > maxQuantity && (
+                                    {showQuantityValidation && roll.shipped_quantity > maxQuantity && (
                                       <p className="text-xs text-red-600">
                                         出貨數量不能超過布卷庫存 ({maxQuantity}kg)
                                       </p>
