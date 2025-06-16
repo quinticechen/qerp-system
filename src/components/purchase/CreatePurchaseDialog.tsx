@@ -4,11 +4,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Plus, Trash2, Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -68,6 +70,10 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     specifications: '',
     selected_product_name: ''
   }]);
+
+  // UI state for comboboxes
+  const [factoryOpen, setFactoryOpen] = useState(false);
+  const [orderSearchOpen, setOrderSearchOpen] = useState(false);
 
   // Fetch factories for selection
   const { data: factories } = useQuery({
@@ -323,18 +329,49 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="factory" className="text-gray-800">工廠 *</Label>
-              <Select value={factoryId} onValueChange={setFactoryId}>
-                <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="選擇工廠" />
-                </SelectTrigger>
-                <SelectContent className="bg-white border border-gray-200">
-                  {factories?.map((factory) => (
-                    <SelectItem key={factory.id} value={factory.id} className="text-gray-900 hover:bg-gray-100">
-                      {factory.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={factoryOpen} onOpenChange={setFactoryOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={factoryOpen}
+                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                  >
+                    {factoryId
+                      ? factories?.find((factory) => factory.id === factoryId)?.name
+                      : "選擇工廠..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="搜尋工廠..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>未找到工廠。</CommandEmpty>
+                      <CommandGroup>
+                        {factories?.map((factory) => (
+                          <CommandItem
+                            key={factory.id}
+                            value={factory.name}
+                            onSelect={() => {
+                              setFactoryId(factory.id);
+                              setFactoryOpen(false);
+                            }}
+                          >
+                            {factory.name}
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                factoryId === factory.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -352,19 +389,69 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           {/* Order Selection */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-gray-900">關聯訂單 (可選擇多個)</CardTitle>
+              <CardTitle className="text-gray-900 flex items-center justify-between">
+                關聯訂單 (可選擇多個)
+                <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-2">
+                      <Plus className="h-4 w-4 mr-1" />
+                      搜尋並添加訂單
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0">
+                    <Command>
+                      <CommandInput placeholder="搜尋訂單編號..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>未找到訂單。</CommandEmpty>
+                        <CommandGroup>
+                          {orders?.map((order) => (
+                            <CommandItem
+                              key={order.id}
+                              value={order.order_number}
+                              onSelect={() => {
+                                if (!selectedOrderIds.includes(order.id)) {
+                                  setSelectedOrderIds(prev => [...prev, order.id]);
+                                }
+                                setOrderSearchOpen(false);
+                              }}
+                            >
+                              {order.order_number}
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  selectedOrderIds.includes(order.id) ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {orders?.map((order) => (
-                <div key={order.id} className="flex items-center space-x-3">
-                  <Checkbox
-                    checked={selectedOrderIds.includes(order.id)}
-                    onCheckedChange={(checked) => handleOrderSelection(order.id, checked as boolean)}
-                    className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                  />
-                  <Label className="text-gray-800">{order.order_number}</Label>
-                </div>
-              ))}
+              {selectedOrderIds.length > 0 ? (
+                selectedOrderIds.map((orderId) => {
+                  const order = orders?.find(o => o.id === orderId);
+                  return (
+                    <div key={orderId} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                      <span className="text-gray-800">{order?.order_number}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedOrderIds(prev => prev.filter(id => id !== orderId))}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        移除
+                      </Button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-gray-500 text-sm">尚未選擇訂單</div>
+              )}
             </CardContent>
           </Card>
 
@@ -473,54 +560,117 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <Label className="text-gray-800">產品名稱 *</Label>
-                        <Select 
-                          value={item.selected_product_name || ''}
-                          onValueChange={(value) => {
-                            updateItem(index, 'selected_product_name', value);
-                            updateItem(index, 'product_id', '');
-                          }}
-                        >
-                          <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                            <SelectValue placeholder="選擇產品名稱" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200">
-                            {uniqueProductNames.map((name) => (
-                              <SelectItem key={name} value={name} className="text-gray-900 hover:bg-gray-100">
-                                {name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                            >
+                              {item.selected_product_name || "選擇產品名稱..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
+                              <CommandList>
+                                <CommandEmpty>未找到產品。</CommandEmpty>
+                                <CommandGroup>
+                                  {uniqueProductNames.map((name) => (
+                                    <CommandItem
+                                      key={name}
+                                      value={name}
+                                      onSelect={(currentValue) => {
+                                        updateItem(index, 'selected_product_name', currentValue);
+                                        updateItem(index, 'product_id', '');
+                                      }}
+                                    >
+                                      {name}
+                                      <Check
+                                        className={cn(
+                                          "ml-auto h-4 w-4",
+                                          item.selected_product_name === name ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div className="space-y-2">
                         <Label className="text-gray-800">顏色/色碼 *</Label>
-                        <Select 
-                          value={item.product_id} 
-                          onValueChange={(value) => updateItem(index, 'product_id', value)}
-                          disabled={!item.selected_product_name}
-                        >
-                          <SelectTrigger className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500">
-                            <SelectValue placeholder="選擇顏色" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200">
-                            {colorVariants.map((variant) => (
-                              <SelectItem key={variant.id} value={variant.id} className="text-gray-900 hover:bg-gray-100">
-                                <div className="flex items-center space-x-2">
-                                  {variant.color_code && (
-                                    <div 
-                                      className="w-4 h-4 rounded border border-gray-400"
-                                      style={{ backgroundColor: variant.color_code }}
-                                    ></div>
-                                  )}
-                                  <span>
-                                    {variant.color || '無顏色'} {variant.color_code ? `(${variant.color_code})` : ''}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              disabled={!item.selected_product_name}
+                              className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                            >
+                              {item.product_id ? (
+                                (() => {
+                                  const selectedVariant = colorVariants.find(v => v.id === item.product_id);
+                                  return selectedVariant ? (
+                                    <div className="flex items-center space-x-2">
+                                      {selectedVariant.color_code && (
+                                        <div 
+                                          className="w-4 h-4 rounded border border-gray-400"
+                                          style={{ backgroundColor: selectedVariant.color_code }}
+                                        ></div>
+                                      )}
+                                      <span>
+                                        {selectedVariant.color || '無顏色'} {selectedVariant.color_code ? `(${selectedVariant.color_code})` : ''}
+                                      </span>
+                                    </div>
+                                  ) : "選擇顏色...";
+                                })()
+                              ) : "選擇顏色..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput placeholder="搜尋顏色..." className="h-9" />
+                              <CommandList>
+                                <CommandEmpty>未找到顏色。</CommandEmpty>
+                                <CommandGroup>
+                                  {colorVariants.map((variant) => (
+                                    <CommandItem
+                                      key={variant.id}
+                                      value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
+                                      onSelect={() => {
+                                        updateItem(index, 'product_id', variant.id);
+                                      }}
+                                    >
+                                      <div className="flex items-center space-x-2">
+                                        {variant.color_code && (
+                                          <div 
+                                            className="w-4 h-4 rounded border border-gray-400"
+                                            style={{ backgroundColor: variant.color_code }}
+                                          ></div>
+                                        )}
+                                        <span>
+                                          {variant.color || '無顏色'} {variant.color_code ? `(${variant.color_code})` : ''}
+                                        </span>
+                                      </div>
+                                      <Check
+                                        className={cn(
+                                          "ml-auto h-4 w-4",
+                                          item.product_id === variant.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div className="space-y-2">
