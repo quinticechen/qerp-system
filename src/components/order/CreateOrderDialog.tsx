@@ -52,14 +52,14 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     specifications: {}
   }]);
 
-  // Generate preview order number when dialog opens
+  // Generate realistic order number preview when dialog opens
   useEffect(() => {
     if (open) {
       const now = new Date();
       const year = now.getFullYear().toString().slice(-2);
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
-      const preview = `${year}K${month}${day}-xxx`;
+      const preview = `${year}K${month}${day}-001`;
       setGeneratedOrderNumber(preview);
     }
   }, [open]);
@@ -85,7 +85,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data, error } = await supabase
         .from('products_new')
         .select('id, name, color, color_code')
-        .order('name, color');
+        .order('name, color, color_code');
       
       if (error) throw error;
       return data as Product[];
@@ -319,19 +319,26 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
             {products.map((product, index) => {
               const colorVariants = getColorVariants(product.base_product_name);
-              const colorOptions = colorVariants.map(variant => ({
-                value: variant.id,
-                label: variant.color || '無顏色',
-                extra: variant.color_code ? (
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className="w-3 h-3 rounded border border-gray-400"
-                      style={{ backgroundColor: variant.color_code }}
-                    ></div>
-                    <span>{variant.color_code}</span>
-                  </div>
-                ) : null,
-              }));
+              // 改善顏色選項顯示：每個色碼都是獨立選項，同時顯示顏色和色碼
+              const colorOptions = colorVariants.map(variant => {
+                const displayText = variant.color && variant.color_code 
+                  ? `${variant.color} (${variant.color_code})`
+                  : variant.color || variant.color_code || '無顏色';
+                
+                return {
+                  value: variant.id,
+                  label: displayText,
+                  extra: variant.color_code ? (
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-3 h-3 rounded border border-gray-400"
+                        style={{ backgroundColor: variant.color_code }}
+                      ></div>
+                      <span className="text-xs text-gray-500">{variant.color_code}</span>
+                    </div>
+                  ) : null,
+                };
+              });
               
               return (
                 <Card key={index} className="border-gray-200">
@@ -356,8 +363,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
                           options={colorOptions}
                           value={product.product_id}
                           onValueChange={(value) => updateProduct(index, 'product_id', value)}
-                          placeholder="選擇顏色..."
-                          searchPlaceholder="搜尋顏色..."
+                          placeholder="選擇顏色/色碼..."
+                          searchPlaceholder="搜尋顏色或色碼..."
                           emptyText="未找到顏色"
                           disabled={!product.base_product_name}
                           className="w-full"
