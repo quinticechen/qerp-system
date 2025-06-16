@@ -40,6 +40,9 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
   colorOpens,
   setColorOpens,
 }) => {
+  console.log('PurchaseItemsSection - items state:', items);
+  console.log('PurchaseItemsSection - items length:', items.length);
+  
   return (
     <Card>
       <CardHeader>
@@ -58,23 +61,32 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {items.map((item, index) => (
-          <PurchaseItemForm
-            key={index}
-            item={item}
-            index={index}
-            products={products}
-            uniqueProductNames={uniqueProductNames}
-            getColorVariants={getColorVariants}
-            updateItem={updateItem}
-            removeItem={removeItem}
-            canRemove={items.length > 1}
-            productNameOpen={productNameOpens[index] || false}
-            setProductNameOpen={(open) => setProductNameOpens({ ...productNameOpens, [index]: open })}
-            colorOpen={colorOpens[index] || false}
-            setColorOpen={(open) => setColorOpens({ ...colorOpens, [index]: open })}
-          />
-        ))}
+        {items.map((item, index) => {
+          console.log(`PurchaseItemsSection - Rendering item ${index}:`, item);
+          return (
+            <PurchaseItemForm
+              key={`item-${index}`}
+              item={item}
+              index={index}
+              products={products}
+              uniqueProductNames={uniqueProductNames}
+              getColorVariants={getColorVariants}
+              updateItem={updateItem}
+              removeItem={removeItem}
+              canRemove={items.length > 1}
+              productNameOpen={productNameOpens[index] || false}
+              setProductNameOpen={(open) => {
+                console.log(`Setting productNameOpen for index ${index} to:`, open);
+                setProductNameOpens({ ...productNameOpens, [index]: open });
+              }}
+              colorOpen={colorOpens[index] || false}
+              setColorOpen={(open) => {
+                console.log(`Setting colorOpen for index ${index} to:`, open);
+                setColorOpens({ ...colorOpens, [index]: open });
+              }}
+            />
+          );
+        })}
       </CardContent>
     </Card>
   );

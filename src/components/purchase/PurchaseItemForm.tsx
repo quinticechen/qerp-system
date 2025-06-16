@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -46,9 +47,10 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 }) => {
   const colorVariants = getColorVariants(item.selected_product_name || '');
 
-  console.log('PurchaseItemForm - uniqueProductNames:', uniqueProductNames);
-  console.log('PurchaseItemForm - products:', products?.length || 0);
-  console.log('PurchaseItemForm - current item:', item);
+  console.log(`PurchaseItemForm ${index} - Received item prop:`, item);
+  console.log(`PurchaseItemForm ${index} - uniqueProductNames:`, uniqueProductNames);
+  console.log(`PurchaseItemForm ${index} - products:`, products?.length || 0);
+  console.log(`PurchaseItemForm ${index} - selected_product_name:`, item.selected_product_name);
 
   return (
     <div className="border border-gray-200 rounded p-4 space-y-4">
@@ -94,12 +96,12 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={name}
                         value={name}
                         onSelect={(currentValue) => {
-                          console.log('Selected product name:', currentValue, 'for index:', index);
-                          console.log('Before update - item:', item);
+                          console.log(`PurchaseItemForm ${index} - Selected product name:`, currentValue);
+                          console.log(`PurchaseItemForm ${index} - Before update - item:`, item);
                           updateItem(index, 'selected_product_name', currentValue);
                           updateItem(index, 'product_id', '');
                           setProductNameOpen(false);
-                          console.log('After update called');
+                          console.log(`PurchaseItemForm ${index} - After update called`);
                         }}
                       >
                         {name}
@@ -160,7 +162,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={variant.id}
                         value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
                         onSelect={() => {
-                          console.log('Selected color variant:', variant);
+                          console.log(`PurchaseItemForm ${index} - Selected color variant:`, variant);
                           updateItem(index, 'product_id', variant.id);
                           setColorOpen(false);
                         }}
