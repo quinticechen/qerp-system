@@ -229,6 +229,8 @@ export const InventorySummary: React.FC = () => {
                   <TableHead className="text-gray-900">C級</TableHead>
                   <TableHead className="text-gray-900">D級</TableHead>
                   <TableHead className="text-gray-900">瑕疵品</TableHead>
+                  <TableHead className="text-gray-900">待入庫</TableHead>
+                  <TableHead className="text-gray-900">待出貨</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -336,22 +338,21 @@ export const InventorySummary: React.FC = () => {
                               {formatGradeDetails(rollDetailsForProduct, 'defective')}
                             </TooltipContent>
                           </Tooltip>
-                          
-                          {(pendingInfo.pending_inventory > 0 || pendingInfo.pending_shipping > 0) && (
-                            <div className="flex gap-1 text-xs">
-                              {pendingInfo.pending_inventory > 0 && (
-                                <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
-                                  待入庫: {pendingInfo.pending_inventory.toFixed(2)}kg
-                                </Badge>
-                              )}
-                              {pendingInfo.pending_shipping > 0 && (
-                                <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
-                                  待出貨: {pendingInfo.pending_shipping.toFixed(2)}kg
-                                </Badge>
-                              )}
-                            </div>
-                          )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {pendingInfo.pending_inventory > 0 && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
+                            {pendingInfo.pending_inventory.toFixed(2)}kg
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {pendingInfo.pending_shipping > 0 && (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
+                            {pendingInfo.pending_shipping.toFixed(2)}kg
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
