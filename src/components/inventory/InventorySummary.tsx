@@ -21,6 +21,17 @@ interface InventorySummaryItem {
   defective_stock: number;
 }
 
+interface RollDetail {
+  product_id: string;
+  quality: string;
+  quantity: number;
+  products_new: {
+    name: string;
+    color: string | null;
+    color_code: string | null;
+  };
+}
+
 export const InventorySummary: React.FC = () => {
   const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary'],
@@ -35,7 +46,6 @@ export const InventorySummary: React.FC = () => {
     }
   });
 
-  // 獲取詳細的卷數信息
   const { data: rollDetails } = useQuery({
     queryKey: ['inventory-roll-details'],
     queryFn: async () => {
@@ -49,7 +59,7 @@ export const InventorySummary: React.FC = () => {
         `);
       
       if (error) throw error;
-      return data;
+      return data as RollDetail[];
     }
   });
 
@@ -82,7 +92,7 @@ export const InventorySummary: React.FC = () => {
     );
   };
 
-  const formatRollDetails = (rolls: any[]) => {
+  const formatRollDetails = (rolls: RollDetail[]) => {
     const qualityGroups = rolls.reduce((acc, roll) => {
       const quality = roll.quality;
       if (!acc[quality]) acc[quality] = [];
@@ -120,7 +130,7 @@ export const InventorySummary: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {inventorySummary?.map((item) => {
-                  const rollDetails = getRollDetailsForProduct(item.product_id, item.color);
+                  const rollDetailsForProduct = getRollDetailsForProduct(item.product_id, item.color);
                   
                   return (
                     <TableRow key={`${item.product_id}-${item.color || 'no-color'}`}>
@@ -157,7 +167,7 @@ export const InventorySummary: React.FC = () => {
                           </TooltipTrigger>
                           <TooltipContent>
                             <div className="whitespace-pre-line">
-                              {formatRollDetails(rollDetails)}
+                              {formatRollDetails(rollDetailsForProduct)}
                             </div>
                           </TooltipContent>
                         </Tooltip>
