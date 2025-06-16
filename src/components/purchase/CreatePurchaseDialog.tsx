@@ -250,8 +250,13 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   };
 
   const updateItem = (index: number, field: keyof PurchaseItem, value: any) => {
+    console.log('updateItem called:', { index, field, value });
+    console.log('Current items before update:', items);
+    
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
+    
+    console.log('Updated items:', updatedItems);
     setItems(updatedItems);
   };
 

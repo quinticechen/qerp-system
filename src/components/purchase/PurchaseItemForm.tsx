@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -49,6 +48,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 
   console.log('PurchaseItemForm - uniqueProductNames:', uniqueProductNames);
   console.log('PurchaseItemForm - products:', products?.length || 0);
+  console.log('PurchaseItemForm - current item:', item);
 
   return (
     <div className="border border-gray-200 rounded p-4 space-y-4">
@@ -94,10 +94,12 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={name}
                         value={name}
                         onSelect={(currentValue) => {
-                          console.log('Selected product name:', currentValue);
+                          console.log('Selected product name:', currentValue, 'for index:', index);
+                          console.log('Before update - item:', item);
                           updateItem(index, 'selected_product_name', currentValue);
                           updateItem(index, 'product_id', '');
                           setProductNameOpen(false);
+                          console.log('After update called');
                         }}
                       >
                         {name}
@@ -158,6 +160,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={variant.id}
                         value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
                         onSelect={() => {
+                          console.log('Selected color variant:', variant);
                           updateItem(index, 'product_id', variant.id);
                           setColorOpen(false);
                         }}
