@@ -113,13 +113,13 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Product Name Selection */}
         <div className="space-y-2">
-          <Label className="text-gray-800">產品名稱 *</Label>
+          <Label>產品名稱 *</Label>
           <Popover open={productNameOpen} onOpenChange={setProductNameOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
-                className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                className="w-full justify-between"
               >
                 <span className="truncate">
                   {item.selected_product_name || "選擇產品名稱..."}
@@ -127,9 +127,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
               <Command>
-                <CommandInput placeholder="搜尋產品名稱..." className="h-9" />
+                <CommandInput placeholder="搜尋產品名稱..." />
                 <CommandList>
                   <CommandEmpty>
                     {uniqueProductNames.length === 0 ? "無產品資料，請先在產品管理中新增產品" : "未找到產品。"}
@@ -140,7 +140,6 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={name}
                         value={name}
                         onSelect={() => handleProductNameSelect(name)}
-                        className="cursor-pointer"
                       >
                         <span className="flex-1">{name}</span>
                         <Check
@@ -160,14 +159,14 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 
         {/* Color/Color Code Selection */}
         <div className="space-y-2">
-          <Label className="text-gray-800">顏色/色碼 *</Label>
+          <Label>顏色/色碼 *</Label>
           <Popover open={colorOpen} onOpenChange={setColorOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 disabled={!item.selected_product_name || availableColorVariants.length === 0}
-                className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+                className="w-full justify-between"
               >
                 <span className="truncate">
                   {selectedProduct ? (
@@ -190,9 +189,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-white shadow-lg border border-gray-200 z-50">
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
               <Command>
-                <CommandInput placeholder="搜尋顏色..." className="h-9" />
+                <CommandInput placeholder="搜尋顏色..." />
                 <CommandList>
                   <CommandEmpty>未找到顏色。</CommandEmpty>
                   <CommandGroup>
@@ -201,7 +200,6 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         key={variant.id}
                         value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
                         onSelect={() => handleColorSelect(variant.id)}
-                        className="cursor-pointer"
                       >
                         <div className="flex items-center space-x-2 flex-1">
                           {variant.color_code && (
@@ -232,28 +230,26 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 
         {/* Quantity Input */}
         <div className="space-y-2">
-          <Label className="text-gray-800">訂購數量 (公斤) *</Label>
+          <Label>訂購數量 (公斤) *</Label>
           <Input
             type="number"
             step="0.01"
             min="0"
             value={item.ordered_quantity || ''}
             onChange={(e) => updateItem(index, 'ordered_quantity', parseFloat(e.target.value) || 0)}
-            className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
             placeholder="輸入數量"
           />
         </div>
 
         {/* Unit Price Input */}
         <div className="space-y-2">
-          <Label className="text-gray-800">單價 *</Label>
+          <Label>單價 *</Label>
           <Input
             type="number"
             step="0.01"
             min="0"
             value={item.unit_price || ''}
             onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-            className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
             placeholder="輸入單價"
           />
         </div>
