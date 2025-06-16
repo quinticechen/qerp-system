@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -59,7 +58,7 @@ export function AppSidebar() {
                     isActive={location.pathname === item.path}
                     className={`w-full transition-all duration-200 ${
                       location.pathname === item.path 
-                        ? 'bg-blue-500 text-white hover:bg-blue-600 font-medium shadow-sm' 
+                        ? 'bg-blue-500 text-blue-900 hover:bg-blue-600 font-medium shadow-sm' 
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
                     }`}
                   >
