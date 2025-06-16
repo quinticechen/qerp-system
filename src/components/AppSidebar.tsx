@@ -57,7 +57,11 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     onClick={() => navigate(item.path)}
                     isActive={location.pathname === item.path}
-                    className="w-full"
+                    className={`w-full transition-all duration-200 ${
+                      location.pathname === item.path 
+                        ? 'bg-blue-500 text-white hover:bg-blue-600 font-medium shadow-sm' 
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
                   >
                     <item.icon size={20} />
                     <span>{item.label}</span>
