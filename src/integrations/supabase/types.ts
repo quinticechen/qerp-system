@@ -505,6 +505,42 @@ export type Database = {
           },
         ]
       }
+      purchase_order_relations: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          purchase_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          purchase_order_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          purchase_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_order_relations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_order_relations_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_orders: {
         Row: {
           created_at: string

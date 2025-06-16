@@ -36,6 +36,13 @@ export const PurchaseList = () => {
             ordered_rolls,
             unit_price,
             products_new (name, color)
+          ),
+          purchase_order_relations (
+            orders (
+              id,
+              order_number,
+              note
+            )
           )
         `)
         .order('created_at', { ascending: false });
@@ -61,17 +68,6 @@ export const PurchaseList = () => {
       purchase.factories?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     );
   }, [purchases, debouncedSearchTerm]);
-
-  // Extract related orders from note field
-  const extractRelatedOrders = (note: string | null) => {
-    if (!note) return [];
-    
-    const match = note.match(/關聯訂單:\s*([^\n]+)/);
-    if (match) {
-      return match[1].split(',').map(order => order.trim());
-    }
-    return [];
-  };
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -148,7 +144,8 @@ export const PurchaseList = () => {
             0
           ) || 0;
 
-          const relatedOrders = extractRelatedOrders(purchase.note);
+          // 獲取關聯訂單
+          const relatedOrders = purchase.purchase_order_relations?.map((rel: any) => rel.orders) || [];
 
           return (
             <Card key={purchase.id} className="hover:shadow-md transition-shadow">
@@ -161,9 +158,9 @@ export const PurchaseList = () => {
                       <div className="mt-2">
                         <p className="text-gray-600 font-medium">關聯訂單：</p>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {relatedOrders.map((orderNumber, index) => (
+                          {relatedOrders.map((order: any, index: number) => (
                             <Badge key={index} variant="outline" className="text-xs">
-                              {orderNumber}
+                              {order.order_number}
                             </Badge>
                           ))}
                         </div>

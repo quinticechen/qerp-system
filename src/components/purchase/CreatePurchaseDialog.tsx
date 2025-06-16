@@ -183,14 +183,22 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
       if (itemsError) throw itemsError;
 
-      // Create order associations if any orders were selected
+      // Create order associations using the new purchase_order_relations table
       if (purchaseData.order_ids.length > 0) {
-        // Insert relationships in order_purchase table or similar
-        // For now, we'll store in a simple way by updating the order status
-        
-        // Get selected order information including notes
-        const selectedOrdersWithNotes = orders?.filter(o => purchaseData.order_ids.includes(o.id)) || [];
-        
+        const orderRelations = purchaseData.order_ids.map(orderId => ({
+          purchase_order_id: purchase.id,
+          order_id: orderId,
+        }));
+
+        const { error: relationsError } = await supabase
+          .from('purchase_order_relations')
+          .insert(orderRelations);
+
+        if (relationsError) {
+          console.error('Error creating order relations:', relationsError);
+          throw relationsError;
+        }
+
         // Update order status to 'factory_ordered' for associated orders
         const { error: orderUpdateError } = await supabase
           .from('orders')
@@ -199,31 +207,6 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
         if (orderUpdateError) {
           console.error('Error updating order status:', orderUpdateError);
-        }
-
-        // Store order associations and notes in purchase note
-        const orderNumbers = selectedOrdersWithNotes.map(o => o.order_number);
-        const orderNotes = selectedOrdersWithNotes
-          .filter(o => o.note)
-          .map(o => `${o.order_number}: ${o.note}`)
-          .join('\n');
-        
-        let combinedNote = `關聯訂單: ${orderNumbers.join(', ')}`;
-        if (orderNotes) {
-          combinedNote += `\n\n訂單備註:\n${orderNotes}`;
-        }
-        if (purchaseData.note) {
-          combinedNote += `\n\n採購備註:\n${purchaseData.note}`;
-        }
-
-        // Update purchase with combined note
-        const { error: noteUpdateError } = await supabase
-          .from('purchase_orders')
-          .update({ note: combinedNote })
-          .eq('id', purchase.id);
-
-        if (noteUpdateError) {
-          console.error('Error updating purchase note:', noteUpdateError);
         }
       }
 
