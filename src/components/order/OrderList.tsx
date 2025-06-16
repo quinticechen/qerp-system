@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +8,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditOrderDialog } from './EditOrderDialog';
+
+interface OrderFactory {
+  id: string;
+  factories: {
+    name: string;
+  } | null;
+}
 
 interface Order {
   id: string;
@@ -31,6 +37,7 @@ interface Order {
       color: string;
     } | null;
   }> | null;
+  order_factories: OrderFactory[] | null;
 }
 
 export const OrderList = () => {
@@ -80,7 +87,7 @@ export const OrderList = () => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'confirmed': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'partial_shipped': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'factory_ordered': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'cancelled': return 'bg-red-100 text-red-800 border-red-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -212,9 +219,9 @@ export const OrderList = () => {
                 <TableCell className="text-gray-800">
                   {order.order_factories && order.order_factories.length > 0 ? (
                     <div className="space-y-1">
-                      {order.order_factories.map((of: any, index: number) => (
+                      {order.order_factories.map((orderFactory: OrderFactory, index: number) => (
                         <div key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {of.factories?.name}
+                          {orderFactory.factories?.name}
                         </div>
                       ))}
                     </div>
