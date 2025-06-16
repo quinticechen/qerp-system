@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -64,7 +63,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select('id, order_number')
+        .select('id, order_number, note')
         .order('order_number');
       
       if (error) throw error;
@@ -84,7 +83,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
           id,
           quantity,
           products_new (id, name, color, color_code),
-          orders (id, order_number)
+          orders (id, order_number, note)
         `)
         .in('order_id', selectedOrderIds);
       
@@ -160,12 +159,6 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
         user_id: user.id
       };
 
-      // If multiple orders selected, store them as JSON in note or create separate relation table
-      if (purchaseData.order_ids.length > 0) {
-        const orderNumbers = orders?.filter(o => purchaseData.order_ids.includes(o.id)).map(o => o.order_number);
-        insertData.note = `關聯訂單: ${orderNumbers?.join(', ')}${purchaseData.note ? `\n備註: ${purchaseData.note}` : ''}`;
-      }
-
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert(insertData)
@@ -190,14 +183,59 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
       if (itemsError) throw itemsError;
 
+      // Create order associations if any orders were selected
+      if (purchaseData.order_ids.length > 0) {
+        // Insert relationships in order_purchase table or similar
+        // For now, we'll store in a simple way by updating the order status
+        
+        // Get selected order information including notes
+        const selectedOrdersWithNotes = orders?.filter(o => purchaseData.order_ids.includes(o.id)) || [];
+        
+        // Update order status to 'factory_ordered' for associated orders
+        const { error: orderUpdateError } = await supabase
+          .from('orders')
+          .update({ status: 'factory_ordered' })
+          .in('id', purchaseData.order_ids);
+
+        if (orderUpdateError) {
+          console.error('Error updating order status:', orderUpdateError);
+        }
+
+        // Store order associations and notes in purchase note
+        const orderNumbers = selectedOrdersWithNotes.map(o => o.order_number);
+        const orderNotes = selectedOrdersWithNotes
+          .filter(o => o.note)
+          .map(o => `${o.order_number}: ${o.note}`)
+          .join('\n');
+        
+        let combinedNote = `關聯訂單: ${orderNumbers.join(', ')}`;
+        if (orderNotes) {
+          combinedNote += `\n\n訂單備註:\n${orderNotes}`;
+        }
+        if (purchaseData.note) {
+          combinedNote += `\n\n採購備註:\n${purchaseData.note}`;
+        }
+
+        // Update purchase with combined note
+        const { error: noteUpdateError } = await supabase
+          .from('purchase_orders')
+          .update({ note: combinedNote })
+          .eq('id', purchase.id);
+
+        if (noteUpdateError) {
+          console.error('Error updating purchase note:', noteUpdateError);
+        }
+      }
+
       return purchase;
     },
     onSuccess: () => {
       toast({
         title: "成功",
-        description: "採購單已成功建立並設為已下單狀態",
+        description: "採購單已成功建立並設為已下單狀態，關聯訂單狀態已更新為「已向工廠下單」",
       });
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       onOpenChange(false);
       resetForm();
     },

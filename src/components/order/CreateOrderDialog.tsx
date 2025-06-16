@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -52,15 +51,37 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     specifications: {}
   }]);
 
-  // Generate realistic order number preview when dialog opens
+  // Generate next order number preview when dialog opens
   useEffect(() => {
     if (open) {
-      const now = new Date();
-      const year = now.getFullYear().toString().slice(-2);
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const preview = `${year}K${month}${day}-001`;
-      setGeneratedOrderNumber(preview);
+      // 獲取下一個訂單編號的預覽
+      const fetchNextOrderNumber = async () => {
+        try {
+          const { data: seqData } = await supabase.rpc('nextval', { 
+            sequence_name: 'order_daily_seq' 
+          });
+          
+          const now = new Date();
+          const year = now.getFullYear().toString().slice(-2);
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const seqNum = seqData || 1;
+          const formattedSeq = String(seqNum).padStart(3, '0');
+          const preview = `${year}K${month}${day}-${formattedSeq}`;
+          
+          setGeneratedOrderNumber(preview);
+        } catch (error) {
+          // 如果無法獲取序列，使用預設預覽
+          const now = new Date();
+          const year = now.getFullYear().toString().slice(-2);
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const day = String(now.getDate()).padStart(2, '0');
+          const preview = `${year}K${month}${day}-001`;
+          setGeneratedOrderNumber(preview);
+        }
+      };
+      
+      fetchNextOrderNumber();
     }
   }, [open]);
 

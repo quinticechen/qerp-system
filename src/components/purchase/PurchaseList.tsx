@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewPurchaseDialog } from './ViewPurchaseDialog';
 import { EditPurchaseDialog } from './EditPurchaseDialog';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const PurchaseList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,15 +19,17 @@ export const PurchaseList = () => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
+  // Debounce search term to improve performance
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const { data: purchases, isLoading } = useQuery({
-    queryKey: ['purchases', searchTerm, statusFilter],
+    queryKey: ['purchases', debouncedSearchTerm, statusFilter],
     queryFn: async () => {
       let query = supabase
         .from('purchase_orders')
         .select(`
           *,
           factories (name),
-          orders (order_number),
           purchase_order_items (
             id,
             ordered_quantity,
@@ -37,10 +40,6 @@ export const PurchaseList = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (searchTerm) {
-        query = query.or(`po_number.ilike.%${searchTerm}%,factories.name.ilike.%${searchTerm}%`);
-      }
-
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
@@ -50,6 +49,29 @@ export const PurchaseList = () => {
       return data;
     }
   });
+
+  // Filter purchases client-side for better performance
+  const filteredPurchases = useMemo(() => {
+    if (!purchases) return [];
+    
+    if (!debouncedSearchTerm) return purchases;
+    
+    return purchases.filter(purchase => 
+      purchase.po_number?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      purchase.factories?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    );
+  }, [purchases, debouncedSearchTerm]);
+
+  // Extract related orders from note field
+  const extractRelatedOrders = (note: string | null) => {
+    if (!note) return [];
+    
+    const match = note.match(/關聯訂單:\s*([^\n]+)/);
+    if (match) {
+      return match[1].split(',').map(order => order.trim());
+    }
+    return [];
+  };
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -115,7 +137,7 @@ export const PurchaseList = () => {
 
       {/* 採購單列表 */}
       <div className="grid gap-4">
-        {purchases?.map((purchase) => {
+        {filteredPurchases?.map((purchase) => {
           const totalAmount = purchase.purchase_order_items?.reduce(
             (sum: number, item: any) => sum + (item.ordered_quantity * item.unit_price), 
             0
@@ -126,6 +148,8 @@ export const PurchaseList = () => {
             0
           ) || 0;
 
+          const relatedOrders = extractRelatedOrders(purchase.note);
+
           return (
             <Card key={purchase.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
@@ -133,8 +157,17 @@ export const PurchaseList = () => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{purchase.po_number}</h3>
                     <p className="text-gray-600">工廠：{purchase.factories?.name}</p>
-                    {purchase.orders && (
-                      <p className="text-gray-600">關聯訂單：{purchase.orders.order_number}</p>
+                    {relatedOrders.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-gray-600 font-medium">關聯訂單：</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {relatedOrders.map((orderNumber, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {orderNumber}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                   <div className="text-right">
@@ -194,7 +227,7 @@ export const PurchaseList = () => {
           );
         })}
 
-        {purchases?.length === 0 && (
+        {filteredPurchases?.length === 0 && (
           <Card>
             <CardContent className="text-center py-8">
               <p className="text-gray-500">沒有找到採購單</p>
