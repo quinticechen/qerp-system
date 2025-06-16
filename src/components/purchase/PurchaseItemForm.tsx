@@ -45,10 +45,8 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
   colorOpen,
   setColorOpen,
 }) => {
-  // Debug logging to track prop changes
-  console.log(`PurchaseItemForm ${index} - Received item prop:`, item);
-  console.log(`PurchaseItemForm ${index} - selected_product_name from prop:`, item.selected_product_name);
-  console.log(`PurchaseItemForm ${index} - product_id from prop:`, item.product_id);
+  console.log(`PurchaseItemForm ${index} - Received item:`, item);
+  console.log(`PurchaseItemForm ${index} - selected_product_name:`, item.selected_product_name);
 
   // Get available color variants for the selected product
   const availableColorVariants = item.selected_product_name 
@@ -65,22 +63,23 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 
   const handleProductNameSelect = (productName: string) => {
     console.log(`PurchaseItemForm ${index} - Selecting product name:`, productName);
-  
-    // 合併更新：設定產品名稱並清空產品 ID
-    updateItem(index, {
-      selected_product_name: productName,
-      product_id: '', // 在選擇產品名稱時清空 product_id
-      unit_price: 0, // 考慮是否也要清空數量和單價，因為產品變了價格可能也不同
-      ordered_quantity: 0,
-      specifications: '',
-    });
-  
-    // 關閉下拉選單
+    
+    // Update product name
+    updateItem(index, 'selected_product_name', productName);
+    
+    // Clear product ID when product name changes
+    updateItem(index, 'product_id', '');
+    
+    // Reset other fields
+    updateItem(index, 'unit_price', 0);
+    updateItem(index, 'ordered_quantity', 0);
+    updateItem(index, 'specifications', '');
+    
+    // Close dropdown
     setProductNameOpen(false);
-  
+    
     console.log(`PurchaseItemForm ${index} - Product name selection completed`);
   };
-  
 
   const handleColorSelect = (productId: string) => {
     console.log(`PurchaseItemForm ${index} - Selecting product ID:`, productId);
