@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,11 +17,18 @@ interface CreateOrderDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  color: string | null;
+  color_code: string | null;
+}
+
 interface OrderProduct {
+  base_product_name: string;
   product_id: string;
   quantity: number;
   unit_price: number;
-  total_rolls: number | null;
   specifications: any;
 }
 
@@ -34,10 +42,10 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [note, setNote] = useState('');
   const [products, setProducts] = useState<OrderProduct[]>([{
+    base_product_name: '',
     product_id: '',
     quantity: 0,
     unit_price: 0,
-    total_rolls: null,
     specifications: {}
   }]);
 
@@ -55,19 +63,27 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     }
   });
 
-  // Fetch products
-  const { data: availableProducts } = useQuery({
-    queryKey: ['products'],
+  // Fetch all products
+  const { data: allProducts } = useQuery({
+    queryKey: ['all-products'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products_new')
-        .select('id, name, color')
-        .order('name');
+        .select('id, name, color, color_code')
+        .order('name, color');
       
       if (error) throw error;
-      return data;
+      return data as Product[];
     }
   });
+
+  // Get unique product names
+  const uniqueProductNames = [...new Set(allProducts?.map(p => p.name))];
+
+  // Get color variants for a specific product name
+  const getColorVariants = (productName: string) => {
+    return allProducts?.filter(p => p.name === productName) || [];
+  };
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: {
@@ -108,7 +124,6 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         product_id: product.product_id,
         quantity: product.quantity,
         unit_price: product.unit_price,
-        total_rolls: product.total_rolls,
         specifications: product.specifications,
       }));
 
@@ -146,20 +161,20 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     setSelectedCustomer('');
     setNote('');
     setProducts([{
+      base_product_name: '',
       product_id: '',
       quantity: 0,
       unit_price: 0,
-      total_rolls: null,
       specifications: {}
     }]);
   };
 
   const addProduct = () => {
     setProducts([...products, {
+      base_product_name: '',
       product_id: '',
       quantity: 0,
       unit_price: 0,
-      total_rolls: null,
       specifications: {}
     }]);
   };
@@ -173,6 +188,12 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const updateProduct = (index: number, field: keyof OrderProduct, value: any) => {
     const updatedProducts = [...products];
     updatedProducts[index] = { ...updatedProducts[index], [field]: value };
+    
+    // If base product name changes, reset product_id
+    if (field === 'base_product_name') {
+      updatedProducts[index].product_id = '';
+    }
+    
     setProducts(updatedProducts);
   };
 
@@ -241,84 +262,107 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
               </Button>
             </div>
 
-            {products.map((product, index) => (
-              <Card key={index} className="border-gray-200">
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-gray-800">產品 *</Label>
-                      <Select
-                        value={product.product_id}
-                        onValueChange={(value) => updateProduct(index, 'product_id', value)}
-                      >
-                        <SelectTrigger className="border-gray-200">
-                          <SelectValue placeholder="選擇產品..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableProducts?.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.name} {p.color && `(${p.color})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+            {products.map((product, index) => {
+              const colorVariants = getColorVariants(product.base_product_name);
+              
+              return (
+                <Card key={index} className="border-gray-200">
+                  <CardContent className="p-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-gray-800">產品名稱 *</Label>
+                        <Select
+                          value={product.base_product_name}
+                          onValueChange={(value) => updateProduct(index, 'base_product_name', value)}
+                        >
+                          <SelectTrigger className="border-gray-200">
+                            <SelectValue placeholder="選擇產品..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {uniqueProductNames.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-800">顏色/色碼 *</Label>
+                        <Select
+                          value={product.product_id}
+                          onValueChange={(value) => updateProduct(index, 'product_id', value)}
+                          disabled={!product.base_product_name}
+                        >
+                          <SelectTrigger className="border-gray-200">
+                            <SelectValue placeholder="選擇顏色..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {colorVariants.map((variant) => (
+                              <SelectItem key={variant.id} value={variant.id}>
+                                <div className="flex items-center space-x-2">
+                                  {variant.color_code && (
+                                    <div 
+                                      className="w-4 h-4 rounded border border-gray-400"
+                                      style={{ backgroundColor: variant.color_code }}
+                                    ></div>
+                                  )}
+                                  <span>
+                                    {variant.color || '無顏色'} {variant.color_code ? `(${variant.color_code})` : ''}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-800">公斤數 *</Label>
+                        <Input
+                          type="number"
+                          value={product.quantity}
+                          onChange={(e) => updateProduct(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          className="border-gray-200 text-gray-900"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-gray-800">單價 (每公斤) *</Label>
+                        <Input
+                          type="number"
+                          value={product.unit_price}
+                          onChange={(e) => updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          className="border-gray-200 text-gray-900"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-gray-800">公斤數 *</Label>
-                      <Input
-                        type="number"
-                        value={product.quantity}
-                        onChange={(e) => updateProduct(index, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="border-gray-200 text-gray-900"
-                        min="0"
-                        step="0.01"
-                      />
+                    <div className="mt-4 flex justify-between items-center">
+                      <div className="text-sm text-gray-700">
+                        小計: ${(product.quantity * product.unit_price).toLocaleString()}
+                      </div>
+                      {products.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeProduct(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-800">單價 (每公斤) *</Label>
-                      <Input
-                        type="number"
-                        value={product.unit_price}
-                        onChange={(e) => updateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="border-gray-200 text-gray-900"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-gray-800">預計總卷數</Label>
-                      <Input
-                        type="number"
-                        value={product.total_rolls || ''}
-                        onChange={(e) => updateProduct(index, 'total_rolls', e.target.value ? parseInt(e.target.value) : null)}
-                        className="border-gray-200 text-gray-900"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex justify-between items-center">
-                    <div className="text-sm text-gray-700">
-                      小計: ${(product.quantity * product.unit_price).toLocaleString()}
-                    </div>
-                    {products.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeProduct(index)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Order Note */}
