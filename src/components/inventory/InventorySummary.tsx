@@ -32,6 +32,13 @@ interface RollDetail {
   };
 }
 
+interface PendingData {
+  product_id: string;
+  color: string | null;
+  pending_inventory: number;
+  pending_shipping: number;
+}
+
 export const InventorySummary: React.FC = () => {
   const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary'],
@@ -60,6 +67,78 @@ export const InventorySummary: React.FC = () => {
       
       if (error) throw error;
       return data as RollDetail[];
+    }
+  });
+
+  const { data: pendingData } = useQuery({
+    queryKey: ['pending-data'],
+    queryFn: async () => {
+      // 獲取待入庫數據
+      const { data: pendingInventory, error: pendingInventoryError } = await supabase
+        .from('purchase_order_items')
+        .select(`
+          product_id,
+          ordered_quantity,
+          received_quantity,
+          products_new!inner(color)
+        `)
+        .in('status', ['pending', 'partial_received']);
+      
+      if (pendingInventoryError) throw pendingInventoryError;
+
+      // 獲取待出貨數據
+      const { data: pendingShipping, error: pendingShippingError } = await supabase
+        .from('order_products')
+        .select(`
+          product_id,
+          quantity,
+          shipped_quantity,
+          products_new!inner(color)
+        `)
+        .in('status', ['pending', 'partial_shipped']);
+      
+      if (pendingShippingError) throw pendingShippingError;
+
+      // 處理數據
+      const pendingMap = new Map<string, PendingData>();
+
+      // 處理待入庫
+      pendingInventory.forEach(item => {
+        const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
+        const pending = (item.ordered_quantity || 0) - (item.received_quantity || 0);
+        
+        if (!pendingMap.has(key)) {
+          pendingMap.set(key, {
+            product_id: item.product_id,
+            color: item.products_new?.color || null,
+            pending_inventory: 0,
+            pending_shipping: 0
+          });
+        }
+        
+        const existing = pendingMap.get(key)!;
+        existing.pending_inventory += pending > 0 ? pending : 0;
+      });
+
+      // 處理待出貨
+      pendingShipping.forEach(item => {
+        const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
+        const pending = (item.quantity || 0) - (item.shipped_quantity || 0);
+        
+        if (!pendingMap.has(key)) {
+          pendingMap.set(key, {
+            product_id: item.product_id,
+            color: item.products_new?.color || null,
+            pending_inventory: 0,
+            pending_shipping: 0
+          });
+        }
+        
+        const existing = pendingMap.get(key)!;
+        existing.pending_shipping += pending > 0 ? pending : 0;
+      });
+
+      return Array.from(pendingMap.values());
     }
   });
 
@@ -116,6 +195,19 @@ export const InventorySummary: React.FC = () => {
     return `${quantities.join('+')}=${total.toFixed(2)}kg`;
   };
 
+  const getPendingDataForProduct = (productId: string, color: string | null) => {
+    if (!pendingData) return { pending_inventory: 0, pending_shipping: 0 };
+    
+    const found = pendingData.find(p => 
+      p.product_id === productId && p.color === color
+    );
+    
+    return found ? { 
+      pending_inventory: found.pending_inventory, 
+      pending_shipping: found.pending_shipping 
+    } : { pending_inventory: 0, pending_shipping: 0 };
+  };
+
   return (
     <TooltipProvider>
       <Card>
@@ -142,6 +234,7 @@ export const InventorySummary: React.FC = () => {
               <TableBody>
                 {inventorySummary?.map((item) => {
                   const rollDetailsForProduct = getRollDetailsForProduct(item.product_id, item.color);
+                  const pendingInfo = getPendingDataForProduct(item.product_id, item.color);
                   
                   return (
                     <TableRow key={`${item.product_id}-${item.color || 'no-color'}`}>
@@ -232,16 +325,33 @@ export const InventorySummary: React.FC = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600">
-                              {item.defective_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {formatGradeDetails(rollDetailsForProduct, 'defective')}
-                          </TooltipContent>
-                        </Tooltip>
+                        <div className="flex items-center space-x-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help hover:text-blue-600">
+                                {item.defective_stock.toFixed(2)} kg
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {formatGradeDetails(rollDetailsForProduct, 'defective')}
+                            </TooltipContent>
+                          </Tooltip>
+                          
+                          {(pendingInfo.pending_inventory > 0 || pendingInfo.pending_shipping > 0) && (
+                            <div className="text-xs text-gray-500">
+                              {pendingInfo.pending_inventory > 0 && (
+                                <span className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded mr-1">
+                                  待入庫: {pendingInfo.pending_inventory.toFixed(2)}kg
+                                </span>
+                              )}
+                              {pendingInfo.pending_shipping > 0 && (
+                                <span className="bg-orange-100 text-orange-800 px-1 py-0.5 rounded">
+                                  待出貨: {pendingInfo.pending_shipping.toFixed(2)}kg
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

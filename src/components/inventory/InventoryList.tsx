@@ -4,20 +4,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SearchInput } from '@/components/ui/search-input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, Package, Filter } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewInventoryDialog } from './ViewInventoryDialog';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export const InventoryList = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [selectedInventory, setSelectedInventory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
 
+  // 使用防抖處理搜尋輸入
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const { data: inventories, isLoading } = useQuery({
-    queryKey: ['inventories', searchTerm, warehouseFilter],
+    queryKey: ['inventories', debouncedSearchTerm],
     queryFn: async () => {
       let query = supabase
         .from('inventories')
@@ -44,36 +46,18 @@ export const InventoryList = () => {
       // 客戶端篩選
       let filteredData = data;
 
-      if (searchTerm) {
+      if (debouncedSearchTerm) {
         filteredData = data.filter((inventory: any) =>
-          inventory.purchase_orders?.po_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          inventory.factories?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          inventory.purchase_orders?.po_number?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+          inventory.factories?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
           inventory.inventory_rolls?.some((roll: any) =>
-            roll.products_new?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            roll.roll_number?.toLowerCase().includes(searchTerm.toLowerCase())
+            roll.products_new?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+            roll.roll_number?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
           )
         );
       }
 
-      if (warehouseFilter !== 'all') {
-        filteredData = filteredData.filter((inventory: any) =>
-          inventory.inventory_rolls?.some((roll: any) => roll.warehouses?.id === warehouseFilter)
-        );
-      }
-
       return filteredData;
-    }
-  });
-
-  const { data: warehouses } = useQuery({
-    queryKey: ['warehouses'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('id, name')
-        .order('name');
-      if (error) throw error;
-      return data;
     }
   });
 
@@ -101,7 +85,7 @@ export const InventoryList = () => {
 
   return (
     <div className="space-y-6">
-      {/* 搜尋和篩選 */}
+      {/* 搜尋篩選 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-900">
@@ -110,27 +94,12 @@ export const InventoryList = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SearchInput
-              placeholder="搜尋採購單號、工廠、產品或布卷編號..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            
-            <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-              <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="選擇倉庫" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部倉庫</SelectItem>
-                {warehouses?.map((warehouse) => (
-                  <SelectItem key={warehouse.id} value={warehouse.id}>
-                    {warehouse.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <SearchInput
+            placeholder="搜尋採購單號、工廠、產品或布卷編號..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-md"
+          />
         </CardContent>
       </Card>
 
