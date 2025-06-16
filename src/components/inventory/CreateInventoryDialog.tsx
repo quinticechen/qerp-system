@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -65,16 +66,33 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .in('status', ['pending', 'partial_received'])
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching purchase orders:', error);
+        throw error;
+      }
       
-      // 過濾掉沒有待入庫項目的採購單
-      const filteredData = data?.filter(po => 
-        po.purchase_order_items && 
-        po.purchase_order_items.some(item => 
-          (item.ordered_quantity || 0) > (item.received_quantity || 0)
-        )
-      ) || [];
+      console.log('Raw purchase orders data:', data);
       
+      // 更詳細的過濾邏輯，確保我們能看到所有相關的採購單
+      const filteredData = data?.filter(po => {
+        if (!po.purchase_order_items || po.purchase_order_items.length === 0) {
+          return false;
+        }
+        
+        // 檢查是否有待入庫的項目
+        const hasPendingItems = po.purchase_order_items.some(item => {
+          const ordered = item.ordered_quantity || 0;
+          const received = item.received_quantity || 0;
+          const remaining = ordered - received;
+          console.log(`Product ${item.product_id}: ordered=${ordered}, received=${received}, remaining=${remaining}`);
+          return remaining > 0;
+        });
+        
+        console.log(`PO ${po.po_number} has pending items:`, hasPendingItems);
+        return hasPendingItems;
+      }) || [];
+      
+      console.log('Filtered purchase orders:', filteredData);
       return filteredData;
     }
   });
@@ -296,7 +314,11 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                   <Command>
                     <CommandInput placeholder="搜尋採購單號或工廠..." className="h-9" />
                     <CommandList>
-                      <CommandEmpty>未找到採購單。</CommandEmpty>
+                      <CommandEmpty>
+                        {purchaseOrders && purchaseOrders.length === 0 
+                          ? "目前沒有待入庫的採購單。所有採購單可能已完成入庫。" 
+                          : "未找到採購單。"}
+                      </CommandEmpty>
                       <CommandGroup>
                         {purchaseOrders?.map((po) => (
                           <CommandItem
@@ -308,6 +330,11 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                             <div className="flex flex-col flex-1">
                               <span className="font-medium">{po.po_number}</span>
                               <span className="text-sm text-gray-500">{po.factories?.name}</span>
+                              <div className="text-xs text-blue-600">
+                                {po.purchase_order_items?.filter(item => 
+                                  (item.ordered_quantity || 0) > (item.received_quantity || 0)
+                                ).length} 項待入庫
+                              </div>
                             </div>
                             <Check
                               className={cn(

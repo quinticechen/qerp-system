@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,13 +42,49 @@ export const InventorySummary: React.FC = () => {
   const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary'],
     queryFn: async () => {
+      // 直接從 products_new 和 inventory_rolls 查詢，而不是依賴視圖
       const { data, error } = await supabase
-        .from('inventory_summary')
-        .select('*')
-        .order('product_name, color');
+        .from('products_new')
+        .select(`
+          id,
+          name,
+          color,
+          color_code,
+          inventory_rolls (
+            current_quantity,
+            quality
+          )
+        `)
+        .order('name, color');
       
       if (error) throw error;
-      return data as InventorySummaryItem[];
+
+      // 處理數據以生成庫存統計
+      const processedData = data.map(product => {
+        const rolls = product.inventory_rolls || [];
+        const totalStock = rolls.reduce((sum, roll) => sum + (roll.current_quantity || 0), 0);
+        const totalRolls = rolls.length;
+        
+        const gradeStocks = {
+          a_grade_stock: rolls.filter(r => r.quality === 'A').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
+          b_grade_stock: rolls.filter(r => r.quality === 'B').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
+          c_grade_stock: rolls.filter(r => r.quality === 'C').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
+          d_grade_stock: rolls.filter(r => r.quality === 'D').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
+          defective_stock: rolls.filter(r => r.quality === 'defective').reduce((sum, r) => sum + (r.current_quantity || 0), 0)
+        };
+
+        return {
+          product_id: product.id,
+          product_name: product.name,
+          color: product.color,
+          color_code: product.color_code,
+          total_stock: totalStock,
+          total_rolls: totalRolls,
+          ...gradeStocks
+        };
+      }).filter(item => item.total_rolls > 0); // 只顯示有庫存的產品
+
+      return processedData as InventorySummaryItem[];
     }
   });
 
