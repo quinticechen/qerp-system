@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 
 interface Customer {
   id: string;
@@ -21,7 +21,6 @@ interface Customer {
 }
 
 const CustomerManagement = () => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [newCustomer, setNewCustomer] = useState({
@@ -153,12 +152,6 @@ const CustomerManagement = () => {
     },
   });
 
-  const filteredCustomers = customers?.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (customer.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-    (customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
-  );
-
   const handleCreateCustomer = async () => {
     createCustomerMutation.mutate(newCustomer);
   };
@@ -170,6 +163,81 @@ const CustomerManagement = () => {
   const handleDeleteCustomer = async (id: string) => {
     deleteCustomerMutation.mutate(id);
   };
+
+  const columns: TableColumn[] = [
+    {
+      key: 'name',
+      title: '客戶名稱',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="font-medium text-gray-900">{value}</span>
+    },
+    {
+      key: 'contact_person',
+      title: '聯絡人',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'phone',
+      title: '電話',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'email',
+      title: 'Email',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'address',
+      title: '地址',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'created_at',
+      title: '建立時間',
+      sortable: true,
+      filterable: false,
+      render: (value) => (
+        <span className="text-gray-800">
+          {new Date(value).toLocaleDateString('zh-TW')}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      sortable: false,
+      filterable: false,
+      render: (value, row) => (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditingCustomer(row)}
+            className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDeleteCustomer(row.id)}
+            className="text-red-600 hover:text-red-800 hover:bg-gray-100 border-gray-300"
+          >
+            <Trash className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -267,67 +335,13 @@ const CustomerManagement = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="搜尋客戶名稱、聯絡人或電話..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-gray-900 font-semibold">客戶名稱</TableHead>
-                <TableHead className="text-gray-900 font-semibold">聯絡人</TableHead>
-                <TableHead className="text-gray-900 font-semibold">電話</TableHead>
-                <TableHead className="text-gray-900 font-semibold">Email</TableHead>
-                <TableHead className="text-gray-900 font-semibold">地址</TableHead>
-                <TableHead className="text-gray-900 font-semibold">建立時間</TableHead>
-                <TableHead className="text-gray-900 font-semibold">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers?.map((customer) => (
-                <TableRow key={customer.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium text-gray-900">{customer.name}</TableCell>
-                  <TableCell className="text-gray-800">{customer.contact_person}</TableCell>
-                  <TableCell className="text-gray-800">{customer.phone}</TableCell>
-                  <TableCell className="text-gray-800">{customer.email}</TableCell>
-                  <TableCell className="text-gray-800">{customer.address}</TableCell>
-                  <TableCell className="text-gray-800">{new Date(customer.created_at).toLocaleDateString('zh-TW')}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingCustomer(customer)}
-                      className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteCustomer(customer.id)}
-                      className="text-red-600 hover:text-red-800 hover:bg-gray-100 border-gray-300 ml-2"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {filteredCustomers?.length === 0 && (
-            <div className="text-center py-8 text-gray-600">
-              {searchTerm ? '沒有找到符合條件的客戶' : '尚無客戶'}
-            </div>
-          )}
+          <EnhancedTable
+            columns={columns}
+            data={customers || []}
+            loading={isLoading}
+            searchPlaceholder="搜尋客戶名稱、聯絡人、電話..."
+            emptyMessage={error ? '載入客戶資料時發生錯誤' : '尚無客戶'}
+          />
         </CardContent>
       </Card>
 

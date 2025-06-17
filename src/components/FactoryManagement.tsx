@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Edit, Trash } from 'lucide-react';
+import { Plus, Edit, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 
 interface Factory {
   id: string;
@@ -21,7 +21,6 @@ interface Factory {
 }
 
 const FactoryManagement = () => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingFactory, setEditingFactory] = useState<Factory | null>(null);
   const [newFactory, setNewFactory] = useState({
@@ -157,11 +156,69 @@ const FactoryManagement = () => {
     },
   });
 
-  const filteredFactories = factories?.filter(factory =>
-    factory.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (factory.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-    (factory.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
-  ) || [];
+  const columns: TableColumn[] = [
+    {
+      key: 'name',
+      title: '工廠名稱',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="font-medium text-gray-900">{value}</span>
+    },
+    {
+      key: 'contact_person',
+      title: '聯絡人',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'phone',
+      title: '電話',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'email',
+      title: 'Email',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'address',
+      title: '地址',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-800">{value || '-'}</span>
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      sortable: false,
+      filterable: false,
+      render: (value, row) => (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditingFactory(row)}
+            className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => deleteFactoryMutation.mutate(row.id)}
+            className="text-red-600 hover:text-red-800 hover:bg-gray-100 border-gray-300"
+          >
+            <Trash className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -264,65 +321,13 @@ const FactoryManagement = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="搜尋工廠名稱、聯絡人或電話..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-gray-300 text-gray-900 placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-gray-900 font-semibold">工廠名稱</TableHead>
-                <TableHead className="text-gray-900 font-semibold">聯絡人</TableHead>
-                <TableHead className="text-gray-900 font-semibold">電話</TableHead>
-                <TableHead className="text-gray-900 font-semibold">Email</TableHead>
-                <TableHead className="text-gray-900 font-semibold">地址</TableHead>
-                <TableHead className="text-gray-900 font-semibold">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredFactories.map((factory) => (
-                <TableRow key={factory.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium text-gray-900">{factory.name}</TableCell>
-                  <TableCell className="text-gray-800">{factory.contact_person}</TableCell>
-                  <TableCell className="text-gray-800">{factory.phone}</TableCell>
-                  <TableCell className="text-gray-800">{factory.email}</TableCell>
-                  <TableCell className="text-gray-800">{factory.address}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditingFactory(factory)}
-                      className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteFactoryMutation.mutate(factory.id)}
-                      className="text-red-600 hover:text-red-800 hover:bg-gray-100 border-gray-300 ml-2"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {filteredFactories.length === 0 && (
-            <div className="text-center py-8 text-gray-600">
-              {searchTerm ? '沒有找到符合條件的工廠' : '尚無工廠'}
-            </div>
-          )}
+          <EnhancedTable
+            columns={columns}
+            data={factories || []}
+            loading={isLoading}
+            searchPlaceholder="搜尋工廠名稱、聯絡人、電話..."
+            emptyMessage={error ? '載入工廠資料時發生錯誤' : '尚無工廠'}
+          />
         </CardContent>
       </Card>
 
