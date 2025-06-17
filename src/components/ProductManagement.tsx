@@ -14,7 +14,10 @@ const ProductManagement = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">產品管理</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">產品管理</h2>
+          <p className="text-gray-600 mt-1">管理產品資訊和庫存預警設定</p>
+        </div>
         <Button 
           onClick={() => setIsCreateDialogOpen(true)}
           className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"

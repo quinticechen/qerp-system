@@ -15,11 +15,19 @@ const InventoryManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { data: lowStockProducts = [] } = useStockAlert();
 
+  const handleNavigateToProducts = () => {
+    // 這裡可以添加導航邏輯，例如通過 React Router 導航到產品管理頁面
+    window.location.href = '/products';
+  };
+
   return (
     <div className="space-y-6">
       {/* 庫存預警通知 */}
       {lowStockProducts.length > 0 && (
-        <StockAlertNotification lowStockProducts={lowStockProducts} />
+        <StockAlertNotification 
+          lowStockProducts={lowStockProducts} 
+          onNavigateToProducts={handleNavigateToProducts}
+        />
       )}
 
       <div className="flex justify-between items-center">
