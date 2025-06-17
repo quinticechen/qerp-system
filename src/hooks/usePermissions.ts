@@ -27,6 +27,8 @@ export interface Permission {
   canViewUsers: boolean;
   canCreateUsers: boolean;
   canEditUsers: boolean;
+  canViewPermissions: boolean;
+  canEditPermissions: boolean;
   canViewSystemSettings: boolean;
   canEditSystemSettings: boolean;
 }
@@ -58,6 +60,8 @@ const rolePermissions: Record<string, Permission> = {
     canViewUsers: true,
     canCreateUsers: true,
     canEditUsers: true,
+    canViewPermissions: true,
+    canEditPermissions: true,
     canViewSystemSettings: true,
     canEditSystemSettings: true,
   },
@@ -87,6 +91,8 @@ const rolePermissions: Record<string, Permission> = {
     canViewUsers: false,
     canCreateUsers: false,
     canEditUsers: false,
+    canViewPermissions: false,
+    canEditPermissions: false,
     canViewSystemSettings: false,
     canEditSystemSettings: false,
   },
@@ -116,6 +122,8 @@ const rolePermissions: Record<string, Permission> = {
     canViewUsers: false,
     canCreateUsers: false,
     canEditUsers: false,
+    canViewPermissions: false,
+    canEditPermissions: false,
     canViewSystemSettings: false,
     canEditSystemSettings: false,
   },
@@ -145,6 +153,8 @@ const rolePermissions: Record<string, Permission> = {
     canViewUsers: false,
     canCreateUsers: false,
     canEditUsers: false,
+    canViewPermissions: false,
+    canEditPermissions: false,
     canViewSystemSettings: false,
     canEditSystemSettings: false,
   },
@@ -174,6 +184,8 @@ const rolePermissions: Record<string, Permission> = {
     canViewUsers: false,
     canCreateUsers: false,
     canEditUsers: false,
+    canViewPermissions: false,
+    canEditPermissions: false,
     canViewSystemSettings: false,
     canEditSystemSettings: false,
   },

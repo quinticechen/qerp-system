@@ -1,8 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { Switch } from '@/components/ui/switch';
+import { Edit } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface PermissionRow {
   feature: string;
@@ -14,7 +19,9 @@ interface PermissionRow {
 }
 
 export const PermissionManagement: React.FC = () => {
-  const permissionData: PermissionRow[] = [
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [permissionData, setPermissionData] = useState<PermissionRow[]>([
     { feature: '查看產品', admin: true, sales: true, assistant: true, accounting: true, warehouse: true },
     { feature: '創建產品', admin: true, sales: false, assistant: true, accounting: false, warehouse: false },
     { feature: '編輯產品', admin: true, sales: false, assistant: true, accounting: false, warehouse: false },
@@ -40,14 +47,53 @@ export const PermissionManagement: React.FC = () => {
     { feature: '查看用戶', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
     { feature: '創建用戶', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
     { feature: '編輯用戶', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
+    { feature: '查看權限', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
+    { feature: '編輯權限', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
     { feature: '查看系統設定', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
     { feature: '編輯系統設定', admin: true, sales: false, assistant: false, accounting: false, warehouse: false },
-  ];
+  ]);
 
-  const renderPermissionBadge = (hasPermission: boolean) => {
+  const handlePermissionToggle = (rowIndex: number, role: keyof Omit<PermissionRow, 'feature'>) => {
+    if (!isEditing) return;
+    
+    const newData = [...permissionData];
+    newData[rowIndex] = {
+      ...newData[rowIndex],
+      [role]: !newData[rowIndex][role]
+    };
+    setPermissionData(newData);
+  };
+
+  const handleSave = () => {
+    // 這裡應該調用 API 來保存權限設定
+    console.log('Saving permissions:', permissionData);
+    toast({
+      title: "權限設定已保存",
+      description: "角色權限矩陣已成功更新",
+    });
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    // 重置到原始狀態
+    setIsEditing(false);
+    // 這裡可以重新載入原始數據
+  };
+
+  const renderPermissionCell = (value: boolean, rowIndex: number, role: keyof Omit<PermissionRow, 'feature'>) => {
+    if (isEditing && role !== 'admin') {
+      return (
+        <Switch
+          checked={value}
+          onCheckedChange={() => handlePermissionToggle(rowIndex, role)}
+          className="data-[state=checked]:bg-green-600"
+        />
+      );
+    }
+    
     return (
-      <Badge variant={hasPermission ? "default" : "secondary"} className={hasPermission ? "bg-green-100 text-green-800" : ""}>
-        {hasPermission ? '允許' : '禁止'}
+      <Badge variant={value ? "default" : "secondary"} className={value ? "bg-green-100 text-green-800" : ""}>
+        {value ? '允許' : '禁止'}
       </Badge>
     );
   };
@@ -61,7 +107,10 @@ export const PermissionManagement: React.FC = () => {
     {
       key: 'admin',
       title: '管理員',
-      render: (value) => renderPermissionBadge(value),
+      render: (value, row) => {
+        const rowIndex = permissionData.findIndex(item => item.feature === row.feature);
+        return renderPermissionCell(value, rowIndex, 'admin');
+      },
       filterable: true,
       filterOptions: [
         { value: 'true', label: '允許' },
@@ -71,7 +120,10 @@ export const PermissionManagement: React.FC = () => {
     {
       key: 'sales',
       title: '業務',
-      render: (value) => renderPermissionBadge(value),
+      render: (value, row) => {
+        const rowIndex = permissionData.findIndex(item => item.feature === row.feature);
+        return renderPermissionCell(value, rowIndex, 'sales');
+      },
       filterable: true,
       filterOptions: [
         { value: 'true', label: '允許' },
@@ -81,7 +133,10 @@ export const PermissionManagement: React.FC = () => {
     {
       key: 'assistant',
       title: '助理',
-      render: (value) => renderPermissionBadge(value),
+      render: (value, row) => {
+        const rowIndex = permissionData.findIndex(item => item.feature === row.feature);
+        return renderPermissionCell(value, rowIndex, 'assistant');
+      },
       filterable: true,
       filterOptions: [
         { value: 'true', label: '允許' },
@@ -91,7 +146,10 @@ export const PermissionManagement: React.FC = () => {
     {
       key: 'accounting',
       title: '會計',
-      render: (value) => renderPermissionBadge(value),
+      render: (value, row) => {
+        const rowIndex = permissionData.findIndex(item => item.feature === row.feature);
+        return renderPermissionCell(value, rowIndex, 'accounting');
+      },
       filterable: true,
       filterOptions: [
         { value: 'true', label: '允許' },
@@ -101,7 +159,10 @@ export const PermissionManagement: React.FC = () => {
     {
       key: 'warehouse',
       title: '倉庫管理員',
-      render: (value) => renderPermissionBadge(value),
+      render: (value, row) => {
+        const rowIndex = permissionData.findIndex(item => item.feature === row.feature);
+        return renderPermissionCell(value, rowIndex, 'warehouse');
+      },
       filterable: true,
       filterOptions: [
         { value: 'true', label: '允許' },
@@ -112,16 +173,45 @@ export const PermissionManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800">權限管理</h1>
-        <p className="text-slate-600 mt-2">查看和管理系統各角色的功能權限</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800">權限管理</h1>
+          <p className="text-slate-600 mt-2">查看和管理系統各角色的功能權限</p>
+        </div>
+        <PermissionGuard permission="canEditPermissions">
+          <div className="flex gap-2">
+            {!isEditing ? (
+              <Button onClick={() => setIsEditing(true)} className="flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                編輯權限
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button onClick={handleSave} variant="default">
+                  保存
+                </Button>
+                <Button onClick={handleCancel} variant="outline">
+                  取消
+                </Button>
+              </div>
+            )}
+          </div>
+        </PermissionGuard>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>角色權限矩陣</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            角色權限矩陣
+            {isEditing && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                編輯模式
+              </Badge>
+            )}
+          </CardTitle>
           <CardDescription>
             此表格顯示不同角色對各功能模組的存取權限
+            {isEditing && " - 點擊開關來調整權限設定"}
           </CardDescription>
         </CardHeader>
         <CardContent>

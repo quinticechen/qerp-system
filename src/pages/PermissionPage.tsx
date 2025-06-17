@@ -2,11 +2,14 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import { PermissionManagement } from '@/components/permission/PermissionManagement';
+import { PermissionGuard } from '@/components/PermissionGuard';
 
 const PermissionPage = () => {
   return (
     <Layout>
-      <PermissionManagement />
+      <PermissionGuard permission="canViewPermissions">
+        <PermissionManagement />
+      </PermissionGuard>
     </Layout>
   );
 };
