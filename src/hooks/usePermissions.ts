@@ -1,5 +1,5 @@
 
-import { useUserRole } from './useUserRole';
+import { useOrganizationPermissions } from './useOrganizationPermissions';
 
 export interface Permission {
   canViewProducts: boolean;
@@ -31,202 +31,54 @@ export interface Permission {
   canEditPermissions: boolean;
   canViewSystemSettings: boolean;
   canEditSystemSettings: boolean;
+  // 新增組織權限
+  canManageOrganization: boolean;
+  canManageUsers: boolean;
+  canManageRoles: boolean;
 }
 
-const rolePermissions: Record<string, Permission> = {
-  admin: {
-    canViewProducts: true,
-    canCreateProducts: true,
-    canEditProducts: true,
-    canDeleteProducts: true,
-    canViewInventory: true,
-    canCreateInventory: true,
-    canEditInventory: true,
-    canViewOrders: true,
-    canCreateOrders: true,
-    canEditOrders: true,
-    canViewPurchases: true,
-    canCreatePurchases: true,
-    canEditPurchases: true,
-    canViewShipping: true,
-    canCreateShipping: true,
-    canEditShipping: true,
-    canViewCustomers: true,
-    canCreateCustomers: true,
-    canEditCustomers: true,
-    canViewFactories: true,
-    canCreateFactories: true,
-    canEditFactories: true,
-    canViewUsers: true,
-    canCreateUsers: true,
-    canEditUsers: true,
-    canViewPermissions: true,
-    canEditPermissions: true,
-    canViewSystemSettings: true,
-    canEditSystemSettings: true,
-  },
-  sales: {
-    canViewProducts: true,
-    canCreateProducts: false,
-    canEditProducts: false,
-    canDeleteProducts: false,
-    canViewInventory: true,
-    canCreateInventory: false,
-    canEditInventory: false,
-    canViewOrders: true,
-    canCreateOrders: true,
-    canEditOrders: true,
-    canViewPurchases: true,
-    canCreatePurchases: false,
-    canEditPurchases: false,
-    canViewShipping: true,
-    canCreateShipping: false,
-    canEditShipping: false,
-    canViewCustomers: true,
-    canCreateCustomers: true,
-    canEditCustomers: true,
-    canViewFactories: true,
-    canCreateFactories: false,
-    canEditFactories: false,
-    canViewUsers: false,
-    canCreateUsers: false,
-    canEditUsers: false,
-    canViewPermissions: false,
-    canEditPermissions: false,
-    canViewSystemSettings: false,
-    canEditSystemSettings: false,
-  },
-  assistant: {
-    canViewProducts: true,
-    canCreateProducts: true,
-    canEditProducts: true,
-    canDeleteProducts: false,
-    canViewInventory: true,
-    canCreateInventory: true,
-    canEditInventory: true,
-    canViewOrders: true,
-    canCreateOrders: true,
-    canEditOrders: true,
-    canViewPurchases: true,
-    canCreatePurchases: true,
-    canEditPurchases: true,
-    canViewShipping: true,
-    canCreateShipping: true,
-    canEditShipping: true,
-    canViewCustomers: true,
-    canCreateCustomers: true,
-    canEditCustomers: true,
-    canViewFactories: true,
-    canCreateFactories: true,
-    canEditFactories: true,
-    canViewUsers: false,
-    canCreateUsers: false,
-    canEditUsers: false,
-    canViewPermissions: false,
-    canEditPermissions: false,
-    canViewSystemSettings: false,
-    canEditSystemSettings: false,
-  },
-  accounting: {
-    canViewProducts: true,
-    canCreateProducts: false,
-    canEditProducts: false,
-    canDeleteProducts: false,
-    canViewInventory: true,
-    canCreateInventory: false,
-    canEditInventory: false,
-    canViewOrders: true,
-    canCreateOrders: false,
-    canEditOrders: false,
-    canViewPurchases: true,
-    canCreatePurchases: false,
-    canEditPurchases: false,
-    canViewShipping: true,
-    canCreateShipping: false,
-    canEditShipping: false,
-    canViewCustomers: true,
-    canCreateCustomers: false,
-    canEditCustomers: false,
-    canViewFactories: true,
-    canCreateFactories: false,
-    canEditFactories: false,
-    canViewUsers: false,
-    canCreateUsers: false,
-    canEditUsers: false,
-    canViewPermissions: false,
-    canEditPermissions: false,
-    canViewSystemSettings: false,
-    canEditSystemSettings: false,
-  },
-  warehouse: {
-    canViewProducts: true,
-    canCreateProducts: false,
-    canEditProducts: false,
-    canDeleteProducts: false,
-    canViewInventory: true,
-    canCreateInventory: true,
-    canEditInventory: true,
-    canViewOrders: true,
-    canCreateOrders: false,
-    canEditOrders: false,
-    canViewPurchases: true,
-    canCreatePurchases: false,
-    canEditPurchases: false,
-    canViewShipping: true,
-    canCreateShipping: true,
-    canEditShipping: true,
-    canViewCustomers: false,
-    canCreateCustomers: false,
-    canEditCustomers: false,
-    canViewFactories: false,
-    canCreateFactories: false,
-    canEditFactories: false,
-    canViewUsers: false,
-    canCreateUsers: false,
-    canEditUsers: false,
-    canViewPermissions: false,
-    canEditPermissions: false,
-    canViewSystemSettings: false,
-    canEditSystemSettings: false,
-  },
-};
-
 export const usePermissions = () => {
-  const { roles, isAdmin, loading } = useUserRole();
+  const { permissions, loading, hasPermission, isOwner } = useOrganizationPermissions();
 
-  const getPermissions = (): Permission => {
-    if (loading) {
-      // 返回無權限的預設值
-      return Object.keys(rolePermissions.sales).reduce((acc, key) => {
-        acc[key as keyof Permission] = false;
-        return acc;
-      }, {} as Permission);
-    }
-
-    if (isAdmin) {
-      return rolePermissions.admin;
-    }
-
-    // 合併所有角色的權限（取聯集）
-    const mergedPermissions = roles.reduce((acc, role) => {
-      const rolePermission = rolePermissions[role];
-      if (rolePermission) {
-        Object.keys(rolePermission).forEach(key => {
-          const permKey = key as keyof Permission;
-          acc[permKey] = acc[permKey] || rolePermission[permKey];
-        });
-      }
-      return acc;
-    }, {} as Permission);
-
-    return mergedPermissions;
+  // 轉換組織權限到舊的權限介面
+  const convertedPermissions: Permission = {
+    canViewProducts: permissions.canViewProducts || false,
+    canCreateProducts: permissions.canCreateProducts || false,
+    canEditProducts: permissions.canEditProducts || false,
+    canDeleteProducts: permissions.canDeleteProducts || false,
+    canViewInventory: permissions.canViewInventory || false,
+    canCreateInventory: permissions.canCreateInventory || false,
+    canEditInventory: permissions.canEditInventory || false,
+    canViewOrders: permissions.canViewOrders || false,
+    canCreateOrders: permissions.canCreateOrders || false,
+    canEditOrders: permissions.canEditOrders || false,
+    canViewPurchases: permissions.canViewPurchases || false,
+    canCreatePurchases: permissions.canCreatePurchases || false,
+    canEditPurchases: permissions.canEditPurchases || false,
+    canViewShipping: permissions.canViewShipping || false,
+    canCreateShipping: permissions.canCreateShipping || false,
+    canEditShipping: permissions.canEditShipping || false,
+    canViewCustomers: permissions.canViewCustomers || false,
+    canCreateCustomers: permissions.canCreateCustomers || false,
+    canEditCustomers: permissions.canEditCustomers || false,
+    canViewFactories: permissions.canViewFactories || false,
+    canCreateFactories: permissions.canCreateFactories || false,
+    canEditFactories: permissions.canEditFactories || false,
+    canViewUsers: permissions.canViewUsers || false,
+    canCreateUsers: permissions.canCreateUsers || false,
+    canEditUsers: permissions.canEditUsers || false,
+    canViewPermissions: permissions.canViewPermissions || false,
+    canEditPermissions: permissions.canEditPermissions || false,
+    canViewSystemSettings: permissions.canViewSystemSettings || false,
+    canEditSystemSettings: permissions.canEditSystemSettings || false,
+    canManageOrganization: permissions.canManageOrganization || isOwner,
+    canManageUsers: permissions.canManageUsers || isOwner,
+    canManageRoles: permissions.canManageRoles || isOwner,
   };
 
-  const permissions = getPermissions();
-
   return {
-    permissions,
+    permissions: convertedPermissions,
     loading,
-    hasPermission: (permission: keyof Permission) => permissions[permission],
+    hasPermission: (permission: keyof Permission) => hasPermission(permission),
   };
 };
