@@ -369,6 +369,8 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          status: Database["public"]["Enums"]["product_status"] | null
+          stock_thresholds: number | null
           unit_of_measure: string
           updated_at: string
           updated_by: string | null
@@ -381,6 +383,8 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          status?: Database["public"]["Enums"]["product_status"] | null
+          stock_thresholds?: number | null
           unit_of_measure?: string
           updated_at?: string
           updated_by?: string | null
@@ -393,6 +397,8 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          status?: Database["public"]["Enums"]["product_status"] | null
+          stock_thresholds?: number | null
           unit_of_measure?: string
           updated_at?: string
           updated_by?: string | null
@@ -863,6 +869,36 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_summary_enhanced: {
+        Row: {
+          a_grade_details: string[] | null
+          a_grade_rolls: number | null
+          a_grade_stock: number | null
+          b_grade_details: string[] | null
+          b_grade_rolls: number | null
+          b_grade_stock: number | null
+          c_grade_details: string[] | null
+          c_grade_rolls: number | null
+          c_grade_stock: number | null
+          color: string | null
+          color_code: string | null
+          d_grade_details: string[] | null
+          d_grade_rolls: number | null
+          d_grade_stock: number | null
+          defective_details: string[] | null
+          defective_rolls: number | null
+          defective_stock: number | null
+          pending_in_quantity: number | null
+          pending_out_quantity: number | null
+          product_id: string | null
+          product_name: string | null
+          product_status: Database["public"]["Enums"]["product_status"] | null
+          stock_thresholds: number | null
+          total_rolls: number | null
+          total_stock: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_current_user_role: {
@@ -879,6 +915,7 @@ export type Database = {
         | "completed"
         | "cancelled"
       payment_status: "unpaid" | "partial_paid" | "paid"
+      product_status: "Available" | "Unavailable"
       purchase_order_status:
         | "pending"
         | "confirmed"
@@ -1012,6 +1049,7 @@ export const Constants = {
         "cancelled",
       ],
       payment_status: ["unpaid", "partial_paid", "paid"],
+      product_status: ["Available", "Unavailable"],
       purchase_order_status: [
         "pending",
         "confirmed",
