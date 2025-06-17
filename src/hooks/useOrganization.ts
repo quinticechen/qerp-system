@@ -127,6 +127,15 @@ export const useOrganization = () => {
       console.log('Creating organization with user:', user.id);
       console.log('Organization data:', { name, description, owner_id: user.id });
       
+      // 檢查當前用戶的認證狀態
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
+        throw new Error('認證會話無效，請重新登入');
+      }
+      
+      console.log('Current session user:', session.user.id);
+      
       // 首先創建組織
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')

@@ -30,7 +30,11 @@ function App() {
       <Router>
         <OrganizationProvider>
           <Routes>
+            {/* 公開路由 */}
             <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Index />} />
+            
+            {/* 受保護路由 - 需要登入但不需要組織 */}
             <Route
               path="/create-organization"
               element={
@@ -39,7 +43,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/" element={<Index />} />
+            
+            {/* 受保護路由 - 需要登入且需要組織 */}
             <Route
               path="/dashboard"
               element={
@@ -160,6 +165,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            
+            {/* 錯誤處理路由 */}
             <Route path="/404" element={<NotFound />} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>

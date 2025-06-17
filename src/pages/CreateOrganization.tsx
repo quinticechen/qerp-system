@@ -46,11 +46,25 @@ const CreateOrganization = () => {
   const onSubmit = async (data: CreateOrganizationForm) => {
     try {
       console.log('Submitting organization creation:', data);
-      await createOrganization(data.name, data.description);
+      console.log('Current user:', user);
+      
+      // 驗證表單數據
+      if (!data.name || data.name.trim() === '') {
+        toast({
+          title: "創建組織失敗",
+          description: "組織名稱不能為空",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      await createOrganization(data.name.trim(), data.description?.trim());
+      
       toast({
         title: "組織創建成功",
         description: "您的組織已成功創建，正在為您設置系統...",
       });
+      
       // 延遲導航，讓使用者看到成功訊息，然後直接回到首頁讓路由系統處理
       setTimeout(() => {
         navigate('/', { replace: true });
@@ -60,7 +74,9 @@ const CreateOrganization = () => {
       
       let errorMessage = "請稍後再試或聯繫系統管理員";
       
-      if (error?.message) {
+      if (error?.code === '42501') {
+        errorMessage = "權限不足，請重新登入後再嘗試";
+      } else if (error?.message) {
         errorMessage = error.message;
       } else if (error?.details) {
         errorMessage = error.details;
@@ -73,6 +89,13 @@ const CreateOrganization = () => {
         description: errorMessage,
         variant: "destructive",
       });
+      
+      // 如果是權限錯誤，建議重新登入
+      if (error?.code === '42501') {
+        setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 2000);
+      }
     }
   };
 
@@ -129,9 +152,13 @@ const CreateOrganization = () => {
                 <Label htmlFor="name">組織名稱 *</Label>
                 <Input
                   id="name"
-                  {...register('name', { required: true })}
+                  {...register('name', { 
+                    required: '組織名稱為必填項',
+                    minLength: { value: 1, message: '組織名稱不能為空' }
+                  })}
                   placeholder="例如：我的公司"
                   className="text-lg"
+                  disabled={isSubmitting}
                 />
               </div>
 
@@ -142,6 +169,7 @@ const CreateOrganization = () => {
                   {...register('description')}
                   placeholder="簡單描述您的組織業務或團隊（可選）"
                   rows={3}
+                  disabled={isSubmitting}
                 />
               </div>
 
