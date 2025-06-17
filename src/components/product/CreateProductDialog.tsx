@@ -29,7 +29,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
     category: '布料',
     unit_of_measure: 'KG',
     stock_thresholds: '',
-    status: 'Available'
+    status: 'Available' as 'Available' | 'Unavailable'
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,8 +127,9 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="布料">布料</SelectItem>
+                <SelectItem value="胚布">胚布</SelectItem>
+                <SelectItem value="紗線">紗線</SelectItem>
                 <SelectItem value="輔料">輔料</SelectItem>
-                <SelectItem value="配件">配件</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -161,14 +162,13 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
 
           <div className="space-y-2">
             <Label htmlFor="status">狀態</Label>
-            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+            <Select value={formData.status} onValueChange={(value: 'Available' | 'Unavailable') => setFormData({ ...formData, status: value })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Available">有庫存</SelectItem>
-                <SelectItem value="OutOfStock">缺貨</SelectItem>
-                <SelectItem value="Discontinued">停產</SelectItem>
+                <SelectItem value="Available">可用</SelectItem>
+                <SelectItem value="Unavailable">不可用</SelectItem>
               </SelectContent>
             </Select>
           </div>

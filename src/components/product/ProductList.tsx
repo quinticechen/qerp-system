@@ -7,13 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditProductDialog } from './EditProductDialog';
-import { ViewProductDialog } from './ViewProductDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-export const ProductList = () => {
+const ProductList = () => {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
@@ -43,11 +41,6 @@ export const ProductList = () => {
     enabled: hasOrganization
   });
 
-  const handleView = (product: any) => {
-    setSelectedProduct(product);
-    setViewDialogOpen(true);
-  };
-
   const handleEdit = (product: any) => {
     setSelectedProduct(product);
     setEditDialogOpen(true);
@@ -56,17 +49,15 @@ export const ProductList = () => {
   const getStatusBadge = (status: string) => {
     const statusMap = {
       'Available': 'bg-green-100 text-green-800 border-green-200',
-      'OutOfStock': 'bg-red-100 text-red-800 border-red-200',
-      'Discontinued': 'bg-gray-100 text-gray-800 border-gray-200'
+      'Unavailable': 'bg-red-100 text-red-800 border-red-200',
     };
     return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   const getStatusText = (status: string) => {
     const textMap = {
-      'Available': '有庫存',
-      'OutOfStock': '缺貨',
-      'Discontinued': '停產'
+      'Available': '可用',
+      'Unavailable': '不可用',
     };
     return textMap[status as keyof typeof textMap] || status;
   };
@@ -103,8 +94,9 @@ export const ProductList = () => {
       filterable: true,
       filterOptions: [
         { value: '布料', label: '布料' },
-        { value: '輔料', label: '輔料' },
-        { value: '配件', label: '配件' }
+        { value: '胚布', label: '胚布' },
+        { value: '紗線', label: '紗線' },
+        { value: '輔料', label: '輔料' }
       ],
       render: (value) => <span className="text-gray-700">{value}</span>
     },
@@ -114,9 +106,8 @@ export const ProductList = () => {
       sortable: true,
       filterable: true,
       filterOptions: [
-        { value: 'Available', label: '有庫存' },
-        { value: 'OutOfStock', label: '缺貨' },
-        { value: 'Discontinued', label: '停產' }
+        { value: 'Available', label: '可用' },
+        { value: 'Unavailable', label: '不可用' }
       ],
       render: (value) => (
         <Badge variant="outline" className={getStatusBadge(value)}>
@@ -160,14 +151,6 @@ export const ProductList = () => {
       filterable: false,
       render: (value, row) => (
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleView(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -218,22 +201,32 @@ export const ProductList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
+      {/* 編輯對話框 */}
       {selectedProduct && (
-        <>
-          <ViewProductDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            product={selectedProduct}
-          />
-          <EditProductDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            product={selectedProduct}
-            onProductUpdated={refetch}
-          />
-        </>
+        <EditProductDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          product={selectedProduct}
+          onSubmit={async (id, data) => {
+            try {
+              const { error } = await supabase
+                .from('products_new')
+                .update(data)
+                .eq('id', id);
+
+              if (error) throw error;
+              
+              refetch();
+              return true;
+            } catch (error) {
+              console.error('Error updating product:', error);
+              return false;
+            }
+          }}
+        />
       )}
     </div>
   );
 };
+
+export default ProductList;
