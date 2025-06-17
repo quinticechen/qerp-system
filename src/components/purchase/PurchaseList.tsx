@@ -1,24 +1,31 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Edit } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ViewPurchaseDialog } from './ViewPurchaseDialog';
 import { EditPurchaseDialog } from './EditPurchaseDialog';
-import { useDebounce } from '@/hooks/useDebounce';
+import { ViewPurchaseDialog } from './ViewPurchaseDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export const PurchaseList = () => {
   const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: purchases, isLoading } = useQuery({
-    queryKey: ['purchases'],
+  const { data: purchases, isLoading, refetch } = useQuery({
+    queryKey: ['purchases', organizationId],
     queryFn: async () => {
+      if (!organizationId) {
+        console.log('No organization ID available');
+        return [];
+      }
+
+      console.log('Fetching purchases for organization:', organizationId);
       const { data, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -27,46 +34,24 @@ export const PurchaseList = () => {
           purchase_order_items (
             id,
             ordered_quantity,
-            ordered_rolls,
+            received_quantity,
             unit_price,
             products_new (name, color)
-          ),
-          purchase_order_relations (
-            orders (
-              id,
-              order_number,
-              note
-            )
           )
         `)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching purchases:', error);
+        throw error;
+      }
+
+      console.log('Fetched purchases:', data);
       return data;
-    }
+    },
+    enabled: hasOrganization
   });
-
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      confirmed: 'bg-blue-100 text-blue-800 border-blue-200',
-      partial_arrived: 'bg-orange-100 text-orange-800 border-orange-200',
-      completed: 'bg-green-100 text-green-800 border-green-200',
-      cancelled: 'bg-red-100 text-red-800 border-red-200'
-    };
-    return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const getStatusText = (status: string) => {
-    const textMap = {
-      pending: '待確認',
-      confirmed: '已確認',
-      partial_arrived: '部分到貨',
-      completed: '已完成',
-      cancelled: '已取消'
-    };
-    return textMap[status as keyof typeof textMap] || status;
-  };
 
   const handleView = (purchase: any) => {
     setSelectedPurchase(purchase);
@@ -76,6 +61,28 @@ export const PurchaseList = () => {
   const handleEdit = (purchase: any) => {
     setSelectedPurchase(purchase);
     setEditDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusMap = {
+      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'confirmed': 'bg-blue-100 text-blue-800 border-blue-200',
+      'partial_received': 'bg-orange-100 text-orange-800 border-orange-200',
+      'completed': 'bg-green-100 text-green-800 border-green-200',
+      'cancelled': 'bg-red-100 text-red-800 border-red-200'
+    };
+    return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getStatusText = (status: string) => {
+    const textMap = {
+      'pending': '待處理',
+      'confirmed': '已確認',
+      'partial_received': '部分收貨',
+      'completed': '已完成',
+      'cancelled': '已取消'
+    };
+    return textMap[status as keyof typeof textMap] || status;
   };
 
   const columns: TableColumn[] = [
@@ -99,9 +106,9 @@ export const PurchaseList = () => {
       sortable: true,
       filterable: true,
       filterOptions: [
-        { value: 'pending', label: '待確認' },
+        { value: 'pending', label: '待處理' },
         { value: 'confirmed', label: '已確認' },
-        { value: 'partial_arrived', label: '部分到貨' },
+        { value: 'partial_received', label: '部分收貨' },
         { value: 'completed', label: '已完成' },
         { value: 'cancelled', label: '已取消' }
       ],
@@ -112,17 +119,26 @@ export const PurchaseList = () => {
       )
     },
     {
-      key: 'total_quantity',
-      title: '總數量',
+      key: 'order_date',
+      title: '下單日期',
       sortable: true,
       filterable: false,
-      render: (value, row) => {
-        const totalQuantity = row.purchase_order_items?.reduce(
-          (sum: number, item: any) => sum + item.ordered_quantity, 
-          0
-        ) || 0;
-        return <span className="text-gray-700">{totalQuantity.toFixed(2)} 公斤</span>;
-      }
+      render: (value) => (
+        <span className="text-gray-700">
+          {new Date(value).toLocaleDateString('zh-TW')}
+        </span>
+      )
+    },
+    {
+      key: 'expected_arrival_date',
+      title: '預計到貨日期',
+      sortable: true,
+      filterable: false,
+      render: (value) => (
+        <span className="text-gray-700">
+          {value ? new Date(value).toLocaleDateString('zh-TW') : '未設定'}
+        </span>
+      )
     },
     {
       key: 'total_amount',
@@ -134,45 +150,7 @@ export const PurchaseList = () => {
           (sum: number, item: any) => sum + (item.ordered_quantity * item.unit_price), 
           0
         ) || 0;
-        return <span className="text-gray-700">${totalAmount.toFixed(2)}</span>;
-      }
-    },
-    {
-      key: 'items_count',
-      title: '項目數',
-      sortable: true,
-      filterable: false,
-      render: (value, row) => <span className="text-gray-700">{row.purchase_order_items?.length || 0}</span>
-    },
-    {
-      key: 'expected_arrival_date',
-      title: '預計到貨',
-      sortable: true,
-      filterable: false,
-      render: (value) => (
-        <span className="text-gray-700">
-          {value ? new Date(value).toLocaleDateString('zh-TW') : '未設定'}
-        </span>
-      )
-    },
-    {
-      key: 'related_orders',
-      title: '關聯訂單',
-      sortable: false,
-      filterable: false,
-      render: (value, row) => {
-        const relatedOrders = row.purchase_order_relations?.map((rel: any) => rel.orders) || [];
-        return relatedOrders.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {relatedOrders.map((order: any, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {order.order_number}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <span className="text-gray-500">-</span>
-        );
+        return <span className="text-gray-700">NT$ {totalAmount.toLocaleString()}</span>;
       }
     },
     {
@@ -203,8 +181,24 @@ export const PurchaseList = () => {
     }
   ];
 
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) {
-    return <div className="text-center py-8 text-gray-500">載入中...</div>;
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">載入中...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -218,7 +212,7 @@ export const PurchaseList = () => {
             columns={columns}
             data={purchases || []}
             loading={isLoading}
-            searchPlaceholder="搜尋採購單號、工廠名稱、訂單號..."
+            searchPlaceholder="搜尋採購單號、工廠名稱..."
             emptyMessage="沒有找到採購單"
           />
         </CardContent>
@@ -236,6 +230,7 @@ export const PurchaseList = () => {
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             purchase={selectedPurchase}
+            onPurchaseUpdated={refetch}
           />
         </>
       )}

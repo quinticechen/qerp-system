@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { StockBadge } from './StockBadge';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface PendingInventoryItem {
   product_name: string;
@@ -17,21 +18,27 @@ interface PendingInventoryItem {
 }
 
 export const PendingInventorySection: React.FC = () => {
+  const { organizationId, hasOrganization } = useCurrentOrganization();
+
   const { data: pendingInventory, isLoading } = useQuery({
-    queryKey: ['pending-inventory'],
+    queryKey: ['pending-inventory', organizationId],
     queryFn: async () => {
+      if (!organizationId) return [];
+
       const { data, error } = await supabase
         .from('purchase_order_items')
         .select(`
           ordered_quantity,
           received_quantity,
           products_new (name, color, color_code),
-          purchase_orders (
+          purchase_orders!inner (
             po_number,
             expected_arrival_date,
+            organization_id,
             factories (name)
           )
         `)
+        .eq('purchase_orders.organization_id', organizationId)
         .in('status', ['pending', 'partial_received']);
       
       if (error) throw error;
@@ -48,7 +55,8 @@ export const PendingInventorySection: React.FC = () => {
       })).filter(item => item.total_pending > 0);
 
       return processedData as PendingInventoryItem[];
-    }
+    },
+    enabled: hasOrganization
   });
 
   const columns: TableColumn[] = [
@@ -116,6 +124,19 @@ export const PendingInventorySection: React.FC = () => {
       )
     }
   ];
+
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-gray-900">待入庫</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4 text-gray-500">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
