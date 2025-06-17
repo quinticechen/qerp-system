@@ -17,7 +17,7 @@ interface ProductWithThreshold {
   created_at: string;
   stock_thresholds: Array<{
     threshold_quantity: number;
-  }>;
+  }> | null;
 }
 
 export const ProductList: React.FC = () => {
@@ -50,7 +50,7 @@ export const ProductList: React.FC = () => {
   };
 
   const getThresholdInfo = (product: ProductWithThreshold) => {
-    if (product.stock_thresholds.length > 0) {
+    if (product.stock_thresholds && product.stock_thresholds.length > 0) {
       return product.stock_thresholds[0].threshold_quantity;
     }
     return null;
