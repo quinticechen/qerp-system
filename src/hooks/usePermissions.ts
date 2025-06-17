@@ -28,6 +28,7 @@ export interface Permission {
   canCreateUsers: boolean;
   canEditUsers: boolean;
   canViewSystemSettings: boolean;
+  canEditSystemSettings: boolean;
 }
 
 const rolePermissions: Record<string, Permission> = {
@@ -58,6 +59,7 @@ const rolePermissions: Record<string, Permission> = {
     canCreateUsers: true,
     canEditUsers: true,
     canViewSystemSettings: true,
+    canEditSystemSettings: true,
   },
   sales: {
     canViewProducts: true,
@@ -86,6 +88,7 @@ const rolePermissions: Record<string, Permission> = {
     canCreateUsers: false,
     canEditUsers: false,
     canViewSystemSettings: false,
+    canEditSystemSettings: false,
   },
   assistant: {
     canViewProducts: true,
@@ -114,6 +117,7 @@ const rolePermissions: Record<string, Permission> = {
     canCreateUsers: false,
     canEditUsers: false,
     canViewSystemSettings: false,
+    canEditSystemSettings: false,
   },
   accounting: {
     canViewProducts: true,
@@ -142,6 +146,7 @@ const rolePermissions: Record<string, Permission> = {
     canCreateUsers: false,
     canEditUsers: false,
     canViewSystemSettings: false,
+    canEditSystemSettings: false,
   },
   warehouse: {
     canViewProducts: true,
@@ -170,6 +175,7 @@ const rolePermissions: Record<string, Permission> = {
     canCreateUsers: false,
     canEditUsers: false,
     canViewSystemSettings: false,
+    canEditSystemSettings: false,
   },
 };
 
