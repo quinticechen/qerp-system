@@ -1,59 +1,50 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import Login from './Login';
+import { useAuth } from '@/hooks/useAuth';
+import { useOrganizationContext } from '@/contexts/OrganizationContext';
 
 const Index = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  const { hasNoOrganizations, loading: orgLoading } = useOrganizationContext();
   const navigate = useNavigate();
+  const [hasNavigated, setHasNavigated] = useState(false);
 
   useEffect(() => {
-    // 檢查用戶登入狀態
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setIsLoggedIn(true);
-        navigate('/dashboard');
-      } else {
-        setIsLoggedIn(false);
-      }
-      setLoading(false);
-    };
+    // 避免重複導航
+    if (hasNavigated) return;
 
-    checkAuth();
+    // 等待認證和組織數據加載完成
+    if (authLoading || orgLoading) return;
 
-    // 監聽認證狀態變化
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        setIsLoggedIn(true);
-        navigate('/dashboard');
-      } else {
-        setIsLoggedIn(false);
-      }
-    });
+    // 未登入用戶導向登入頁面
+    if (!user) {
+      setHasNavigated(true);
+      navigate('/login', { replace: true });
+      return;
+    }
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    // 已登入但沒有組織的用戶導向創建組織頁面
+    if (hasNoOrganizations) {
+      setHasNavigated(true);
+      navigate('/create-organization', { replace: true });
+      return;
+    }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600">載入中...</p>
-        </div>
+    // 已登入且有組織的用戶導向儀表板
+    setHasNavigated(true);
+    navigate('/dashboard', { replace: true });
+  }, [user, hasNoOrganizations, authLoading, orgLoading, navigate, hasNavigated]);
+
+  // 顯示載入狀態
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-slate-600">載入中...</p>
       </div>
-    );
-  }
-
-  if (!isLoggedIn) {
-    navigate('/login');
-    return null;
-  }
-
-  return null;
+    </div>
+  );
 };
 
 export default Index;
