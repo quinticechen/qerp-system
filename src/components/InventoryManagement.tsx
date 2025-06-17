@@ -9,12 +9,20 @@ import { InventorySummary } from './inventory/InventorySummary';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
+import { StockAlertNotification } from './inventory/StockAlertNotification';
+import { useStockAlert } from '@/hooks/useStockAlert';
 
 const InventoryManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { data: lowStockProducts = [] } = useStockAlert();
 
   return (
     <div className="space-y-6">
+      {/* 庫存預警通知 */}
+      {lowStockProducts.length > 0 && (
+        <StockAlertNotification lowStockProducts={lowStockProducts} />
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">庫存管理</h2>
         <Button 
