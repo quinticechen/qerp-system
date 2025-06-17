@@ -77,10 +77,11 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
 
       // 分配角色
       if (data.roles && data.roles.length > 0) {
+        const currentUser = await supabase.auth.getUser();
         const roleInserts = data.roles.map(role => ({
           user_id: authData.user!.id,
           role: role as any,
-          granted_by: (await supabase.auth.getUser()).data.user?.id
+          granted_by: currentUser.data.user?.id
         }));
 
         const { error: rolesError } = await supabase
@@ -91,10 +92,11 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       }
 
       // 記錄操作日誌
+      const currentUser = await supabase.auth.getUser();
       await supabase
         .from('user_operation_logs')
         .insert({
-          operator_id: (await supabase.auth.getUser()).data.user?.id,
+          operator_id: currentUser.data.user?.id,
           target_user_id: authData.user.id,
           operation_type: 'create',
           operation_details: {

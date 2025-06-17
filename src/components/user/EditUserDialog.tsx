@@ -87,10 +87,11 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
       // 添加新角色
       const rolesToAdd = newRoles.filter(role => !currentRoles.includes(role));
       if (rolesToAdd.length > 0) {
+        const currentUser = await supabase.auth.getUser();
         const roleInserts = rolesToAdd.map(role => ({
           user_id: user.id,
           role: role as any,
-          granted_by: (await supabase.auth.getUser()).data.user?.id
+          granted_by: currentUser.data.user?.id
         }));
 
         const { error: addError } = await supabase
@@ -101,10 +102,11 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
       }
 
       // 記錄操作日誌
+      const currentUser = await supabase.auth.getUser();
       await supabase
         .from('user_operation_logs')
         .insert({
-          operator_id: (await supabase.auth.getUser()).data.user?.id,
+          operator_id: currentUser.data.user?.id,
           target_user_id: user.id,
           operation_type: 'update',
           operation_details: {

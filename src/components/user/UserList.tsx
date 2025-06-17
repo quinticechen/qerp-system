@@ -40,10 +40,11 @@ export const UserList = () => {
       if (error) throw error;
 
       // 記錄操作日誌
+      const currentUser = await supabase.auth.getUser();
       await supabase
         .from('user_operation_logs')
         .insert({
-          operator_id: (await supabase.auth.getUser()).data.user?.id,
+          operator_id: currentUser.data.user?.id,
           target_user_id: userId,
           operation_type: currentStatus ? 'disable' : 'enable',
           operation_details: { previous_status: currentStatus, new_status: !currentStatus }
@@ -144,8 +145,8 @@ export const UserList = () => {
       sortable: true,
       filterable: true,
       filterOptions: [
-        { value: true, label: '啟用' },
-        { value: false, label: '停用' }
+        { value: 'true', label: '啟用' },
+        { value: 'false', label: '停用' }
       ],
       render: (value) => (
         <Badge variant="outline" className={value ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
