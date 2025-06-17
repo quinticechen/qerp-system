@@ -101,13 +101,14 @@
     @apply border-border;
   }
 
-  html {
-    @apply bg-background text-foreground;
+  /* 重置所有 margin 和 padding，確保滿版背景 */
+  html, body {
+    @apply m-0 p-0 h-full w-full bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+  #root {
+    @apply m-0 p-0 h-full w-full;
   }
 
   /* Typography Scale - Clear Hierarchy */
