@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react';
 import { useProducts, Product } from '@/hooks/useProducts';
 import { CreateProductDialog } from './product/CreateProductDialog';
 import { EditProductDialog } from './product/EditProductDialog';
-import { ProductList } from './product/ProductList';
+import ProductList from './product/ProductList';
 
 const ProductManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
