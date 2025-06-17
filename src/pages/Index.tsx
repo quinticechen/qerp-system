@@ -14,16 +14,31 @@ const Index = () => {
     // 避免重複導航
     if (hasNavigated) return;
 
-    // 等待認證和組織數據加載完成
-    if (authLoading || orgLoading) return;
+    console.log('Index navigation check:', { 
+      user: !!user, 
+      hasNoOrganizations, 
+      authLoading, 
+      orgLoading,
+      hasNavigated 
+    });
 
-    console.log('Index navigation check:', { user: !!user, hasNoOrganizations, authLoading, orgLoading });
+    // 如果還在載入認證或組織資料，等待
+    if (authLoading) {
+      console.log('Still loading auth, waiting...');
+      return;
+    }
 
     // 未登入用戶導向登入頁面
     if (!user) {
       console.log('Redirecting to login - no user');
       setHasNavigated(true);
       navigate('/login', { replace: true });
+      return;
+    }
+
+    // 用戶已登入，但組織資料還在載入中
+    if (orgLoading) {
+      console.log('User logged in, but organizations still loading...');
       return;
     }
 
@@ -46,7 +61,9 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
         <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-slate-600">載入中...</p>
+        <p className="text-slate-600">
+          {authLoading ? '載入用戶資料中...' : orgLoading ? '載入組織資料中...' : '載入中...'}
+        </p>
       </div>
     </div>
   );

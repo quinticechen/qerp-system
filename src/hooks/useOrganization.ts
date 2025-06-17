@@ -24,12 +24,17 @@ export interface UserOrganization {
 }
 
 export const useOrganization = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [organizations, setOrganizations] = useState<UserOrganization[]>([]);
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) {
+      console.log('useOrganization: Auth still loading, waiting...');
+      return;
+    }
+
     if (!user) {
       console.log('useOrganization: No user, clearing state');
       setOrganizations([]);
@@ -40,7 +45,7 @@ export const useOrganization = () => {
 
     console.log('useOrganization: User found, fetching organizations');
     fetchUserOrganizations();
-  }, [user]);
+  }, [user, authLoading]);
 
   const fetchUserOrganizations = async () => {
     if (!user) return;

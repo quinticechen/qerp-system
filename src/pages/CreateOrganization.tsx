@@ -21,29 +21,29 @@ const CreateOrganization = () => {
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<CreateOrganizationForm>();
   const { toast } = useToast();
   const { createOrganization } = useOrganizationContext();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  // 如果還在載入認證狀態，顯示載入畫面
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
   // 如果用戶未登入，重定向到登入頁面
-  React.useEffect(() => {
-    if (!user) {
-      console.log('CreateOrganization: No user, redirecting to login');
-      navigate('/login');
-    }
-  }, [user, navigate]);
+  if (!user) {
+    console.log('CreateOrganization: No user, redirecting to login');
+    navigate('/login', { replace: true });
+    return null;
+  }
 
   const onSubmit = async (data: CreateOrganizationForm) => {
-    if (!user) {
-      console.log('CreateOrganization: No user when submitting');
-      toast({
-        title: "認證錯誤",
-        description: "您需要先登入才能創建組織",
-        variant: "destructive",
-      });
-      navigate('/login');
-      return;
-    }
-
     try {
       console.log('Submitting organization creation:', data);
       await createOrganization(data.name, data.description);
@@ -75,18 +75,6 @@ const CreateOrganization = () => {
       });
     }
   };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">請先登入</h1>
-          <p className="text-gray-600 mb-6">您需要登入後才能創建組織</p>
-          <Button onClick={() => navigate('/login')}>前往登入</Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
