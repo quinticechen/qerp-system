@@ -1,27 +1,25 @@
 
 import React from 'react';
-import Layout from '@/components/Layout';
-import { Card, CardContent } from '@/components/ui/card';
-import { User } from 'lucide-react';
+import { UserManagement } from '@/components/user/UserManagement';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const UserPage = () => {
-  return (
-    <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">用戶管理</h2>
-        </div>
-        
-        <Card>
-          <CardContent className="p-12 text-center">
-            <User size={48} className="mx-auto text-slate-400 mb-4" />
-            <h3 className="text-xl font-semibold text-slate-600 mb-2">用戶管理功能</h3>
-            <p className="text-slate-500">此功能正在開發中...</p>
-          </CardContent>
-        </Card>
+  const { isAdmin, loading } = useUserRole();
+
+  if (loading) {
+    return <div className="text-center py-8 text-gray-500">載入中...</div>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="text-center py-8">
+        <h2 className="text-xl font-semibold text-gray-700 mb-2">權限不足</h2>
+        <p className="text-gray-500">您沒有權限存取使用者管理功能</p>
       </div>
-    </Layout>
-  );
+    );
+  }
+
+  return <UserManagement />;
 };
 
 export default UserPage;
