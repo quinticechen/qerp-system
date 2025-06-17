@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -121,6 +121,9 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>新增使用者</DialogTitle>
+          <DialogDescription>
+            填寫以下資訊來創建新的使用者帳號
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

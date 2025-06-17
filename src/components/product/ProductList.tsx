@@ -18,6 +18,7 @@ interface ProductListProps {
   onStatusFilter: (status: string) => void;
   onLoadMore: () => void;
   onEdit: (product: Product) => void;
+  canEdit?: boolean;
 }
 
 const ProductList: React.FC<ProductListProps> = ({
@@ -32,6 +33,7 @@ const ProductList: React.FC<ProductListProps> = ({
   onStatusFilter,
   onLoadMore,
   onEdit,
+  canEdit = false,
 }) => {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
@@ -134,7 +136,11 @@ const ProductList: React.FC<ProductListProps> = ({
         </span>
       )
     },
-    {
+  ];
+
+  // 只有在有編輯權限時才添加操作欄
+  if (canEdit) {
+    columns.push({
       key: 'actions',
       title: '操作',
       sortable: false,
@@ -151,8 +157,8 @@ const ProductList: React.FC<ProductListProps> = ({
           </Button>
         </div>
       )
-    }
-  ];
+    });
+  }
 
   return (
     <EnhancedTable
