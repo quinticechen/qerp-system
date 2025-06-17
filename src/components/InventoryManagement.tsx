@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
@@ -9,12 +8,28 @@ import { InventorySummary } from './inventory/InventorySummary';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
+import { StockAlertNotification } from './inventory/StockAlertNotification';
+import { useStockAlert } from '@/hooks/useStockAlert';
 
 const InventoryManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { data: lowStockProducts = [] } = useStockAlert();
+
+  const handleNavigateToProducts = () => {
+    // 這裡可以添加導航邏輯，例如通過 React Router 導航到產品管理頁面
+    window.location.href = '/products';
+  };
 
   return (
     <div className="space-y-6">
+      {/* 庫存預警通知 */}
+      {lowStockProducts.length > 0 && (
+        <StockAlertNotification 
+          lowStockProducts={lowStockProducts} 
+          onNavigateToProducts={handleNavigateToProducts}
+        />
+      )}
+
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">庫存管理</h2>
         <Button 
