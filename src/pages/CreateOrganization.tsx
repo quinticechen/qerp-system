@@ -27,12 +27,14 @@ const CreateOrganization = () => {
   // 如果用戶未登入，重定向到登入頁面
   React.useEffect(() => {
     if (!user) {
+      console.log('CreateOrganization: No user, redirecting to login');
       navigate('/login');
     }
   }, [user, navigate]);
 
   const onSubmit = async (data: CreateOrganizationForm) => {
     if (!user) {
+      console.log('CreateOrganization: No user when submitting');
       toast({
         title: "認證錯誤",
         description: "您需要先登入才能創建組織",
@@ -49,10 +51,10 @@ const CreateOrganization = () => {
         title: "組織創建成功",
         description: "您的組織已成功創建，正在為您設置系統...",
       });
-      // 延遲導航，讓使用者看到成功訊息
+      // 延遲導航，讓使用者看到成功訊息，然後直接回到首頁讓路由系統處理
       setTimeout(() => {
-        navigate('/');
-      }, 2000);
+        navigate('/', { replace: true });
+      }, 1500);
     } catch (error: any) {
       console.error('Error creating organization:', error);
       

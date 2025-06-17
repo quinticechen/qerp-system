@@ -31,12 +31,14 @@ export const useOrganization = () => {
 
   useEffect(() => {
     if (!user) {
+      console.log('useOrganization: No user, clearing state');
       setOrganizations([]);
       setCurrentOrganization(null);
       setLoading(false);
       return;
     }
 
+    console.log('useOrganization: User found, fetching organizations');
     fetchUserOrganizations();
   }, [user]);
 
@@ -45,6 +47,8 @@ export const useOrganization = () => {
 
     try {
       setLoading(true);
+      console.log('Fetching organizations for user:', user.id);
+      
       const { data, error } = await supabase
         .from('user_organizations')
         .select(`
@@ -73,6 +77,7 @@ export const useOrganization = () => {
         throw error;
       }
 
+      console.log('Fetched organizations:', data);
       const userOrgs = data as UserOrganization[];
       setOrganizations(userOrgs);
 
@@ -88,6 +93,7 @@ export const useOrganization = () => {
         currentOrg = userOrgs[0].organization;
       }
 
+      console.log('Setting current organization:', currentOrg);
       setCurrentOrganization(currentOrg);
       if (currentOrg) {
         localStorage.setItem('currentOrganizationId', currentOrg.id);
@@ -114,6 +120,7 @@ export const useOrganization = () => {
 
     try {
       console.log('Creating organization with user:', user.id);
+      console.log('Organization data:', { name, description, owner_id: user.id });
       
       // 首先創建組織
       const { data: orgData, error: orgError } = await supabase

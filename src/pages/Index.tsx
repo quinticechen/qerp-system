@@ -17,8 +17,11 @@ const Index = () => {
     // 等待認證和組織數據加載完成
     if (authLoading || orgLoading) return;
 
+    console.log('Index navigation check:', { user: !!user, hasNoOrganizations, authLoading, orgLoading });
+
     // 未登入用戶導向登入頁面
     if (!user) {
+      console.log('Redirecting to login - no user');
       setHasNavigated(true);
       navigate('/login', { replace: true });
       return;
@@ -26,12 +29,14 @@ const Index = () => {
 
     // 已登入但沒有組織的用戶導向創建組織頁面
     if (hasNoOrganizations) {
+      console.log('Redirecting to create organization - no organizations');
       setHasNavigated(true);
       navigate('/create-organization', { replace: true });
       return;
     }
 
     // 已登入且有組織的用戶導向儀表板
+    console.log('Redirecting to dashboard - user has organizations');
     setHasNavigated(true);
     navigate('/dashboard', { replace: true });
   }, [user, hasNoOrganizations, authLoading, orgLoading, navigate, hasNavigated]);
