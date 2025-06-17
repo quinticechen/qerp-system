@@ -14,6 +14,7 @@ import InventoryPage from '@/pages/InventoryPage';
 import ShippingPage from '@/pages/ShippingPage';
 import UserPage from '@/pages/UserPage';
 import PermissionPage from '@/pages/PermissionPage';
+import OrganizationRolePage from '@/pages/OrganizationRolePage';
 import SystemPage from '@/pages/SystemPage';
 import CreateOrganization from '@/pages/CreateOrganization';
 import NotFound from '@/pages/NotFound';
@@ -145,6 +146,16 @@ function App() {
                 <ProtectedRoute>
                   <OrganizationGuard>
                     <PermissionPage />
+                  </OrganizationGuard>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/organization-roles"
+              element={
+                <ProtectedRoute>
+                  <OrganizationGuard>
+                    <OrganizationRolePage />
                   </OrganizationGuard>
                 </ProtectedRoute>
               }
