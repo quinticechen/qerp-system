@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Eye, EyeOff, LogIn, User, Mail, UserPlus } from 'lucide-react';
+import { Eye, EyeOff, LogIn, User, Mail, UserPlus, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -18,6 +20,7 @@ const Login = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+  const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -44,6 +47,7 @@ const Login = () => {
     }
 
     setIsLoading(true);
+    setShowUserNotFoundAlert(false);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -54,18 +58,27 @@ const Login = () => {
       if (error) {
         console.error('Login error:', error);
         
-        // 根據錯誤類型提供更具體的錯誤訊息
-        let errorMessage = "登入失敗，請檢查您的電子郵件和密碼";
-        
         if (error.message.includes('Invalid login credentials')) {
-          errorMessage = "找不到此用戶帳號，請檢查電子郵件或考慮先註冊";
-          // 顯示 alert 提示用戶註冊
-          alert("查不到用戶，請先註冊帳號");
+          setShowUserNotFoundAlert(true);
+          toast({
+            title: "找不到用戶",
+            description: "查不到此用戶帳號，請檢查電子郵件或先註冊",
+            variant: "destructive",
+          });
         } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = "請先確認您的電子郵件，檢查收件箱中的驗證信";
+          toast({
+            title: "請確認電子郵件",
+            description: "請先確認您的電子郵件，檢查收件箱中的驗證信",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "登入失敗",
+            description: "登入失敗，請檢查您的電子郵件和密碼",
+            variant: "destructive",
+          });
         }
-        
-        throw new Error(errorMessage);
+        return;
       }
 
       toast({
@@ -121,23 +134,32 @@ const Login = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/dashboard`,
           data: {
             full_name: fullName,
           }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          toast({
+            title: "註冊失敗",
+            description: "此電子郵件已被註冊，請直接登入或使用其他電子郵件",
+            variant: "destructive",
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
 
-      // 顯示註冊成功訊息和驗證信提示
+      // 註冊成功
       toast({
-        title: "註冊成功",
+        title: "註冊成功！",
         description: "請檢查您的電子郵件收件箱，點擊驗證連結完成帳戶啟用",
+        duration: 5000,
       });
-
-      // 顯示 alert 提醒用戶收驗證信
-      alert("註冊成功！請前往您的電子郵件收件箱，點擊驗證連結完成帳戶啟用。");
 
       // 清除表單並切換到登入頁面
       setEmail('');
@@ -147,15 +169,9 @@ const Login = () => {
       setActiveTab('login');
     } catch (error: any) {
       console.error('Signup error:', error);
-      
-      let errorMessage = "註冊過程中發生錯誤";
-      if (error.message.includes('User already registered')) {
-        errorMessage = "此電子郵件已被註冊，請直接登入或使用其他電子郵件";
-      }
-      
       toast({
         title: "註冊失敗",
-        description: errorMessage,
+        description: "註冊過程中發生錯誤，請稍後再試或聯繫系統管理員",
         variant: "destructive",
       });
     } finally {
@@ -240,6 +256,15 @@ const Login = () => {
               </TabsList>
 
               <TabsContent value="login" className="space-y-4 mt-6">
+                {showUserNotFoundAlert && (
+                  <Alert className="border-amber-200 bg-amber-50">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800">
+                      查不到用戶，請先註冊帳號或檢查您的電子郵件地址
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
