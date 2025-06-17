@@ -154,6 +154,9 @@ export const useOrganization = () => {
 
       console.log('Organization created successfully:', orgData);
 
+      // 等待一下讓觸發器完成
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // 重新獲取組織列表以確保狀態更新
       await fetchUserOrganizations();
       

@@ -18,11 +18,12 @@ interface CreateOrganizationForm {
 }
 
 const CreateOrganization = () => {
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm<CreateOrganizationForm>();
+  const { register, handleSubmit, formState: { isSubmitting }, reset } = useForm<CreateOrganizationForm>();
   const { toast } = useToast();
   const { createOrganization } = useOrganizationContext();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [isCreating, setIsCreating] = useState(false);
 
   // 如果還在載入認證狀態，顯示載入畫面
   if (authLoading) {
@@ -44,7 +45,14 @@ const CreateOrganization = () => {
   }
 
   const onSubmit = async (data: CreateOrganizationForm) => {
+    // 防止重複提交
+    if (isCreating || isSubmitting) {
+      console.log('Already creating organization, skipping...');
+      return;
+    }
+
     try {
+      setIsCreating(true);
       console.log('Submitting organization creation:', data);
       console.log('Current user:', user);
       
@@ -58,12 +66,16 @@ const CreateOrganization = () => {
         return;
       }
       
-      await createOrganization(data.name.trim(), data.description?.trim());
+      const result = await createOrganization(data.name.trim(), data.description?.trim());
+      console.log('Organization created successfully:', result);
       
       toast({
         title: "組織創建成功",
         description: "您的組織已成功創建，正在為您設置系統...",
       });
+      
+      // 清除表單
+      reset();
       
       // 延遲導航，讓使用者看到成功訊息，然後直接回到首頁讓路由系統處理
       setTimeout(() => {
@@ -96,6 +108,8 @@ const CreateOrganization = () => {
           navigate('/login', { replace: true });
         }, 2000);
       }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -158,7 +172,7 @@ const CreateOrganization = () => {
                   })}
                   placeholder="例如：我的公司"
                   className="text-lg"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isCreating}
                 />
               </div>
 
@@ -169,16 +183,16 @@ const CreateOrganization = () => {
                   {...register('description')}
                   placeholder="簡單描述您的組織業務或團隊（可選）"
                   rows={3}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isCreating}
                 />
               </div>
 
               <Button 
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-lg py-3"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isCreating}
               >
-                {isSubmitting ? '創建中...' : '創建組織並開始使用'}
+                {isSubmitting || isCreating ? '創建中...' : '創建組織並開始使用'}
               </Button>
             </form>
           </CardContent>
