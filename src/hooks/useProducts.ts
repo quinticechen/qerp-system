@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -32,8 +31,8 @@ export const useProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const { toast } = useToast();
@@ -57,13 +56,13 @@ export const useProducts = () => {
       }
 
       // 應用類別過濾
-      if (categoryFilter) {
+      if (categoryFilter && categoryFilter !== 'all') {
         query = query.eq('category', categoryFilter);
       }
 
       // 應用狀態過濾
-      if (statusFilter) {
-        query = query.eq('status', statusFilter);
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter as 'Available' | 'Unavailable');
       }
 
       const { data, error } = await query;

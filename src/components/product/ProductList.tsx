@@ -63,7 +63,7 @@ export const ProductList: React.FC<ProductListProps> = ({
               <SelectValue placeholder="類別" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有類別</SelectItem>
+              <SelectItem value="all">所有類別</SelectItem>
               {CATEGORIES.map((category) => (
                 <SelectItem key={category} value={category}>
                   {category}
@@ -77,7 +77,7 @@ export const ProductList: React.FC<ProductListProps> = ({
               <SelectValue placeholder="狀態" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">所有狀態</SelectItem>
+              <SelectItem value="all">所有狀態</SelectItem>
               <SelectItem value="Available">可用</SelectItem>
               <SelectItem value="Unavailable">不可用</SelectItem>
             </SelectContent>
@@ -119,16 +119,14 @@ export const ProductList: React.FC<ProductListProps> = ({
                     '-'
                   )}
                 </TableCell>
+                <TableCell>{product.unit_of_measure}</TableCell>
                 <TableCell>
-                  <div className="flex items-center space-x-2">
-                    <span>{product.unit_of_measure}</span>
-                    <Badge 
-                      variant={product.status === 'Available' ? 'default' : 'secondary'}
-                      className={product.status === 'Available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
-                    >
-                      {product.status === 'Available' ? '可用' : '不可用'}
-                    </Badge>
-                  </div>
+                  <Badge 
+                    variant={product.status === 'Available' ? 'default' : 'secondary'}
+                    className={product.status === 'Available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+                  >
+                    {product.status === 'Available' ? '可用' : '不可用'}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   {product.stock_thresholds ? `${product.stock_thresholds} ${product.unit_of_measure}` : '-'}
