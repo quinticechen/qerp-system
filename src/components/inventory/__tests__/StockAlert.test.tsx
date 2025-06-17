@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StockAlertManager } from '../StockAlertManager';
+import { StockAlertNotification } from '../StockAlertNotification';
 import { supabase } from '@/integrations/supabase/client';
 
 // Mock Supabase
