@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -52,7 +51,22 @@ const Login = () => {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Login error:', error);
+        
+        // 根據錯誤類型提供更具體的錯誤訊息
+        let errorMessage = "登入失敗，請檢查您的電子郵件和密碼";
+        
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = "找不到此用戶帳號，請檢查電子郵件或考慮先註冊";
+          // 顯示 alert 提示用戶註冊
+          alert("查不到用戶，請先註冊帳號");
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = "請先確認您的電子郵件，檢查收件箱中的驗證信";
+        }
+        
+        throw new Error(errorMessage);
+      }
 
       toast({
         title: "登入成功",
@@ -63,7 +77,7 @@ const Login = () => {
     } catch (error: any) {
       toast({
         title: "登入失敗",
-        description: error.message || "請檢查您的電子郵件和密碼",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
@@ -116,10 +130,14 @@ const Login = () => {
 
       if (error) throw error;
 
+      // 顯示註冊成功訊息和驗證信提示
       toast({
         title: "註冊成功",
-        description: "請檢查您的電子郵件以確認帳戶",
+        description: "請檢查您的電子郵件收件箱，點擊驗證連結完成帳戶啟用",
       });
+
+      // 顯示 alert 提醒用戶收驗證信
+      alert("註冊成功！請前往您的電子郵件收件箱，點擊驗證連結完成帳戶啟用。");
 
       // 清除表單並切換到登入頁面
       setEmail('');
@@ -128,9 +146,16 @@ const Login = () => {
       setFullName('');
       setActiveTab('login');
     } catch (error: any) {
+      console.error('Signup error:', error);
+      
+      let errorMessage = "註冊過程中發生錯誤";
+      if (error.message.includes('User already registered')) {
+        errorMessage = "此電子郵件已被註冊，請直接登入或使用其他電子郵件";
+      }
+      
       toast({
         title: "註冊失敗",
-        description: error.message || "註冊過程中發生錯誤",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -160,7 +185,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden m-0 p-0">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
       {/* 背景裝飾 */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-indigo-600/5 to-purple-600/5"></div>
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>

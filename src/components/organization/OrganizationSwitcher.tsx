@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, Building2, Settings } from 'lucide-react';
+import { ChevronDown, Building2, Settings, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { CreateOrganizationDialog } from './CreateOrganizationDialog';
 
 export const OrganizationSwitcher: React.FC = () => {
   const { 
@@ -19,6 +20,8 @@ export const OrganizationSwitcher: React.FC = () => {
     loading, 
     switchOrganization 
   } = useOrganizationContext();
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   if (loading || !currentOrganization) {
     return (
@@ -30,16 +33,16 @@ export const OrganizationSwitcher: React.FC = () => {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="flex items-center space-x-2 px-3 py-2">
-          <Building2 className="h-4 w-4" />
-          <span className="font-medium">{currentOrganization.name}</span>
-          {organizations.length > 1 && <ChevronDown className="h-4 w-4" />}
-        </Button>
-      </DropdownMenuTrigger>
-      
-      {organizations.length > 1 && (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="flex items-center space-x-2 px-3 py-2">
+            <Building2 className="h-4 w-4" />
+            <span className="font-medium">{currentOrganization.name}</span>
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        
         <DropdownMenuContent align="start" className="w-64">
           <div className="px-2 py-1.5">
             <p className="text-sm font-medium">切換組織</p>
@@ -68,28 +71,43 @@ export const OrganizationSwitcher: React.FC = () => {
                 </div>
               </div>
               
-              {currentOrganization.id === userOrg.organization.id && (
-                <Badge variant="secondary" className="text-xs">
-                  目前
-                </Badge>
-              )}
-              
-              {userOrg.organization.owner_id === userOrg.user_id && (
-                <Badge variant="outline" className="text-xs">
-                  擁有者
-                </Badge>
-              )}
+              <div className="flex items-center space-x-1">
+                {currentOrganization.id === userOrg.organization.id && (
+                  <Badge variant="secondary" className="text-xs">
+                    目前
+                  </Badge>
+                )}
+                
+                {userOrg.organization.owner_id === userOrg.user_id && (
+                  <Badge variant="outline" className="text-xs">
+                    擁有者
+                  </Badge>
+                )}
+              </div>
             </DropdownMenuItem>
           ))}
           
           <DropdownMenuSeparator />
+          
+          <DropdownMenuItem 
+            onClick={() => setShowCreateDialog(true)}
+            className="flex items-center space-x-2 px-2 py-2"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="text-sm">新增組織</span>
+          </DropdownMenuItem>
           
           <DropdownMenuItem className="flex items-center space-x-2 px-2 py-2">
             <Settings className="h-4 w-4" />
             <span className="text-sm">組織設定</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
-      )}
-    </DropdownMenu>
+      </DropdownMenu>
+
+      <CreateOrganizationDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog}
+      />
+    </>
   );
 };
