@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Package, TrendingDown, TrendingUp } from 'lucide-react';
 import { useInventorySummary, InventorySummaryItem } from '@/hooks/useInventorySummary';
@@ -17,14 +18,14 @@ export const EnhancedInventorySummary = () => {
     search(localSearchTerm);
   };
 
-  const getStockBackgroundColor = (currentStock: number, threshold: number | null) => {
-    if (!threshold) return '';
+  const getStockBadgeStyle = (currentStock: number, threshold: number | null) => {
+    if (!threshold) return 'bg-gray-100 text-gray-800';
     
-    if (currentStock > threshold) return 'bg-green-100';
-    if (currentStock === threshold) return 'bg-yellow-100';
-    if (currentStock < threshold) return 'bg-red-100';
+    if (currentStock > threshold) return 'bg-green-100 text-green-800';
+    if (currentStock === threshold) return 'bg-yellow-100 text-yellow-800';
+    if (currentStock < threshold) return 'bg-red-100 text-red-800';
     
-    return '';
+    return 'bg-gray-100 text-gray-800';
   };
 
   const formatDetailsArray = (details: string[] | null, gradeName: string, rolls: number) => {
@@ -194,8 +195,13 @@ export const EnhancedInventorySummary = () => {
                             '無'
                           )}
                         </TableCell>
-                        <TableCell className={`text-right ${getStockBackgroundColor(item.total_stock, item.stock_thresholds)} px-2 py-1 rounded`}>
-                          {item.total_stock.toFixed(2)} KG
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant="secondary"
+                            className={getStockBadgeStyle(item.total_stock, item.stock_thresholds)}
+                          >
+                            {item.total_stock.toFixed(2)} KG
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Tooltip>
@@ -285,11 +291,15 @@ export const EnhancedInventorySummary = () => {
                             </TooltipContent>
                           </Tooltip>
                         </TableCell>
-                        <TableCell className="text-right text-orange-600">
-                          {item.pending_in_quantity.toFixed(2)} KG
+                        <TableCell className="text-right">
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            {item.pending_in_quantity.toFixed(2)} KG
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-blue-600">
-                          {item.pending_out_quantity.toFixed(2)} KG
+                        <TableCell className="text-right">
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                            {item.pending_out_quantity.toFixed(2)} KG
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
