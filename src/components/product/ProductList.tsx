@@ -122,8 +122,8 @@ export const ProductList: React.FC<ProductListProps> = ({
                 <TableCell>{product.unit_of_measure}</TableCell>
                 <TableCell>
                   <Badge 
-                    variant={product.status === 'Available' ? 'default' : 'secondary'}
-                    className={product.status === 'Available' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+                    variant="outline"
+                    className={product.status === 'Available' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}
                   >
                     {product.status === 'Available' ? '可用' : '不可用'}
                   </Badge>

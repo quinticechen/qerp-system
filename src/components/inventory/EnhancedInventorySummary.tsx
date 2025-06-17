@@ -1,31 +1,22 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Package, TrendingDown, TrendingUp } from 'lucide-react';
 import { useInventorySummary, InventorySummaryItem } from '@/hooks/useInventorySummary';
+import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
+import { StockBadge } from './StockBadge';
 
 export const EnhancedInventorySummary = () => {
   const { inventoryData, loading, hasMore, searchTerm, loadMore, search } = useInventorySummary();
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    search(localSearchTerm);
-  };
-
-  const getStockBadgeStyle = (currentStock: number, threshold: number | null) => {
-    if (!threshold) return 'bg-gray-100 text-gray-800';
+  const formatRollDetails = (details: string[] | null) => {
+    if (!details || details.length === 0) return '0 kg';
     
-    if (currentStock > threshold) return 'bg-green-100 text-green-800';
-    if (currentStock === threshold) return 'bg-yellow-100 text-yellow-800';
-    if (currentStock < threshold) return 'bg-red-100 text-red-800';
-    
-    return 'bg-gray-100 text-gray-800';
+    const values = details.map(d => parseFloat(d));
+    return values.join(' + ') + ' = ' + values.reduce((sum, val) => sum + val, 0).toFixed(2) + ' kg';
   };
 
   const formatDetailsArray = (details: string[] | null, gradeName: string, rolls: number) => {
@@ -36,13 +27,6 @@ export const EnhancedInventorySummary = () => {
     const calculation = values.join(' + ');
     
     return `${gradeName}: ${rolls} 卷 ${calculation} = ${total.toFixed(2)} kg`;
-  };
-
-  const formatRollDetails = (details: string[] | null) => {
-    if (!details || details.length === 0) return '0 kg';
-    
-    const values = details.map(d => parseFloat(d));
-    return values.join(' + ') + ' = ' + values.reduce((sum, val) => sum + val, 0).toFixed(2) + ' kg';
   };
 
   const getTotalStock = () => {
@@ -60,6 +44,179 @@ export const EnhancedInventorySummary = () => {
   const getTotalPendingOut = () => {
     return inventoryData.reduce((sum, item) => sum + item.pending_out_quantity, 0);
   };
+
+  const columns: TableColumn[] = [
+    {
+      key: 'product_name',
+      title: '產品名稱',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="font-medium">{value}</span>
+    },
+    {
+      key: 'color',
+      title: '顏色',
+      sortable: true,
+      filterable: false,
+      render: (value) => value || '無'
+    },
+    {
+      key: 'color_code',
+      title: '色碼',
+      sortable: false,
+      filterable: false,
+      render: (value) => value ? (
+        <div className="flex items-center space-x-2">
+          <div 
+            className="w-4 h-4 rounded border border-gray-300"
+            style={{ backgroundColor: value }}
+          />
+          <span className="text-sm">{value}</span>
+        </div>
+      ) : '無'
+    },
+    {
+      key: 'total_stock',
+      title: '總庫存',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <StockBadge 
+          currentStock={value} 
+          threshold={row.stock_thresholds} 
+          type="stock" 
+        />
+      )
+    },
+    {
+      key: 'total_rolls',
+      title: '總卷數',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value}</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">
+                <div>{formatDetailsArray(row.a_grade_details, 'A 級', row.a_grade_rolls)}</div>
+                <div>{formatDetailsArray(row.b_grade_details, 'B 級', row.b_grade_rolls)}</div>
+                <div>{formatDetailsArray(row.c_grade_details, 'C 級', row.c_grade_rolls)}</div>
+                <div>{formatDetailsArray(row.d_grade_details, 'D 級', row.d_grade_rolls)}</div>
+                <div>{formatDetailsArray(row.defective_details, '瑕疵品', row.defective_rolls)}</div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'a_grade_stock',
+      title: 'A級',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value.toFixed(2)} KG</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">{formatRollDetails(row.a_grade_details)}</div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'b_grade_stock',
+      title: 'B級',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value.toFixed(2)} KG</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">{formatRollDetails(row.b_grade_details)}</div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'c_grade_stock',
+      title: 'C級',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value.toFixed(2)} KG</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">{formatRollDetails(row.c_grade_details)}</div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'd_grade_stock',
+      title: 'D級',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value.toFixed(2)} KG</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">{formatRollDetails(row.d_grade_details)}</div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'defective_stock',
+      title: '瑕疵品',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help hover:underline">{value.toFixed(2)} KG</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm">{formatRollDetails(row.defective_details)}</div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    },
+    {
+      key: 'pending_in_quantity',
+      title: '待入庫',
+      sortable: true,
+      filterable: false,
+      render: (value) => <StockBadge currentStock={value} type="pending-in" />
+    },
+    {
+      key: 'pending_out_quantity',
+      title: '待出貨',
+      sortable: true,
+      filterable: false,
+      render: (value) => <StockBadge currentStock={value} type="pending-out" />
+    }
+  ];
 
   if (loading && inventoryData.length === 0) {
     return (
@@ -138,189 +295,17 @@ export const EnhancedInventorySummary = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* 搜尋控制 */}
-          <div className="mb-4">
-            <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <Input
-                placeholder="搜尋產品名稱、顏色..."
-                value={localSearchTerm}
-                onChange={(e) => setLocalSearchTerm(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="submit" variant="outline">搜尋</Button>
-            </form>
-          </div>
-
-          {inventoryData.length === 0 ? (
-            <div className="text-center py-8">
-              <Package size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">暫無庫存數據</h3>
-              <p className="text-gray-600">請先進行入庫操作</p>
-            </div>
-          ) : (
-            <TooltipProvider>
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>產品名稱</TableHead>
-                      <TableHead>顏色</TableHead>
-                      <TableHead>色碼</TableHead>
-                      <TableHead className="text-right">總庫存</TableHead>
-                      <TableHead className="text-right">總卷數</TableHead>
-                      <TableHead className="text-right">A級</TableHead>
-                      <TableHead className="text-right">B級</TableHead>
-                      <TableHead className="text-right">C級</TableHead>
-                      <TableHead className="text-right">D級</TableHead>
-                      <TableHead className="text-right">瑕疵品</TableHead>
-                      <TableHead className="text-right">待入庫</TableHead>
-                      <TableHead className="text-right">待出貨</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventoryData.map((item) => (
-                      <TableRow key={`${item.product_id}-${item.color || 'default'}`}>
-                        <TableCell className="font-medium">{item.product_name}</TableCell>
-                        <TableCell>{item.color || '無'}</TableCell>
-                        <TableCell>
-                          {item.color_code ? (
-                            <div className="flex items-center space-x-2">
-                              <div 
-                                className="w-4 h-4 rounded border border-gray-300"
-                                style={{ backgroundColor: item.color_code }}
-                              />
-                              <span className="text-sm">{item.color_code}</span>
-                            </div>
-                          ) : (
-                            '無'
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge 
-                            variant="secondary"
-                            className={getStockBadgeStyle(item.total_stock, item.stock_thresholds)}
-                          >
-                            {item.total_stock.toFixed(2)} KG
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.total_rolls}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <div>{formatDetailsArray(item.a_grade_details, 'A 級', item.a_grade_rolls)}</div>
-                                <div>{formatDetailsArray(item.b_grade_details, 'B 級', item.b_grade_rolls)}</div>
-                                <div>{formatDetailsArray(item.c_grade_details, 'C 級', item.c_grade_rolls)}</div>
-                                <div>{formatDetailsArray(item.d_grade_details, 'D 級', item.d_grade_rolls)}</div>
-                                <div>{formatDetailsArray(item.defective_details, '瑕疵品', item.defective_rolls)}</div>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.a_grade_stock.toFixed(2)} KG
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                {formatRollDetails(item.a_grade_details)}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.b_grade_stock.toFixed(2)} KG
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                {formatRollDetails(item.b_grade_details)}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.c_grade_stock.toFixed(2)} KG
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                {formatRollDetails(item.c_grade_details)}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.d_grade_stock.toFixed(2)} KG
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                {formatRollDetails(item.d_grade_details)}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help hover:underline">
-                                {item.defective_stock.toFixed(2)} KG
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                {formatRollDetails(item.defective_details)}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            {item.pending_in_quantity.toFixed(2)} KG
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-                            {item.pending_out_quantity.toFixed(2)} KG
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* 載入更多按鈕 */}
-              {hasMore && (
-                <div className="flex justify-center pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={loadMore}
-                    disabled={loading}
-                  >
-                    {loading ? '載入中...' : '載入更多'}
-                  </Button>
-                </div>
-              )}
-            </TooltipProvider>
-          )}
+          <EnhancedTable
+            columns={columns}
+            data={inventoryData}
+            loading={loading}
+            hasMore={hasMore}
+            searchTerm={searchTerm}
+            onSearch={search}
+            onLoadMore={loadMore}
+            searchPlaceholder="搜尋產品名稱、顏色..."
+            emptyMessage="暫無庫存數據"
+          />
         </CardContent>
       </Card>
     </div>

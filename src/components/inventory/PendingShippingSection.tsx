@@ -2,9 +2,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
+import { StockBadge } from './StockBadge';
 
 interface PendingShippingItem {
   product_name: string;
@@ -48,6 +48,61 @@ export const PendingShippingSection: React.FC = () => {
     }
   });
 
+  const columns: TableColumn[] = [
+    {
+      key: 'product_name',
+      title: '產品名稱',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="font-medium text-gray-900">{value}</span>
+    },
+    {
+      key: 'color',
+      title: '顏色',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'color_code',
+      title: '色碼',
+      sortable: false,
+      filterable: false,
+      render: (value) => value ? (
+        <div className="flex items-center space-x-2">
+          <div 
+            className="w-4 h-4 rounded border border-gray-400"
+            style={{ backgroundColor: value }}
+          />
+          <span className="text-sm text-gray-900">{value}</span>
+        </div>
+      ) : (
+        <span className="text-gray-500">-</span>
+      )
+    },
+    {
+      key: 'total_pending',
+      title: '待出貨數量',
+      sortable: true,
+      filterable: false,
+      render: (value) => <StockBadge currentStock={value} type="pending-out" />
+    },
+    {
+      key: 'order_number',
+      title: '訂單號',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value}</span>
+    },
+    {
+      key: 'customer_name',
+      title: '客戶',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value}</span>
+    }
+  ];
+
   if (isLoading) {
     return (
       <Card>
@@ -68,62 +123,13 @@ export const PendingShippingSection: React.FC = () => {
         <p className="text-sm text-gray-600">還沒出貨給客人的產品</p>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-gray-900">產品名稱</TableHead>
-                <TableHead className="text-gray-900">顏色</TableHead>
-                <TableHead className="text-gray-900">色碼</TableHead>
-                <TableHead className="text-gray-900">待出貨數量</TableHead>
-                <TableHead className="text-gray-900">訂單號</TableHead>
-                <TableHead className="text-gray-900">客戶</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pendingShipping?.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-medium text-gray-900">
-                    {item.product_name}
-                  </TableCell>
-                  <TableCell className="text-gray-700">
-                    {item.color || '-'}
-                  </TableCell>
-                  <TableCell className="text-gray-700">
-                    {item.color_code ? (
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-4 h-4 rounded border border-gray-400"
-                          style={{ backgroundColor: item.color_code }}
-                        ></div>
-                        <span className="text-sm text-gray-900">{item.color_code}</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-500">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
-                      {item.total_pending.toFixed(2)} kg
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-gray-700">
-                    {item.order_number}
-                  </TableCell>
-                  <TableCell className="text-gray-700">
-                    {item.customer_name}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        
-        {(!pendingShipping || pendingShipping.length === 0) && (
-          <div className="text-center py-8 text-gray-500">
-            目前沒有待出貨的產品
-          </div>
-        )}
+        <EnhancedTable
+          columns={columns}
+          data={pendingShipping || []}
+          loading={isLoading}
+          searchPlaceholder="搜尋產品名稱、訂單號、客戶..."
+          emptyMessage="目前沒有待出貨的產品"
+        />
       </CardContent>
     </Card>
   );
