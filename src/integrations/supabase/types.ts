@@ -814,62 +814,6 @@ export type Database = {
           },
         ]
       }
-      stock_thresholds: {
-        Row: {
-          created_at: string
-          id: string
-          product_id: string
-          threshold_quantity: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          product_id: string
-          threshold_quantity: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          product_id?: string
-          threshold_quantity?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "stock_thresholds_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: true
-            referencedRelation: "inventory_summary"
-            referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "stock_thresholds_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: true
-            referencedRelation: "products_new"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stock_thresholds_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "stock_thresholds_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_roles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_operation_logs: {
         Row: {
           id: string

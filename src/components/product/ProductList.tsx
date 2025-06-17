@@ -1,12 +1,10 @@
 
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Edit } from 'lucide-react';
+import { Edit, Eye } from 'lucide-react';
 import { Product } from '@/hooks/useProducts';
+import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 
 interface ProductListProps {
   products: Product[];
@@ -22,9 +20,7 @@ interface ProductListProps {
   onEdit: (product: Product) => void;
 }
 
-const CATEGORIES = ['布料', '胚布', '紗線', '輔料'];
-
-export const ProductList: React.FC<ProductListProps> = ({
+const ProductList: React.FC<ProductListProps> = ({
   products,
   loading,
   hasMore,
@@ -37,133 +33,140 @@ export const ProductList: React.FC<ProductListProps> = ({
   onLoadMore,
   onEdit,
 }) => {
-  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSearch(localSearchTerm);
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'Available':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Discontinued':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'Out_of_Stock':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
-  return (
-    <div className="space-y-4">
-      {/* 搜尋和篩選控制 */}
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-end">
-        <form onSubmit={handleSearchSubmit} className="flex-1">
-          <Input
-            placeholder="搜尋產品名稱、類別、顏色..."
-            value={localSearchTerm}
-            onChange={(e) => setLocalSearchTerm(e.target.value)}
-            className="w-full"
-          />
-        </form>
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'Available':
+        return '可用';
+      case 'Discontinued':
+        return '停產';
+      case 'Out_of_Stock':
+        return '缺貨';
+      default:
+        return status;
+    }
+  };
 
+  const columns: TableColumn[] = [
+    {
+      key: 'name',
+      title: '產品名稱',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="font-medium text-gray-900">{value}</span>
+    },
+    {
+      key: 'category',
+      title: '類別',
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: '布料', label: '布料' },
+        { value: '配件', label: '配件' },
+        { value: '其他', label: '其他' }
+      ],
+      render: (value) => <span className="text-gray-700">{value}</span>
+    },
+    {
+      key: 'color',
+      title: '顏色',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'color_code',
+      title: '色號',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'unit_of_measure',
+      title: '單位',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value}</span>
+    },
+    {
+      key: 'stock_thresholds',
+      title: '庫存閾值',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'status',
+      title: '狀態',
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'Available', label: '可用' },
+        { value: 'Discontinued', label: '停產' },
+        { value: 'Out_of_Stock', label: '缺貨' }
+      ],
+      render: (value) => (
+        <Badge variant="outline" className={getStatusBadgeClass(value)}>
+          {getStatusText(value)}
+        </Badge>
+      )
+    },
+    {
+      key: 'created_at',
+      title: '建立時間',
+      sortable: true,
+      filterable: false,
+      render: (value) => (
+        <span className="text-gray-700">
+          {new Date(value).toLocaleDateString('zh-TW')}
+        </span>
+      )
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      sortable: false,
+      filterable: false,
+      render: (value, row) => (
         <div className="flex gap-2">
-          <Select value={categoryFilter} onValueChange={onCategoryFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="類別" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有類別</SelectItem>
-              {CATEGORIES.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={statusFilter} onValueChange={onStatusFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="狀態" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">所有狀態</SelectItem>
-              <SelectItem value="Available">可用</SelectItem>
-              <SelectItem value="Unavailable">不可用</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* 產品表格 */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>產品名稱</TableHead>
-              <TableHead>類別</TableHead>
-              <TableHead>顏色</TableHead>
-              <TableHead>色碼</TableHead>
-              <TableHead>計量單位</TableHead>
-              <TableHead>產品狀態</TableHead>
-              <TableHead>庫存閾值</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>{product.color || '-'}</TableCell>
-                <TableCell>
-                  {product.color_code ? (
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-4 h-4 rounded border border-gray-300"
-                        style={{ backgroundColor: product.color_code }}
-                      />
-                      <span className="text-sm">{product.color_code}</span>
-                    </div>
-                  ) : (
-                    '-'
-                  )}
-                </TableCell>
-                <TableCell>{product.unit_of_measure}</TableCell>
-                <TableCell>
-                  <Badge 
-                    variant="outline"
-                    className={product.status === 'Available' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}
-                  >
-                    {product.status === 'Available' ? '可用' : '不可用'}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {product.stock_thresholds ? `${product.stock_thresholds} ${product.unit_of_measure}` : '-'}
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(product)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* 載入更多按鈕 */}
-      {hasMore && (
-        <div className="flex justify-center pt-4">
-          <Button 
-            variant="outline" 
-            onClick={onLoadMore}
-            disabled={loading}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(row)}
+            className="border-gray-300 text-gray-700 hover:bg-gray-50"
           >
-            {loading ? '載入中...' : '載入更多'}
+            <Edit className="h-4 w-4" />
           </Button>
         </div>
-      )}
+      )
+    }
+  ];
 
-      {products.length === 0 && !loading && (
-        <div className="text-center py-8 text-gray-500">
-          暫無產品資料
-        </div>
-      )}
-    </div>
+  return (
+    <EnhancedTable
+      columns={columns}
+      data={products}
+      loading={loading}
+      hasMore={hasMore}
+      searchTerm={searchTerm}
+      onSearch={onSearch}
+      onLoadMore={onLoadMore}
+      searchPlaceholder="搜尋產品名稱、顏色、色號..."
+      emptyMessage="沒有找到產品"
+    />
   );
 };
+
+export default ProductList;

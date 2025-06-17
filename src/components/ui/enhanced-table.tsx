@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,18 +48,74 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState<Record<string, string>>({});
 
+  // 本地排序和篩選邏輯
+  const processedData = useMemo(() => {
+    let result = [...data];
+
+    // 應用篩選
+    Object.entries(filters).forEach(([column, value]) => {
+      if (value && value !== 'all') {
+        result = result.filter(row => {
+          const cellValue = row[column];
+          if (typeof cellValue === 'boolean') {
+            return cellValue.toString() === value;
+          }
+          if (Array.isArray(cellValue)) {
+            return cellValue.some(item => 
+              typeof item === 'object' && item.role ? item.role === value : item === value
+            );
+          }
+          return cellValue?.toString().toLowerCase().includes(value.toLowerCase());
+        });
+      }
+    });
+
+    // 應用搜尋
+    if (localSearchTerm) {
+      result = result.filter(row => 
+        Object.values(row).some(value => 
+          value?.toString().toLowerCase().includes(localSearchTerm.toLowerCase())
+        )
+      );
+    }
+
+    // 應用排序
+    if (sortColumn) {
+      result.sort((a, b) => {
+        let aValue = a[sortColumn];
+        let bValue = b[sortColumn];
+
+        // 處理特殊資料類型
+        if (typeof aValue === 'boolean') {
+          aValue = aValue ? 1 : 0;
+          bValue = bValue ? 1 : 0;
+        } else if (aValue instanceof Date) {
+          aValue = aValue.getTime();
+          bValue = bValue.getTime();
+        } else if (typeof aValue === 'string') {
+          aValue = aValue.toLowerCase();
+          bValue = bValue.toLowerCase();
+        }
+
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [data, filters, localSearchTerm, sortColumn, sortDirection]);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch?.(localSearchTerm);
   };
 
   const handleSort = (column: string) => {
-    if (!onSort) return;
-    
     const newDirection = sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc';
     setSortColumn(column);
     setSortDirection(newDirection);
-    onSort(column, newDirection);
+    onSort?.(column, newDirection);
   };
 
   const handleFilter = (column: string, value: string) => {
@@ -137,7 +193,7 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((row, index) => (
+            {processedData.map((row, index) => (
               <TableRow key={index}>
                 {columns.map((column) => (
                   <TableCell key={column.key}>
@@ -163,7 +219,7 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
         </div>
       )}
 
-      {data.length === 0 && !loading && (
+      {processedData.length === 0 && !loading && (
         <div className="text-center py-8 text-gray-500">
           {emptyMessage}
         </div>
