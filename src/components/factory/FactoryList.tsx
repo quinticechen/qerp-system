@@ -3,142 +3,92 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { EditProductDialog } from './EditProductDialog';
-import { ViewProductDialog } from './ViewProductDialog';
+import { EditFactoryDialog } from './EditFactoryDialog';
+import { ViewFactoryDialog } from './ViewFactoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-export const ProductList = () => {
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+export const FactoryList = () => {
+  const [selectedFactory, setSelectedFactory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: products, isLoading, refetch } = useQuery({
-    queryKey: ['products', organizationId],
+  const { data: factories, isLoading, refetch } = useQuery({
+    queryKey: ['factories', organizationId],
     queryFn: async () => {
       if (!organizationId) {
         console.log('No organization ID available');
         return [];
       }
 
-      console.log('Fetching products for organization:', organizationId);
+      console.log('Fetching factories for organization:', organizationId);
       const { data, error } = await supabase
-        .from('products_new')
+        .from('factories')
         .select('*')
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching products:', error);
+        console.error('Error fetching factories:', error);
         throw error;
       }
 
-      console.log('Fetched products:', data);
+      console.log('Fetched factories:', data);
       return data;
     },
     enabled: hasOrganization
   });
 
-  const handleView = (product: any) => {
-    setSelectedProduct(product);
+  const handleView = (factory: any) => {
+    setSelectedFactory(factory);
     setViewDialogOpen(true);
   };
 
-  const handleEdit = (product: any) => {
-    setSelectedProduct(product);
+  const handleEdit = (factory: any) => {
+    setSelectedFactory(factory);
     setEditDialogOpen(true);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'Available': 'bg-green-100 text-green-800 border-green-200',
-      'OutOfStock': 'bg-red-100 text-red-800 border-red-200',
-      'Discontinued': 'bg-gray-100 text-gray-800 border-gray-200'
-    };
-    return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const getStatusText = (status: string) => {
-    const textMap = {
-      'Available': '有庫存',
-      'OutOfStock': '缺貨',
-      'Discontinued': '停產'
-    };
-    return textMap[status as keyof typeof textMap] || status;
   };
 
   const columns: TableColumn[] = [
     {
       key: 'name',
-      title: '產品名稱',
+      title: '工廠名稱',
       sortable: true,
       filterable: false,
       render: (value) => <span className="font-medium text-gray-900">{value}</span>
     },
     {
-      key: 'color',
-      title: '顏色',
+      key: 'contact_person',
+      title: '聯絡人',
       sortable: true,
       filterable: false,
-      render: (value, row) => (
-        <div className="flex items-center gap-2">
-          {row.color_code && (
-            <div 
-              className="w-4 h-4 rounded border border-gray-300" 
-              style={{ backgroundColor: row.color_code }}
-            />
-          )}
-          <span className="text-gray-700">{value}</span>
-        </div>
-      )
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
     },
     {
-      key: 'category',
-      title: '類別',
-      sortable: true,
-      filterable: true,
-      filterOptions: [
-        { value: '布料', label: '布料' },
-        { value: '輔料', label: '輔料' },
-        { value: '配件', label: '配件' }
-      ],
-      render: (value) => <span className="text-gray-700">{value}</span>
-    },
-    {
-      key: 'status',
-      title: '狀態',
-      sortable: true,
-      filterable: true,
-      filterOptions: [
-        { value: 'Available', label: '有庫存' },
-        { value: 'OutOfStock', label: '缺貨' },
-        { value: 'Discontinued', label: '停產' }
-      ],
-      render: (value) => (
-        <Badge variant="outline" className={getStatusBadge(value)}>
-          {getStatusText(value)}
-        </Badge>
-      )
-    },
-    {
-      key: 'unit_of_measure',
-      title: '單位',
+      key: 'phone',
+      title: '電話',
       sortable: true,
       filterable: false,
-      render: (value) => <span className="text-gray-700">{value}</span>
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
     },
     {
-      key: 'stock_thresholds',
-      title: '庫存警戒值',
+      key: 'email',
+      title: 'Email',
       sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'address',
+      title: '地址',
+      sortable: false,
       filterable: false,
       render: (value) => (
-        <span className="text-gray-700">
-          {value ? `${value} KG` : '未設定'}
+        <span className="text-gray-700 max-w-xs truncate block">
+          {value || '-'}
         </span>
       )
     },
@@ -205,32 +155,32 @@ export const ProductList = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">產品列表</CardTitle>
+          <CardTitle className="text-gray-900">工廠列表</CardTitle>
         </CardHeader>
         <CardContent>
           <EnhancedTable
             columns={columns}
-            data={products || []}
+            data={factories || []}
             loading={isLoading}
-            searchPlaceholder="搜尋產品名稱、顏色、類別..."
-            emptyMessage="沒有找到產品"
+            searchPlaceholder="搜尋工廠名稱、聯絡人、電話..."
+            emptyMessage="沒有找到工廠"
           />
         </CardContent>
       </Card>
 
       {/* 對話框 */}
-      {selectedProduct && (
+      {selectedFactory && (
         <>
-          <ViewProductDialog
+          <ViewFactoryDialog
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
-            product={selectedProduct}
+            factory={selectedFactory}
           />
-          <EditProductDialog
+          <EditFactoryDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
-            product={selectedProduct}
-            onProductUpdated={refetch}
+            factory={selectedFactory}
+            onFactoryUpdated={refetch}
           />
         </>
       )}
