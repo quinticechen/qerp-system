@@ -1,3 +1,4 @@
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
@@ -56,7 +57,7 @@ function App() {
               }
             />
             <Route
-              path="/products"
+              path="/product"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -66,7 +67,7 @@ function App() {
               }
             />
             <Route
-              path="/customers"
+              path="/customer"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -76,7 +77,7 @@ function App() {
               }
             />
             <Route
-              path="/factories"
+              path="/factory"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -86,7 +87,7 @@ function App() {
               }
             />
             <Route
-              path="/orders"
+              path="/order"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -96,7 +97,7 @@ function App() {
               }
             />
             <Route
-              path="/purchases"
+              path="/purchase"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -126,7 +127,7 @@ function App() {
               }
             />
             <Route
-              path="/users"
+              path="/user"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
@@ -136,7 +137,7 @@ function App() {
               }
             />
             <Route
-              path="/permissions"
+              path="/permission"
               element={
                 <ProtectedRoute>
                   <OrganizationGuard>
