@@ -16,11 +16,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Search, Package, Clock, User, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { ThresholdInput } from '@/components/product/ThresholdInput';
+import { useStockThresholds } from '@/hooks/useStockThresholds';
 
 // 顏色項目類型
 type ColorVariant = {
   color: string;
   color_code: string;
+  threshold_quantity?: number;
 };
 
 // 產品表單驗證模式 - 支援多個顏色變體
@@ -29,7 +32,8 @@ const productSchema = z.object({
   category: z.string().default('布料'),
   colorVariants: z.array(z.object({
     color: z.string().optional(),
-    color_code: z.string().optional().transform(val => val ? val.toUpperCase() : val), // 自動轉大寫
+    color_code: z.string().optional().transform(val => val ? val.toUpperCase() : val),
+    threshold_quantity: z.number().min(0, '閾值必須大於等於0').optional(),
   })).min(1, '至少需要一個顏色變體'),
 });
 
@@ -63,13 +67,14 @@ const ProductManagement = () => {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { getThresholdByProductId } = useStockThresholds();
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: '',
       category: '布料',
-      colorVariants: [{ color: '', color_code: '' }],
+      colorVariants: [{ color: '', color_code: '', threshold_quantity: undefined }],
     },
   });
 
@@ -140,7 +145,7 @@ const ProductManagement = () => {
   // 新增顏色變體
   const addColorVariant = () => {
     const currentVariants = form.getValues('colorVariants');
-    form.setValue('colorVariants', [...currentVariants, { color: '', color_code: '' }]);
+    form.setValue('colorVariants', [...currentVariants, { color: '', color_code: '', threshold_quantity: undefined }]);
   };
 
   // 移除顏色變體
@@ -319,12 +324,14 @@ const ProductManagement = () => {
   // 編輯產品
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    const threshold = getThresholdByProductId(product.id);
     form.reset({
       name: product.name,
       category: product.category,
       colorVariants: [{
         color: product.color || '',
         color_code: product.color_code || '',
+        threshold_quantity: threshold?.threshold_quantity,
       }],
     });
     setIsDialogOpen(true);
@@ -336,7 +343,7 @@ const ProductManagement = () => {
     form.reset({
       name: '',
       category: '布料',
-      colorVariants: [{ color: '', color_code: '' }],
+      colorVariants: [{ color: '', color_code: '', threshold_quantity: undefined }],
     });
     setIsDialogOpen(true);
   };
@@ -453,7 +460,7 @@ const ProductManagement = () => {
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-3 mb-3">
                         <FormField
                           control={form.control}
                           name={`colorVariants.${index}.color`}
@@ -495,6 +502,28 @@ const ProductManagement = () => {
                           )}
                         />
                       </div>
+
+                      <FormField
+                        control={form.control}
+                        name={`colorVariants.${index}.threshold_quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-900 text-sm">庫存閾值 (KG)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                placeholder="設定庫存預警閾值" 
+                                className="bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                                value={field.value || ''}
+                                onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   ))}
                 </div>
@@ -578,6 +607,7 @@ const ProductManagement = () => {
                   <TableHead className="text-gray-900 font-semibold">類別</TableHead>
                   <TableHead className="text-gray-900 font-semibold">顏色</TableHead>
                   <TableHead className="text-gray-900 font-semibold">顏色代碼</TableHead>
+                  <TableHead className="text-gray-900 font-semibold">庫存閾值</TableHead>
                   <TableHead className="text-gray-900 font-semibold">計量單位</TableHead>
                   <TableHead className="text-gray-900 font-semibold">建立時間</TableHead>
                   <TableHead className="text-gray-900 font-semibold">最後修改</TableHead>
@@ -585,86 +615,98 @@ const ProductManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium text-gray-900">{product.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">{product.category}</Badge>
-                    </TableCell>
-                    <TableCell className="text-gray-900">{product.color || '無'}</TableCell>
-                    <TableCell>
-                      {product.color_code ? (
-                        <div className="flex items-center space-x-2">
-                          <div 
-                            className="w-4 h-4 rounded border border-slate-400"
-                            style={{ backgroundColor: product.color_code }}
-                          ></div>
-                          <span className="text-sm text-gray-900">{product.color_code}</span>
-                        </div>
-                      ) : <span className="text-gray-900">無</span>}
-                    </TableCell>
-                    <TableCell className="text-gray-900">{product.unit_of_measure}</TableCell>
-                    <TableCell className="text-gray-900">{new Date(product.created_at).toLocaleDateString('zh-TW')}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col text-sm">
-                        <div className="flex items-center text-gray-700">
-                          <Clock size={12} className="mr-1" />
-                          {new Date(product.updated_at).toLocaleDateString('zh-TW')}
-                        </div>
-                        {product.updated_by && (
-                          <div className="flex items-center text-gray-600 mt-1">
-                            <User size={12} className="mr-1" />
-                            {getUserDisplayName(product.updated_by)}
+                {filteredProducts.map((product) => {
+                  const threshold = getThresholdByProductId(product.id);
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium text-gray-900">{product.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">{product.category}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-900">{product.color || '無'}</TableCell>
+                      <TableCell>
+                        {product.color_code ? (
+                          <div className="flex items-center space-x-2">
+                            <div 
+                              className="w-4 h-4 rounded border border-slate-400"
+                              style={{ backgroundColor: product.color_code }}
+                            ></div>
+                            <span className="text-sm text-gray-900">{product.color_code}</span>
                           </div>
+                        ) : <span className="text-gray-900">無</span>}
+                      </TableCell>
+                      <TableCell>
+                        {threshold ? (
+                          <Badge variant="outline" className="text-green-700 border-green-300">
+                            {threshold.threshold_quantity} KG
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-500 text-sm">未設定</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(product)}
-                          className="border-gray-300 text-gray-900 hover:bg-gray-50"
-                        >
-                          <Edit size={14} className="mr-1" />
-                          編輯
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                            >
-                              <Trash2 size={14} className="mr-1" />
-                              刪除
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-white">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-gray-900">確認刪除產品</AlertDialogTitle>
-                              <AlertDialogDescription className="text-gray-700">
-                                您確定要刪除產品「{product.name}」嗎？
-                                <br />
-                                <span className="text-red-600 font-semibold">此操作無法復原！</span>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="text-gray-900 border-gray-300 hover:bg-gray-50">取消</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleDelete(product)}
+                      </TableCell>
+                      <TableCell className="text-gray-900">{product.unit_of_measure}</TableCell>
+                      <TableCell className="text-gray-900">{new Date(product.created_at).toLocaleDateString('zh-TW')}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-sm">
+                          <div className="flex items-center text-gray-700">
+                            <Clock size={12} className="mr-1" />
+                            {new Date(product.updated_at).toLocaleDateString('zh-TW')}
+                          </div>
+                          {product.updated_by && (
+                            <div className="flex items-center text-gray-600 mt-1">
+                              <User size={12} className="mr-1" />
+                              {getUserDisplayName(product.updated_by)}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEdit(product)}
+                            className="border-gray-300 text-gray-900 hover:bg-gray-50"
+                          >
+                            <Edit size={14} className="mr-1" />
+                            編輯
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="destructive"
                                 className="bg-red-600 hover:bg-red-700 text-white"
                               >
-                                確認刪除
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                                <Trash2 size={14} className="mr-1" />
+                                刪除
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-white">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-gray-900">確認刪除產品</AlertDialogTitle>
+                                <AlertDialogDescription className="text-gray-700">
+                                  您確定要刪除產品「{product.name}」嗎？
+                                  <br />
+                                  <span className="text-red-600 font-semibold">此操作無法復原！</span>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="text-gray-900 border-gray-300 hover:bg-gray-50">取消</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => handleDelete(product)}
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  確認刪除
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -1,16 +1,18 @@
-import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { supabase } from '@/integrations/supabase/client';
 
-interface InventorySummaryItem {
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertTriangle, Package, TrendingDown, TrendingUp } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { StockAlertBadge } from './StockAlertBadge';
+import { useStockThresholds } from '@/hooks/useStockThresholds';
+import { useInventoryAlerts } from '@/hooks/useInventoryAlerts';
+
+type InventorySummaryItem = {
   product_id: string;
   product_name: string;
   color: string | null;
-  color_code: string | null;
   total_stock: number;
   total_rolls: number;
   a_grade_stock: number;
@@ -18,441 +20,225 @@ interface InventorySummaryItem {
   c_grade_stock: number;
   d_grade_stock: number;
   defective_stock: number;
-}
+};
 
-interface RollDetail {
-  product_id: string;
-  quality: string;
-  quantity: number;
-  current_quantity: number;
-  roll_number: string;
-  products_new: {
-    name: string;
-    color: string | null;
-    color_code: string | null;
-  };
-}
+export const InventorySummary = () => {
+  const [inventoryData, setInventoryData] = useState<InventorySummaryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { getThresholdByProductId } = useStockThresholds();
+  const { alerts } = useInventoryAlerts();
 
-interface PendingData {
-  product_id: string;
-  color: string | null;
-  pending_inventory: number;
-  pending_shipping: number;
-}
-
-export const InventorySummary: React.FC = () => {
-  const queryClient = useQueryClient();
-
-  // 監聽庫存變化並自動刷新
-  React.useEffect(() => {
-    const channel = supabase
-      .channel('inventory-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inventory_rolls'
-      }, () => {
-        // 當庫存卷數據變化時，刷新相關查詢
-        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inventories'
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'shipping_items'
-      }, () => {
-        queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-roll-details'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  const { data: inventorySummary, isLoading } = useQuery({
-    queryKey: ['inventory-summary'],
-    queryFn: async () => {
+  const loadInventorySummary = async () => {
+    try {
       const { data, error } = await supabase
-        .from('products_new')
-        .select(`
-          id,
-          name,
-          color,
-          color_code,
-          inventory_rolls (
-            current_quantity,
-            quality
-          )
-        `)
-        .order('name, color');
-      
+        .from('inventory_summary')
+        .select('*')
+        .order('product_name');
+
       if (error) throw error;
 
-      const processedData = data.map(product => {
-        const rolls = product.inventory_rolls || [];
-        const totalStock = rolls.reduce((sum, roll) => sum + (roll.current_quantity || 0), 0);
-        const totalRolls = rolls.filter(roll => (roll.current_quantity || 0) > 0).length;
-        
-        const gradeStocks = {
-          a_grade_stock: rolls.filter(r => r.quality === 'A').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
-          b_grade_stock: rolls.filter(r => r.quality === 'B').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
-          c_grade_stock: rolls.filter(r => r.quality === 'C').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
-          d_grade_stock: rolls.filter(r => r.quality === 'D').reduce((sum, r) => sum + (r.current_quantity || 0), 0),
-          defective_stock: rolls.filter(r => r.quality === 'defective').reduce((sum, r) => sum + (r.current_quantity || 0), 0)
-        };
+      const summaryData = (data || []).map(item => ({
+        product_id: item.product_id || '',
+        product_name: item.product_name || '未知產品',
+        color: item.color,
+        total_stock: Number(item.total_stock || 0),
+        total_rolls: Number(item.total_rolls || 0),
+        a_grade_stock: Number(item.a_grade_stock || 0),
+        b_grade_stock: Number(item.b_grade_stock || 0),
+        c_grade_stock: Number(item.c_grade_stock || 0),
+        d_grade_stock: Number(item.d_grade_stock || 0),
+        defective_stock: Number(item.defective_stock || 0),
+      }));
 
-        return {
-          product_id: product.id,
-          product_name: product.name,
-          color: product.color,
-          color_code: product.color_code,
-          total_stock: totalStock,
-          total_rolls: totalRolls,
-          ...gradeStocks
-        };
-      }).filter(item => item.total_rolls > 0);
-
-      return processedData as InventorySummaryItem[];
-    },
-    refetchInterval: 30000, // 每30秒自動刷新
-  });
-
-  const { data: rollDetails } = useQuery({
-    queryKey: ['inventory-roll-details'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_rolls')
-        .select(`
-          product_id,
-          quality,
-          quantity,
-          current_quantity,
-          roll_number,
-          products_new!inner(name, color, color_code)
-        `)
-        .gt('current_quantity', 0); // 只取當前數量大於0的卷
-      
-      if (error) throw error;
-      return data as RollDetail[];
-    },
-    refetchInterval: 30000,
-  });
-
-  const { data: pendingData } = useQuery({
-    queryKey: ['pending-data'],
-    queryFn: async () => {
-      const { data: pendingInventory, error: pendingInventoryError } = await supabase
-        .from('purchase_order_items')
-        .select(`
-          product_id,
-          ordered_quantity,
-          received_quantity,
-          products_new!inner(color)
-        `)
-        .in('status', ['pending', 'partial_received']);
-      
-      if (pendingInventoryError) throw pendingInventoryError;
-
-      const { data: pendingShipping, error: pendingShippingError } = await supabase
-        .from('order_products')
-        .select(`
-          product_id,
-          quantity,
-          shipped_quantity,
-          products_new!inner(color)
-        `)
-        .in('status', ['pending', 'partial_shipped']);
-      
-      if (pendingShippingError) throw pendingShippingError;
-
-      const pendingMap = new Map<string, PendingData>();
-
-      pendingInventory.forEach(item => {
-        const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
-        const pending = (item.ordered_quantity || 0) - (item.received_quantity || 0);
-        
-        if (!pendingMap.has(key)) {
-          pendingMap.set(key, {
-            product_id: item.product_id,
-            color: item.products_new?.color || null,
-            pending_inventory: 0,
-            pending_shipping: 0
-          });
-        }
-        
-        const existing = pendingMap.get(key)!;
-        existing.pending_inventory += pending > 0 ? pending : 0;
-      });
-
-      pendingShipping.forEach(item => {
-        const key = `${item.product_id}_${item.products_new?.color || 'null'}`;
-        const pending = (item.quantity || 0) - (item.shipped_quantity || 0);
-        
-        if (!pendingMap.has(key)) {
-          pendingMap.set(key, {
-            product_id: item.product_id,
-            color: item.products_new?.color || null,
-            pending_inventory: 0,
-            pending_shipping: 0
-          });
-        }
-        
-        const existing = pendingMap.get(key)!;
-        existing.pending_shipping += pending > 0 ? pending : 0;
-      });
-
-      return Array.from(pendingMap.values());
+      setInventoryData(summaryData);
+    } catch (error) {
+      console.error('Failed to load inventory summary:', error);
+      setInventoryData([]);
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
-  if (isLoading) {
+  useEffect(() => {
+    loadInventorySummary();
+  }, []);
+
+  const getTotalStock = () => {
+    return inventoryData.reduce((sum, item) => sum + item.total_stock, 0);
+  };
+
+  const getTotalRolls = () => {
+    return inventoryData.reduce((sum, item) => sum + item.total_rolls, 0);
+  };
+
+  const getLowStockCount = () => {
+    return alerts.length;
+  };
+
+  const getCriticalStockCount = () => {
+    return alerts.filter(alert => alert.alert_level === 'critical').length;
+  };
+
+  if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">庫存統計</CardTitle>
+          <CardTitle>庫存統計</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-4 text-gray-500">載入中...</div>
+          <div className="flex justify-center py-8">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  const getStockBadgeColor = (stock: number) => {
-    if (stock === 0) return 'bg-gray-100 text-gray-800';
-    if (stock < 100) return 'bg-red-100 text-red-800';
-    if (stock < 500) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-green-100 text-green-800';
-  };
-
-  const getRollDetailsForProduct = (productId: string, color: string | null) => {
-    if (!rollDetails) return [];
-    
-    return rollDetails.filter(roll => 
-      roll.product_id === productId && 
-      roll.products_new.color === color &&
-      roll.current_quantity > 0 // 確保只顯示有庫存的卷
-    );
-  };
-
-  const formatRollDetails = (rolls: RollDetail[]) => {
-    const qualityGroups = rolls.reduce((acc, roll) => {
-      const quality = roll.quality;
-      if (!acc[quality]) acc[quality] = [];
-      acc[quality].push({
-        rollNumber: roll.roll_number,
-        quantity: roll.current_quantity, // 使用當前數量而非原始數量
-      });
-      return acc;
-    }, {} as Record<string, Array<{rollNumber: string, quantity: number}>>);
-
-    return Object.entries(qualityGroups).map(([quality, rollsData]) => {
-      const totalWeight = rollsData.reduce((sum, r) => sum + r.quantity, 0);
-      const rollsText = rollsData.map(r => `${r.rollNumber}:${r.quantity.toFixed(2)}kg`).join(', ');
-      return `${quality}級: ${rollsData.length}卷\n${rollsText}\n總計=${totalWeight.toFixed(2)}kg`;
-    }).join('\n\n');
-  };
-
-  const formatGradeDetails = (rolls: RollDetail[], targetGrade: string) => {
-    const gradeRolls = rolls.filter(roll => roll.quality === targetGrade && roll.current_quantity > 0);
-    if (gradeRolls.length === 0) return '';
-    
-    const rollsText = gradeRolls.map(roll => `${roll.roll_number}:${roll.current_quantity.toFixed(2)}kg`).join(', ');
-    const total = gradeRolls.reduce((sum, roll) => sum + roll.current_quantity, 0);
-    return `${gradeRolls.length}卷\n${rollsText}\n總計=${total.toFixed(2)}kg`;
-  };
-
-  const getPendingDataForProduct = (productId: string, color: string | null) => {
-    if (!pendingData) return { pending_inventory: 0, pending_shipping: 0 };
-    
-    const found = pendingData.find(p => 
-      p.product_id === productId && p.color === color
-    );
-    
-    return found ? { 
-      pending_inventory: found.pending_inventory, 
-      pending_shipping: found.pending_shipping 
-    } : { pending_inventory: 0, pending_shipping: 0 };
-  };
-
   return (
-    <TooltipProvider>
+    <div className="space-y-6">
+      {/* 統計卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Package className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">總庫存重量</p>
+                <p className="text-2xl font-bold text-gray-900">{getTotalStock().toFixed(2)} KG</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">總布卷數</p>
+                <p className="text-2xl font-bold text-gray-900">{getTotalRolls()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <AlertTriangle className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">庫存不足</p>
+                <p className="text-2xl font-bold text-orange-600">{getLowStockCount()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <TrendingDown className="h-8 w-8 text-red-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">嚴重不足</p>
+                <p className="text-2xl font-bold text-red-600">{getCriticalStockCount()}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 庫存預警提示 */}
+      {alerts.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <CardTitle className="flex items-center text-orange-800">
+              <AlertTriangle className="mr-2" size={20} />
+              庫存預警
+            </CardTitle>
+            <CardDescription className="text-orange-700">
+              以下產品庫存已低於設定閾值，請及時補貨
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {alerts.map((alert) => (
+                <div key={alert.product_id} className="flex items-center justify-between p-3 bg-white rounded border">
+                  <div>
+                    <span className="font-medium text-gray-900">{alert.product_name}</span>
+                    {alert.color && <span className="text-gray-600 ml-2">({alert.color})</span>}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={alert.alert_level === 'critical' ? 'destructive' : 'secondary'}>
+                      {alert.alert_level === 'critical' ? '嚴重不足' : '庫存不足'}
+                    </Badge>
+                    <span className="text-sm text-gray-600">
+                      目前: {alert.current_stock} KG / 閾值: {alert.threshold_quantity} KG
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 詳細庫存表格 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">庫存統計</CardTitle>
+          <CardTitle>產品庫存明細</CardTitle>
+          <CardDescription>
+            按產品分類的詳細庫存信息，包含各等級庫存分布
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          {inventoryData.length === 0 ? (
+            <div className="text-center py-8">
+              <Package size={48} className="mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">暫無庫存數據</h3>
+              <p className="text-gray-600">請先進行入庫操作</p>
+            </div>
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-gray-900">產品名稱</TableHead>
-                  <TableHead className="text-gray-900">顏色</TableHead>
-                  <TableHead className="text-gray-900">色碼</TableHead>
-                  <TableHead className="text-gray-900">總庫存</TableHead>
-                  <TableHead className="text-gray-900">總卷數</TableHead>
-                  <TableHead className="text-gray-900">A級</TableHead>
-                  <TableHead className="text-gray-900">B級</TableHead>
-                  <TableHead className="text-gray-900">C級</TableHead>
-                  <TableHead className="text-gray-900">D級</TableHead>
-                  <TableHead className="text-gray-900">瑕疵品</TableHead>
-                  <TableHead className="text-gray-900">待入庫</TableHead>
-                  <TableHead className="text-gray-900">待出貨</TableHead>
+                  <TableHead>產品名稱</TableHead>
+                  <TableHead>顏色</TableHead>
+                  <TableHead className="text-right">總庫存</TableHead>
+                  <TableHead className="text-right">布卷數</TableHead>
+                  <TableHead className="text-right">A級</TableHead>
+                  <TableHead className="text-right">B級</TableHead>
+                  <TableHead className="text-right">C級</TableHead>
+                  <TableHead className="text-right">D級</TableHead>
+                  <TableHead className="text-right">瑕疵品</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventorySummary?.map((item) => {
-                  const rollDetailsForProduct = getRollDetailsForProduct(item.product_id, item.color);
-                  const pendingInfo = getPendingDataForProduct(item.product_id, item.color);
-                  
+                {inventoryData.map((item) => {
+                  const threshold = getThresholdByProductId(item.product_id);
                   return (
-                    <TableRow key={`${item.product_id}-${item.color || 'no-color'}`}>
-                      <TableCell className="font-medium text-gray-900">
-                        {item.product_name}
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        {item.color || '-'}
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        {item.color_code ? (
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-4 h-4 rounded border border-gray-400"
-                              style={{ backgroundColor: item.color_code }}
-                            ></div>
-                            <span className="text-sm text-gray-900">{item.color_code}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-500">-</span>
-                        )}
-                      </TableCell>
+                    <TableRow key={`${item.product_id}-${item.color || 'default'}`}>
+                      <TableCell className="font-medium">{item.product_name}</TableCell>
+                      <TableCell>{item.color || '無'}</TableCell>
                       <TableCell>
-                        <Badge className={getStockBadgeColor(item.total_stock)}>
-                          {item.total_stock.toFixed(2)} kg
-                        </Badge>
+                        <StockAlertBadge
+                          currentStock={item.total_stock}
+                          threshold={threshold?.threshold_quantity || null}
+                        />
                       </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.total_rolls} 卷
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatRollDetails(rollDetailsForProduct)}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.a_grade_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatGradeDetails(rollDetailsForProduct, 'A')}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.b_grade_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatGradeDetails(rollDetailsForProduct, 'B')}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.c_grade_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatGradeDetails(rollDetailsForProduct, 'C')}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.d_grade_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatGradeDetails(rollDetailsForProduct, 'D')}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-gray-700">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help hover:text-blue-600 underline decoration-dotted">
-                              {item.defective_stock.toFixed(2)} kg
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-md">
-                            <div className="whitespace-pre-line text-sm">
-                              {formatGradeDetails(rollDetailsForProduct, 'defective')}
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        {pendingInfo.pending_inventory > 0 && (
-                          <Badge className="bg-blue-50 text-blue-800 border-blue-200 text-xs px-1 py-0">
-                            {pendingInfo.pending_inventory.toFixed(2)}kg
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {pendingInfo.pending_shipping > 0 && (
-                          <Badge className="bg-orange-50 text-orange-800 border-orange-200 text-xs px-1 py-0">
-                            {pendingInfo.pending_shipping.toFixed(2)}kg
-                          </Badge>
-                        )}
-                      </TableCell>
+                      <TableCell className="text-right">{item.total_rolls}</TableCell>
+                      <TableCell className="text-right">{item.a_grade_stock.toFixed(2)} KG</TableCell>
+                      <TableCell className="text-right">{item.b_grade_stock.toFixed(2)} KG</TableCell>
+                      <TableCell className="text-right">{item.c_grade_stock.toFixed(2)} KG</TableCell>
+                      <TableCell className="text-right">{item.d_grade_stock.toFixed(2)} KG</TableCell>
+                      <TableCell className="text-right">{item.defective_stock.toFixed(2)} KG</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          </div>
-          
-          {(!inventorySummary || inventorySummary.length === 0) && (
-            <div className="text-center py-8 text-gray-500">
-              暫無庫存資料
-            </div>
           )}
         </CardContent>
       </Card>
-    </TooltipProvider>
+    </div>
   );
 };
