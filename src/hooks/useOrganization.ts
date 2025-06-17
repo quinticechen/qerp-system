@@ -68,7 +68,10 @@ export const useOrganization = () => {
         .eq('is_active', true)
         .order('joined_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching organizations:', error);
+        throw error;
+      }
 
       const userOrgs = data as UserOrganization[];
       setOrganizations(userOrgs);
@@ -105,10 +108,15 @@ export const useOrganization = () => {
   };
 
   const createOrganization = async (name: string, description?: string) => {
-    if (!user) return null;
+    if (!user) {
+      throw new Error('用戶未登入');
+    }
 
     try {
-      const { data, error } = await supabase
+      console.log('Creating organization with user:', user.id);
+      
+      // 首先創建組織
+      const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name,
@@ -118,14 +126,19 @@ export const useOrganization = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (orgError) {
+        console.error('Error creating organization:', orgError);
+        throw orgError;
+      }
 
-      // 重新獲取組織列表
+      console.log('Organization created successfully:', orgData);
+
+      // 重新獲取組織列表以確保狀態更新
       await fetchUserOrganizations();
       
-      return data;
+      return orgData;
     } catch (error) {
-      console.error('Error creating organization:', error);
+      console.error('Error in createOrganization:', error);
       throw error;
     }
   };

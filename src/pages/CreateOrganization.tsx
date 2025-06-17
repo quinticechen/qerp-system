@@ -10,6 +10,7 @@ import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 interface CreateOrganizationForm {
   name: string;
@@ -20,10 +21,29 @@ const CreateOrganization = () => {
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<CreateOrganizationForm>();
   const { toast } = useToast();
   const { createOrganization } = useOrganizationContext();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
+  // 如果用戶未登入，重定向到登入頁面
+  React.useEffect(() => {
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
   const onSubmit = async (data: CreateOrganizationForm) => {
+    if (!user) {
+      toast({
+        title: "認證錯誤",
+        description: "您需要先登入才能創建組織",
+        variant: "destructive",
+      });
+      navigate('/login');
+      return;
+    }
+
     try {
+      console.log('Submitting organization creation:', data);
       await createOrganization(data.name, data.description);
       toast({
         title: "組織創建成功",
@@ -33,15 +53,38 @@ const CreateOrganization = () => {
       setTimeout(() => {
         navigate('/');
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating organization:', error);
+      
+      let errorMessage = "請稍後再試或聯繫系統管理員";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.details) {
+        errorMessage = error.details;
+      } else if (error?.hint) {
+        errorMessage = error.hint;
+      }
+      
       toast({
         title: "創建組織失敗",
-        description: "請稍後再試或聯繫系統管理員",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">請先登入</h1>
+          <p className="text-gray-600 mb-6">您需要登入後才能創建組織</p>
+          <Button onClick={() => navigate('/login')}>前往登入</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
