@@ -1,166 +1,273 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Package, 
-  Users, 
-  ShoppingCart, 
-  Truck, 
-  TrendingUp, 
-  AlertTriangle,
-  Plus,
-  Eye,
-  Edit
-} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Plus, Package, Users, ShoppingCart, TrendingUp } from 'lucide-react';
+import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog';
+import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
 
 const Dashboard = () => {
-  // 模擬數據
-  const stats = [
-    { title: '總訂單', value: '156', change: '+12%', icon: ShoppingCart, color: 'text-blue-600' },
-    { title: '庫存產品', value: '2,341', change: '+5%', icon: Package, color: 'text-green-600' },
-    { title: '活躍客戶', value: '89', change: '+8%', icon: Users, color: 'text-purple-600' },
-    { title: '待出貨', value: '23', change: '-3%', icon: Truck, color: 'text-orange-600' }
-  ];
+  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
+  const [isShippingDialogOpen, setIsShippingDialogOpen] = useState(false);
 
-  const recentOrders = [
-    { id: 'ORD-20250115-0001', customer: '永豐紡織', status: 'pending', amount: '¥52,000' },
-    { id: 'ORD-20250115-0002', customer: '昌隆實業', status: 'confirmed', amount: '¥78,500' },
-    { id: 'ORD-20250115-0003', customer: '宏達布料', status: 'shipped', amount: '¥34,200' },
-    { id: 'ORD-20250115-0004', customer: '美生織品', status: 'completed', amount: '¥91,300' }
-  ];
+  // 獲取總體統計數據
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const [
+        { count: totalProducts },
+        { count: totalOrders },
+        { count: totalCustomers },
+        { data: inventoryData }
+      ] = await Promise.all([
+        supabase.from('products_new').select('*', { count: 'exact', head: true }),
+        supabase.from('orders').select('*', { count: 'exact', head: true }),
+        supabase.from('customers').select('*', { count: 'exact', head: true }),
+        supabase.from('inventory_summary').select('total_stock').limit(1000)
+      ]);
 
-  const lowStockItems = [
-    { name: '純棉帆布 - 米白', current: 45, threshold: 100, unit: 'KG' },
-    { name: '聚酯纖維 - 深藍', current: 23, threshold: 50, unit: 'KG' },
-    { name: '混紡布料 - 灰色', current: 12, threshold: 30, unit: 'KG' }
-  ];
+      const totalInventory = inventoryData?.reduce((sum, item) => sum + (item.total_stock || 0), 0) || 0;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed': return 'bg-blue-100 text-blue-800';
-      case 'shipped': return 'bg-green-100 text-green-800';
-      case 'completed': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-gray-100 text-gray-800';
+      return {
+        totalProducts: totalProducts || 0,
+        totalOrders: totalOrders || 0,
+        totalCustomers: totalCustomers || 0,
+        totalInventory
+      };
     }
+  });
+
+  // 獲取最近訂單
+  const { data: recentOrders } = useQuery({
+    queryKey: ['recent-orders'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          customers (name),
+          order_products (
+            quantity,
+            unit_price,
+            products_new (name)
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // 獲取庫存警報
+  const { data: lowStockItems } = useQuery({
+    queryKey: ['low-stock-items'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inventory_summary_enhanced')
+        .select('*')
+        .not('stock_thresholds', 'is', null)
+        .order('product_name')
+        .limit(10);
+
+      if (error) throw error;
+      
+      return data?.filter(item => 
+        item.stock_thresholds && 
+        item.total_stock !== null && 
+        Number(item.total_stock) < Number(item.stock_thresholds)
+      ) || [];
+    }
+  });
+
+  const getOrderStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': '待處理',
+      'confirmed': '已確認',
+      'in_production': '製作中',
+      'completed': '已完成',
+      'cancelled': '已取消',
+      'factory_ordered': '已向工廠下單'
+    };
+    return statusMap[status] || status;
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return '待處理';
-      case 'confirmed': return '已確認';
-      case 'shipped': return '已出貨';
-      case 'completed': return '已完成';
-      default: return status;
-    }
+  const getOrderStatusBadge = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'confirmed': 'bg-blue-100 text-blue-800 border-blue-200',
+      'in_production': 'bg-purple-100 text-purple-800 border-purple-200',
+      'completed': 'bg-green-100 text-green-800 border-green-200',
+      'cancelled': 'bg-red-100 text-red-800 border-red-200',
+      'factory_ordered': 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    };
+    return statusMap[status] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Plus size={16} className="mr-2" />
-            新增訂單
-          </Button>
+          <h1 className="text-3xl font-bold text-gray-900">系統總覽</h1>
+          <div className="flex gap-2">
+            <Button 
+              onClick={() => setIsPurchaseDialogOpen(true)}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              新增採購
+            </Button>
+            <Button 
+              onClick={() => setIsShippingDialogOpen(true)}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              新增出貨
+            </Button>
+          </div>
         </div>
 
         {/* 統計卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <Card key={index} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">{stat.title}</p>
-                    <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-                    <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                      {stat.change} 較上月
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
-                    <stat.icon size={24} />
-                  </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Package className="h-8 w-8 text-blue-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">總產品數</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.totalProducts || 0}</p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <ShoppingCart className="h-8 w-8 text-green-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">總訂單數</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.totalOrders || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Users className="h-8 w-8 text-purple-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">總客戶數</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.totalCustomers || 0}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <TrendingUp className="h-8 w-8 text-orange-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">總庫存 (KG)</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.totalInventory?.toFixed(2) || '0.00'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* 最近訂單和庫存警告 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 最近訂單 */}
           <Card>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">最近訂單</h3>
-                <Button variant="outline" size="sm">
-                  <Eye size={16} className="mr-2" />
-                  查看全部
-                </Button>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">最新的客戶訂單記錄</p>
+            <CardHeader>
+              <CardTitle>最近訂單</CardTitle>
+              <CardDescription>最新的10筆訂單記錄</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-slate-800">{order.id}</p>
-                      <p className="text-sm text-slate-600">{order.customer}</p>
+                {recentOrders?.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{order.order_number}</span>
+                        <Badge variant="outline" className={getOrderStatusBadge(order.status)}>
+                          {getOrderStatusText(order.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600">{order.customers?.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(order.created_at).toLocaleDateString('zh-TW')}
+                      </p>
                     </div>
                     <div className="text-right">
-                      <Badge className={getStatusColor(order.status)}>
-                        {getStatusText(order.status)}
-                      </Badge>
-                      <p className="text-sm font-medium text-slate-800 mt-1">{order.amount}</p>
+                      <p className="font-semibold">
+                        ${order.order_products?.reduce((total: number, item: any) => 
+                          total + (item.quantity * item.unit_price), 0
+                        )?.toFixed(2) || '0.00'}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {order.order_products?.length || 0} 項產品
+                      </p>
                     </div>
                   </div>
                 ))}
+                {(!recentOrders || recentOrders.length === 0) && (
+                  <p className="text-center text-gray-500 py-4">暫無訂單記錄</p>
+                )}
               </div>
-            </div>
+            </CardContent>
           </Card>
 
-          {/* 庫存警告 */}
+          {/* 庫存警報 */}
           <Card>
-            <div className="p-6">
-              <div className="flex items-center text-orange-600 mb-4">
-                <AlertTriangle size={20} className="mr-2" />
-                <h3 className="text-lg font-semibold">庫存警告</h3>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">以下產品庫存偏低，建議補貨</p>
+            <CardHeader>
+              <CardTitle>庫存警報</CardTitle>
+              <CardDescription>低於安全庫存的產品</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                {lowStockItems.map((item, index) => (
-                  <div key={index} className="p-3 border border-orange-200 bg-orange-50 rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <p className="font-medium text-slate-800">{item.name}</p>
-                      <Button variant="outline" size="sm">
-                        <Edit size={14} className="mr-1" />
-                        採購
-                      </Button>
+                {lowStockItems?.map((item) => (
+                  <div key={item.product_id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium">{item.product_name}</p>
+                      {item.color && (
+                        <p className="text-sm text-gray-600">{item.color}</p>
+                      )}
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">
-                        當前: {item.current} {item.unit}
-                      </span>
-                      <span className="text-slate-600">
-                        閾值: {item.threshold} {item.unit}
-                      </span>
-                    </div>
-                    <div className="mt-2 bg-white rounded-full h-2">
-                      <div 
-                        className="bg-orange-500 h-2 rounded-full"
-                        style={{ width: `${(item.current / item.threshold) * 100}%` }}
-                      ></div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-orange-600">
+                        {Number(item.total_stock).toFixed(2)} KG
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        警戒值: {Number(item.stock_thresholds).toFixed(2)} KG
+                      </p>
                     </div>
                   </div>
                 ))}
+                {(!lowStockItems || lowStockItems.length === 0) && (
+                  <p className="text-center text-gray-500 py-4">目前沒有庫存警報</p>
+                )}
               </div>
-            </div>
+            </CardContent>
           </Card>
         </div>
+
+        <CreatePurchaseDialog
+          open={isPurchaseDialogOpen}
+          onOpenChange={setIsPurchaseDialogOpen}
+        />
+
+        <CreateShippingDialog
+          open={isShippingDialogOpen}
+          onOpenChange={setIsShippingDialogOpen}
+        />
       </div>
     </Layout>
   );

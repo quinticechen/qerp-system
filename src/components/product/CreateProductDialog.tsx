@@ -83,7 +83,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
           unit_of_measure: 'KG', // 固定為KG
         };
 
-        const success = await onSubmit(productData);
+        const success = await onSubmit(product:
         if (!success) {
           setLoading(false);
           return;
@@ -178,7 +178,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
                         <Input
                           value={variant.color}
                           onChange={(e) => updateVariant(variant.id, 'color', e.target.value)}
-                          placeholder="輸入顏色名稱"
+                          placeholder="输入颜色名称"
                         />
                       </TableCell>
                       <TableCell>
