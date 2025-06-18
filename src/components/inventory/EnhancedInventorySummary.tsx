@@ -48,14 +48,29 @@ export const EnhancedInventorySummary = () => {
 
       console.log('Fetching inventory for organization:', organizationId);
 
-      // 直接查詢 inventory_summary_enhanced，但通過 products_new 進行組織過濾
+      // First, get all products for this organization to filter the inventory
+      const { data: orgProducts, error: productsError } = await supabase
+        .from('products_new')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+      if (productsError) {
+        console.error('Error fetching organization products:', productsError);
+        throw productsError;
+      }
+
+      if (!orgProducts || orgProducts.length === 0) {
+        console.log('No products found for organization');
+        return [];
+      }
+
+      const productIds = orgProducts.map(p => p.id);
+
+      // Then fetch inventory summary for these products
       const { data, error } = await supabase
         .from('inventory_summary_enhanced')
-        .select(`
-          *,
-          products_new!inner(organization_id)
-        `)
-        .eq('products_new.organization_id', organizationId);
+        .select('*')
+        .in('product_id', productIds);
       
       if (error) {
         console.error('Error fetching inventory:', error);
