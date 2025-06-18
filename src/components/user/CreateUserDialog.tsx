@@ -31,7 +31,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
   
   const selectedRoleId = watch('role_id');
 
-  // 獲取組織角色列表
+  // 獲取組織角色列表，排除組織擁有者角色
   const { data: roles = [] } = useQuery({
     queryKey: ['organization-roles', organizationId],
     queryFn: async () => {
@@ -42,6 +42,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         .select('id, name, display_name')
         .eq('organization_id', organizationId)
         .eq('is_active', true)
+        .neq('name', 'owner') // 排除組織擁有者角色
         .order('display_name');
 
       if (error) throw error;
@@ -57,21 +58,71 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     }
 
     try {
-      // 發送邀請郵件
-      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-        data.email,
-        {
+      console.log('Creating user with data:', data);
+      
+      // 使用 signUp 而不是 admin.inviteUserByEmail
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: Math.random().toString(36).slice(-8), // 臨時密碼
+        options: {
           data: {
             full_name: data.full_name,
             phone: data.phone,
             organization_id: organizationId,
             role_id: data.role_id
           },
-          redirectTo: `${window.location.origin}/auth`
+          emailRedirectTo: `${window.location.origin}/auth`
         }
-      );
+      });
 
-      if (inviteError) throw inviteError;
+      if (signUpError) {
+        console.error('SignUp error:', signUpError);
+        throw signUpError;
+      }
+
+      if (signUpData.user) {
+        // 創建 profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: signUpData.user.id,
+            email: data.email,
+            full_name: data.full_name,
+            phone: data.phone
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        // 將用戶加入組織
+        const { error: orgError } = await supabase
+          .from('user_organizations')
+          .insert({
+            user_id: signUpData.user.id,
+            organization_id: organizationId,
+            is_active: true
+          });
+
+        if (orgError) {
+          console.error('Organization membership error:', orgError);
+        }
+
+        // 分配角色
+        const { error: roleError } = await supabase
+          .from('user_organization_roles')
+          .insert({
+            user_id: signUpData.user.id,
+            organization_id: organizationId,
+            role_id: data.role_id,
+            granted_by: (await supabase.auth.getUser()).data.user?.id,
+            is_active: true
+          });
+
+        if (roleError) {
+          console.error('Role assignment error:', roleError);
+        }
+      }
 
       // 記錄操作日誌
       const currentUser = await supabase.auth.getUser();
@@ -80,8 +131,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           .from('user_operation_logs')
           .insert({
             operator_id: currentUser.data.user.id,
-            target_user_id: inviteData.user?.id,
-            operation_type: 'invite',
+            target_user_id: signUpData.user?.id,
+            operation_type: 'create',
             operation_details: {
               email: data.email,
               full_name: data.full_name,
@@ -91,12 +142,12 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       }
 
       queryClient.invalidateQueries({ queryKey: ['organization_users'] });
-      toast.success('邀請已發送，用戶將收到註冊郵件');
+      toast.success('使用者已創建，邀請郵件已發送');
       reset();
       onOpenChange(false);
-    } catch (error) {
-      console.error('Error inviting user:', error);
-      toast.error('邀請使用者失敗');
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast.error(`創建使用者失敗: ${error.message}`);
     }
   };
 
@@ -104,7 +155,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>邀請新使用者</DialogTitle>
+          <DialogTitle>新增使用者</DialogTitle>
           <DialogDescription>
             輸入使用者資訊，系統將發送邀請郵件讓用戶完成註冊
           </DialogDescription>
@@ -164,7 +215,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               取消
             </Button>
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              發送邀請
+              創建使用者
             </Button>
           </div>
         </form>

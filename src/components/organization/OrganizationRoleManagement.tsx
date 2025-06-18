@@ -103,9 +103,12 @@ export const OrganizationRoleManagement = () => {
     }
   };
 
-  const getPermissionCount = (permissions: Record<string, boolean>, roleName: string) => {
+  const getPermissionCount = (permissions: Record<string, boolean> | null | undefined, roleName: string) => {
     if (roleName === 'owner') {
       return '所有權限';
+    }
+    if (!permissions || typeof permissions !== 'object') {
+      return '0 項權限';
     }
     return `${Object.values(permissions).filter(Boolean).length} 項權限`;
   };

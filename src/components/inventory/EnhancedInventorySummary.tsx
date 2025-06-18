@@ -24,18 +24,29 @@ export const EnhancedInventorySummary = () => {
 
   const { data: inventorySummary = [], isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<InventoryItem[]> => {
       if (!organizationId) return [];
 
+      console.log('Fetching inventory for organization:', organizationId);
+
+      // Get inventory data joined with products to filter by organization
       const { data, error } = await supabase
         .from('inventory_summary_enhanced')
-        .select('*')
-        .eq('organization_id', organizationId);
+        .select(`
+          *,
+          products_new!inner(organization_id)
+        `)
+        .eq('products_new.organization_id', organizationId);
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching inventory:', error);
+        throw error;
+      }
+      
+      console.log('Raw inventory data:', data);
       
       // Transform data to match our interface
-      const transformedData: InventoryItem[] = (data || []).map((item) => ({
+      const transformedData: InventoryItem[] = (data || []).map((item: any) => ({
         product_id: item.product_id || '',
         product_name: item.product_name || '',
         color: item.color,
@@ -47,6 +58,7 @@ export const EnhancedInventorySummary = () => {
         stock_thresholds: item.stock_thresholds ? Number(item.stock_thresholds) : null,
       }));
 
+      console.log('Transformed inventory data:', transformedData);
       return transformedData;
     },
     enabled: hasOrganization
