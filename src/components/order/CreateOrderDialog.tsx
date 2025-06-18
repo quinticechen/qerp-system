@@ -199,9 +199,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     }
   };
 
-  const updateProduct = (index: number, field: keyof OrderProduct, value: any) => {
+  const updateProduct = (index: number, field: keyof OrderProduct, value: string | number) => {
     const newProducts = [...orderProducts];
-    newProducts[index][field] = value;
+    (newProducts[index] as any)[field] = value;
     
     // 更新小計
     if (field === 'quantity' || field === 'unit_price') {
