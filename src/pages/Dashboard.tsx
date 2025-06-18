@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,9 +17,19 @@ import {
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { CreateProductDialog } from '@/components/product/CreateProductDialog';
+import { CreateCustomerDialog } from '@/components/customer/CreateCustomerDialog';
+import { CreatePurchaseOrderDialog } from '@/components/purchase/CreatePurchaseOrderDialog';
+import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const { organization, organizationId, hasOrganization } = useCurrentOrganization();
+  const navigate = useNavigate();
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [createPurchaseOpen, setCreatePurchaseOpen] = useState(false);
+  const [createShippingOpen, setCreateShippingOpen] = useState(false);
 
   // 獲取組織統計資料
   const { data: stats } = useQuery({
@@ -31,7 +40,7 @@ const Dashboard = () => {
       // 獲取訂單統計
       const { data: orders } = await supabase
         .from('orders')
-        .select('id, status')
+        .select('id, status, shipping_status')
         .eq('organization_id', organizationId);
 
       // 獲取產品統計
@@ -46,12 +55,12 @@ const Dashboard = () => {
         .select('id')
         .eq('organization_id', organizationId);
 
-      // 獲取待出貨訂單
+      // 獲取待出貨訂單（修正邏輯）
       const { data: pendingShipments } = await supabase
         .from('orders')
         .select('id')
         .eq('organization_id', organizationId)
-        .eq('shipping_status', 'not_started');
+        .in('shipping_status', ['not_started', 'partial_shipped']);
 
       return {
         totalOrders: orders?.length || 0,
@@ -114,6 +123,26 @@ const Dashboard = () => {
     }
   };
 
+  const handleProductCreated = () => {
+    setCreateProductOpen(false);
+    navigate('/products');
+  };
+
+  const handleCustomerCreated = () => {
+    setCreateCustomerOpen(false);
+    navigate('/customers');
+  };
+
+  const handlePurchaseCreated = () => {
+    setCreatePurchaseOpen(false);
+    navigate('/purchases');
+  };
+
+  const handleShippingCreated = () => {
+    setCreateShippingOpen(false);
+    navigate('/shipping');
+  };
+
   if (!hasOrganization) {
     return (
       <Layout>
@@ -169,7 +198,7 @@ const Dashboard = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">最近訂單</h3>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => navigate('/orders')}>
                   <Eye size={16} className="mr-2" />
                   查看全部
                 </Button>
@@ -207,19 +236,35 @@ const Dashboard = () => {
               </div>
               <p className="text-sm text-slate-600 mb-4">常用功能快速入口</p>
               <div className="space-y-3">
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateProductOpen(true)}
+                >
                   <Package size={16} className="mr-2" />
                   新增產品
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateCustomerOpen(true)}
+                >
                   <Users size={16} className="mr-2" />
                   新增客戶
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreatePurchaseOpen(true)}
+                >
                   <ShoppingCart size={16} className="mr-2" />
                   建立採購單
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateShippingOpen(true)}
+                >
                   <Truck size={16} className="mr-2" />
                   安排出貨
                 </Button>
@@ -227,6 +272,28 @@ const Dashboard = () => {
             </div>
           </Card>
         </div>
+
+        {/* 對話框 */}
+        <CreateProductDialog
+          open={createProductOpen}
+          onOpenChange={setCreateProductOpen}
+          onProductCreated={handleProductCreated}
+        />
+        <CreateCustomerDialog
+          open={createCustomerOpen}
+          onOpenChange={setCreateCustomerOpen}
+          onCustomerCreated={handleCustomerCreated}
+        />
+        <CreatePurchaseOrderDialog
+          open={createPurchaseOpen}
+          onOpenChange={setCreatePurchaseOpen}
+          onPurchaseCreated={handlePurchaseCreated}
+        />
+        <CreateShippingDialog
+          open={createShippingOpen}
+          onOpenChange={setCreateShippingOpen}
+          onShippingCreated={handleShippingCreated}
+        />
       </div>
     </Layout>
   );

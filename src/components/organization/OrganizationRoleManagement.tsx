@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { CreateRoleDialog } from './CreateRoleDialog';
 import { EditRoleDialog } from './EditRoleDialog';
-import { UserPlus, Edit, Trash2, Shield } from 'lucide-react';
+import { TransferOwnershipDialog } from './TransferOwnershipDialog';
+import { UserPlus, Edit, Trash2, Shield, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -30,6 +31,7 @@ export const OrganizationRoleManagement = () => {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<OrganizationRole | null>(null);
 
   const { data: roles = [], refetch } = useQuery({
@@ -69,6 +71,10 @@ export const OrganizationRoleManagement = () => {
     setEditDialogOpen(true);
   };
 
+  const handleTransferOwnership = () => {
+    setTransferDialogOpen(true);
+  };
+
   const handleDeleteRole = async (roleId: string) => {
     if (!currentOrganization) return;
 
@@ -97,8 +103,11 @@ export const OrganizationRoleManagement = () => {
     }
   };
 
-  const getPermissionCount = (permissions: Record<string, boolean>) => {
-    return Object.values(permissions).filter(Boolean).length;
+  const getPermissionCount = (permissions: Record<string, boolean>, roleName: string) => {
+    if (roleName === 'owner') {
+      return '所有權限';
+    }
+    return `${Object.values(permissions).filter(Boolean).length} 項權限`;
   };
 
   const columns: TableColumn[] = [
@@ -130,9 +139,9 @@ export const OrganizationRoleManagement = () => {
     {
       key: 'permissions',
       title: '權限數量',
-      render: (value) => (
+      render: (value, row) => (
         <Badge variant="secondary">
-          {getPermissionCount(value)} 項權限
+          {getPermissionCount(value, row.name)}
         </Badge>
       ),
     },
@@ -148,24 +157,38 @@ export const OrganizationRoleManagement = () => {
       title: '操作',
       render: (_, row) => (
         <div className="flex items-center space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEditRole(row)}
-            disabled={!isOwner}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          {!row.is_system_role && (
+          {row.name === 'owner' ? (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleDeleteRole(row.id)}
-              disabled={!isOwner || row.user_count > 0}
-              className="text-red-600 hover:text-red-700"
+              onClick={handleTransferOwnership}
+              disabled={!isOwner}
+              className="text-blue-600 hover:text-blue-700"
             >
-              <Trash2 className="h-4 w-4" />
+              <ArrowRightLeft className="h-4 w-4" />
             </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleEditRole(row)}
+                disabled={!isOwner}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              {!row.is_system_role && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteRole(row.id)}
+                  disabled={!isOwner || row.user_count > 0}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </>
           )}
         </div>
       ),
@@ -200,7 +223,7 @@ export const OrganizationRoleManagement = () => {
         <CardHeader>
           <CardTitle>角色列表</CardTitle>
           <CardDescription>
-            管理組織內的角色權限設定。系統角色無法刪除，但可以編輯權限。
+            管理組織內的角色權限設定。組織擁有者角色只能轉移所有權，不能編輯或刪除。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -223,6 +246,12 @@ export const OrganizationRoleManagement = () => {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         role={selectedRole}
+        onSuccess={refetch}
+      />
+
+      <TransferOwnershipDialog
+        open={transferDialogOpen}
+        onOpenChange={setTransferDialogOpen}
         onSuccess={refetch}
       />
     </div>
