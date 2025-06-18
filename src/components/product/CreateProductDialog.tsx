@@ -83,7 +83,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
           unit_of_measure: 'KG', // 固定為KG
         };
 
-        const success = await onSubmit(product:
+        const success = await onSubmit(productData);
         if (!success) {
           setLoading(false);
           return;
