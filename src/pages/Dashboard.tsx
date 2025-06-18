@@ -19,7 +19,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CreateProductDialog } from '@/components/product/CreateProductDialog';
 import { CreateCustomerDialog } from '@/components/customer/CreateCustomerDialog';
-import { CreatePurchaseOrderDialog } from '@/components/purchase/CreatePurchaseOrderDialog';
+import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog';
 import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
 import { useNavigate } from 'react-router-dom';
 
@@ -125,17 +125,17 @@ const Dashboard = () => {
 
   const handleProductCreated = () => {
     setCreateProductOpen(false);
-    navigate('/products');
+    navigate('/product');
   };
 
   const handleCustomerCreated = () => {
     setCreateCustomerOpen(false);
-    navigate('/customers');
+    navigate('/customer');
   };
 
   const handlePurchaseCreated = () => {
     setCreatePurchaseOpen(false);
-    navigate('/purchases');
+    navigate('/purchase');
   };
 
   const handleShippingCreated = () => {
@@ -198,7 +198,7 @@ const Dashboard = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">最近訂單</h3>
-                <Button variant="outline" size="sm" onClick={() => navigate('/orders')}>
+                <Button variant="outline" size="sm" onClick={() => navigate('/order')}>
                   <Eye size={16} className="mr-2" />
                   查看全部
                 </Button>
@@ -284,7 +284,7 @@ const Dashboard = () => {
           onOpenChange={setCreateCustomerOpen}
           onCustomerCreated={handleCustomerCreated}
         />
-        <CreatePurchaseOrderDialog
+        <CreatePurchaseDialog
           open={createPurchaseOpen}
           onOpenChange={setCreatePurchaseOpen}
           onPurchaseCreated={handlePurchaseCreated}

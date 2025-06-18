@@ -22,9 +22,9 @@ interface InventoryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary = [], isLoading } = useQuery({
+  const { data: inventorySummary = [], isLoading } = useQuery<InventoryItem[]>({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async (): Promise<InventoryItem[]> => {
+    queryFn: async () => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
@@ -34,7 +34,7 @@ export const EnhancedInventorySummary = () => {
       
       if (error) throw error;
       
-      return (data || []).map((item: any) => ({
+      return (data || []).map((item: any): InventoryItem => ({
         product_id: item.product_id || '',
         product_name: item.product_name || '',
         color: item.color,
