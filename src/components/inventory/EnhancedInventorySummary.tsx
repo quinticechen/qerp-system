@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +42,7 @@ export const EnhancedInventorySummary = () => {
 
   const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<InventorySummaryData[]> => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
@@ -52,7 +51,7 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return (data || []) as InventorySummaryData[];
+      return data || [];
     },
     enabled: hasOrganization
   });
