@@ -207,9 +207,6 @@ export const OrganizationRoleManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">組織角色管理</h2>
-          <p className="text-slate-600 mt-2">
-            管理 {currentOrganization.name} 的角色和權限設定
-          </p>
         </div>
         {isOwner && (
           <Button
@@ -226,7 +223,7 @@ export const OrganizationRoleManagement = () => {
         <CardHeader>
           <CardTitle>角色列表</CardTitle>
           <CardDescription>
-            管理組織內的角色權限設定。組織擁有者角色只能轉移所有權，不能編輯或刪除。
+            管理 {currentOrganization.name} 的角色和權限設定
           </CardDescription>
         </CardHeader>
         <CardContent>
