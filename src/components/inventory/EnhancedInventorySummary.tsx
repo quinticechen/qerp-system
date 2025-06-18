@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,10 +42,10 @@ interface InventoryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  // 完全避免類型推斷問題，直接使用 any 類型
-  const { data: rawData, isLoading }: { data: any[] | undefined; isLoading: boolean } = useQuery<any[], Error>({
+  // 簡化查詢，避免複雜的類型推斷
+  const { data: rawData, isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async (): Promise<any[]> => {
+    queryFn: async () => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
