@@ -10,24 +10,73 @@ import { ViewUserDialog } from './ViewUserDialog';
 import { EditUserDialog } from './EditUserDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { toast } from 'sonner';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export const UserList = () => {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['users_with_roles'],
+    queryKey: ['organization_users', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('users_with_roles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      if (!organizationId) {
+        console.log('No organization ID available');
+        return [];
+      }
 
-      if (error) throw error;
-      return data;
-    }
+      console.log('Fetching users for organization:', organizationId);
+      const { data, error } = await supabase
+        .from('user_organizations')
+        .select(`
+          user_id,
+          is_active,
+          joined_at,
+          profiles (
+            id,
+            email,
+            full_name,
+            phone,
+            is_active,
+            created_at
+          ),
+          user_organization_roles (
+            role_id,
+            organization_roles (
+              name,
+              display_name
+            )
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching organization users:', error);
+        throw error;
+      }
+
+      // 轉換資料格式
+      const processedData = data.map(item => ({
+        id: item.profiles?.id,
+        email: item.profiles?.email,
+        full_name: item.profiles?.full_name,
+        phone: item.profiles?.phone,
+        is_active: item.profiles?.is_active,
+        created_at: item.profiles?.created_at,
+        joined_at: item.joined_at,
+        roles: item.user_organization_roles?.map(role => ({
+          role: role.organization_roles?.name,
+          display_name: role.organization_roles?.display_name
+        })) || []
+      }));
+
+      console.log('Fetched organization users:', processedData);
+      return processedData;
+    },
+    enabled: hasOrganization
   });
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
@@ -50,7 +99,7 @@ export const UserList = () => {
           operation_details: { previous_status: currentStatus, new_status: !currentStatus }
         });
 
-      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
+      queryClient.invalidateQueries({ queryKey: ['organization_users'] });
       toast.success(currentStatus ? '使用者已停用' : '使用者已啟用');
     } catch (error) {
       console.error('Error toggling user status:', error);
@@ -116,21 +165,14 @@ export const UserList = () => {
       key: 'roles',
       title: '角色',
       sortable: false,
-      filterable: true,
-      filterOptions: [
-        { value: 'admin', label: '管理員' },
-        { value: 'sales', label: '業務' },
-        { value: 'assistant', label: '助理' },
-        { value: 'accounting', label: '會計' },
-        { value: 'warehouse', label: '倉管' }
-      ],
+      filterable: false,
       render: (value, row) => {
         const roles = Array.isArray(row.roles) ? row.roles : [];
         return (
           <div className="flex flex-wrap gap-1">
             {roles.length > 0 ? roles.map((roleInfo: any, index: number) => (
-              <Badge key={index} variant="outline" className={`text-xs ${getRoleBadge(roleInfo.role)}`}>
-                {getRoleText(roleInfo.role)}
+              <Badge key={index} variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                {roleInfo.display_name || roleInfo.role}
               </Badge>
             )) : (
               <span className="text-gray-500">無角色</span>
@@ -155,8 +197,8 @@ export const UserList = () => {
       )
     },
     {
-      key: 'created_at',
-      title: '建立時間',
+      key: 'joined_at',
+      title: '加入時間',
       sortable: true,
       filterable: false,
       render: (value) => (
@@ -204,6 +246,16 @@ export const UserList = () => {
     }
   ];
 
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) {
     return <div className="text-center py-8 text-gray-500">載入中...</div>;
   }
@@ -212,7 +264,7 @@ export const UserList = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">使用者列表</CardTitle>
+          <CardTitle className="text-gray-900">組織成員列表</CardTitle>
         </CardHeader>
         <CardContent>
           <EnhancedTable
