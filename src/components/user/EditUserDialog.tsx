@@ -1,14 +1,15 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface EditUserDialogProps {
   open: boolean;
@@ -19,41 +20,45 @@ interface EditUserDialogProps {
 interface EditUserForm {
   full_name: string;
   phone: string;
-  roles: string[];
+  role_id: string;
 }
 
-const roleOptions = [
-  { value: 'admin', label: '管理員' },
-  { value: 'sales', label: '業務' },
-  { value: 'assistant', label: '助理' },
-  { value: 'accounting', label: '會計' },
-  { value: 'warehouse', label: '倉管' }
-];
-
 export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps) => {
-  const { register, handleSubmit, reset, watch, setValue } = useForm<EditUserForm>();
+  const { register, handleSubmit, reset, setValue, watch } = useForm<EditUserForm>();
   const queryClient = useQueryClient();
-  const selectedRoles = watch('roles') || [];
+  const { organizationId, hasOrganization } = useCurrentOrganization();
+  const selectedRoleId = watch('role_id');
+
+  // 獲取組織角色列表
+  const { data: roles = [] } = useQuery({
+    queryKey: ['organization-roles', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+
+      const { data, error } = await supabase
+        .from('organization_roles')
+        .select('id, name, display_name')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('display_name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: hasOrganization,
+  });
 
   useEffect(() => {
-    if (user) {
-      const userRoles = Array.isArray(user.roles) ? user.roles.map((r: any) => r.role) : [];
+    if (user && roles.length > 0) {
+      // 從用戶的角色中找到第一個匹配的角色
+      const userRoleId = user.roles?.[0]?.role_id;
       reset({
         full_name: user.full_name || '',
         phone: user.phone || '',
-        roles: userRoles
+        role_id: userRoleId || ''
       });
     }
-  }, [user, reset]);
-
-  const handleRoleChange = (roleValue: string, checked: boolean) => {
-    const currentRoles = selectedRoles;
-    if (checked) {
-      setValue('roles', [...currentRoles, roleValue]);
-    } else {
-      setValue('roles', currentRoles.filter(role => role !== roleValue));
-    }
-  };
+  }, [user, roles, reset]);
 
   const onSubmit = async (data: EditUserForm) => {
     try {
@@ -66,43 +71,32 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
         })
         .eq('id', user.id);
 
-      if (profileError) throw profileError;
+      if (error) throw profileError;
 
-      // 獲取當前角色
-      const currentRoles = Array.isArray(user.roles) ? user.roles.map((r: any) => r.role) : [];
-      const newRoles = data.roles || [];
+      // 更新角色 - 先刪除現有角色，再添加新角色
+      const { error: deleteRoleError } = await supabase
+        .from('user_organization_roles')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('organization_id', organizationId);
 
-      // 刪除不再需要的角色
-      const rolesToRemove = currentRoles.filter(role => !newRoles.includes(role));
-      if (rolesToRemove.length > 0) {
-        const { error: removeError } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', user.id)
-          .in('role', rolesToRemove);
-
-        if (removeError) throw removeError;
-      }
+      if (deleteRoleError) throw deleteRoleError;
 
       // 添加新角色
-      const rolesToAdd = newRoles.filter(role => !currentRoles.includes(role));
-      if (rolesToAdd.length > 0) {
-        const currentUser = await supabase.auth.getUser();
-        const roleInserts = rolesToAdd.map(role => ({
+      const currentUser = await supabase.auth.getUser();
+      const { error: addRoleError } = await supabase
+        .from('user_organization_roles')
+        .insert({
           user_id: user.id,
-          role: role as any,
-          granted_by: currentUser.data.user?.id
-        }));
+          organization_id: organizationId,
+          role_id: data.role_id,
+          granted_by: currentUser.data.user?.id,
+          is_active: true
+        });
 
-        const { error: addError } = await supabase
-          .from('user_roles')
-          .insert(roleInserts);
-
-        if (addError) throw addError;
-      }
+      if (addRoleError) throw addRoleError;
 
       // 記錄操作日誌
-      const currentUser = await supabase.auth.getUser();
       await supabase
         .from('user_operation_logs')
         .insert({
@@ -112,12 +106,11 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
           operation_details: {
             full_name: data.full_name,
             phone: data.phone,
-            roles_added: rolesToAdd,
-            roles_removed: rolesToRemove
+            role_id: data.role_id
           }
         });
 
-      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
+      queryClient.invalidateQueries({ queryKey: ['organization_users'] });
       toast.success('使用者資料更新成功');
       onOpenChange(false);
     } catch (error) {
@@ -158,21 +151,19 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
           </div>
 
           <div className="space-y-2">
-            <Label>角色</Label>
-            <div className="space-y-2">
-              {roleOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={option.value}
-                    checked={selectedRoles.includes(option.value)}
-                    onCheckedChange={(checked) => handleRoleChange(option.value, checked as boolean)}
-                  />
-                  <Label htmlFor={option.value} className="text-sm">
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
+            <Label htmlFor="role_id">角色 *</Label>
+            <Select onValueChange={(value) => setValue('role_id', value)} value={selectedRoleId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇角色" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex justify-end space-x-2">

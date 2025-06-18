@@ -8,11 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface CreateProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onProductCreated: () => void;
+}
+
+interface ProductVariant {
+  color: string;
+  color_code: string;
+  stock_thresholds: string;
 }
 
 export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
@@ -24,13 +31,27 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
   const { organizationId } = useCurrentOrganization();
   const [formData, setFormData] = useState({
     name: '',
-    color: '',
-    color_code: '',
-    category: '布料',
-    unit_of_measure: 'KG',
-    stock_thresholds: '',
-    status: 'Available' as 'Available' | 'Unavailable'
+    category: '布料'
   });
+  const [variants, setVariants] = useState<ProductVariant[]>([
+    { color: '', color_code: '#000000', stock_thresholds: '' }
+  ]);
+
+  const addVariant = () => {
+    setVariants([...variants, { color: '', color_code: '#000000', stock_thresholds: '' }]);
+  };
+
+  const removeVariant = (index: number) => {
+    if (variants.length > 1) {
+      setVariants(variants.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateVariant = (index: number, field: keyof ProductVariant, value: string) => {
+    const newVariants = [...variants];
+    newVariants[index][field] = value;
+    setVariants(newVariants);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,32 +68,38 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
         return;
       }
 
-      const productData = {
-        ...formData,
-        organization_id: organizationId,
-        user_id: user.id,
-        stock_thresholds: formData.stock_thresholds ? parseFloat(formData.stock_thresholds) : null
-      };
+      // 創建每個產品變體
+      const productPromises = variants.map(variant => {
+        const productData = {
+          name: formData.name,
+          category: formData.category,
+          color: variant.color || null,
+          color_code: variant.color_code || null,
+          stock_thresholds: variant.stock_thresholds ? parseFloat(variant.stock_thresholds) : null,
+          status: 'Available' as const,
+          unit_of_measure: 'KG',
+          organization_id: organizationId,
+          user_id: user.id
+        };
 
-      const { error } = await supabase
-        .from('products_new')
-        .insert(productData);
+        return supabase.from('products_new').insert(productData);
+      });
 
-      if (error) {
-        console.error('Error creating product:', error);
-        throw error;
+      const results = await Promise.all(productPromises);
+      
+      // 檢查是否有任何錯誤
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        console.error('Error creating products:', errors);
+        throw new Error('創建產品時發生錯誤');
       }
 
-      toast.success('產品創建成功');
-      setFormData({
-        name: '',
-        color: '',
-        color_code: '',
-        category: '布料',
-        unit_of_measure: 'KG',
-        stock_thresholds: '',
-        status: 'Available'
-      });
+      toast.success(`成功創建 ${variants.length} 個產品`);
+      
+      // 重置表單
+      setFormData({ name: '', category: '布料' });
+      setVariants([{ color: '', color_code: '#000000', stock_thresholds: '' }]);
+      
       onProductCreated();
       onOpenChange(false);
     } catch (error: any) {
@@ -85,92 +112,107 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>新增產品</DialogTitle>
+          <p className="text-sm text-gray-600">可以一次新增多個產品變體（不同顏色、色碼、庫存閾值）</p>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">產品名稱</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">產品名稱 *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+                placeholder="輸入產品名稱"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">類別</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="布料">布料</SelectItem>
+                  <SelectItem value="胚布">胚布</SelectItem>
+                  <SelectItem value="紗線">紗線</SelectItem>
+                  <SelectItem value="輔料">輔料</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="color">顏色</Label>
-            <Input
-              id="color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-            />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-medium">產品變體</Label>
+              <Button type="button" onClick={addVariant} variant="outline" size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                新增變體
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {variants.map((variant, index) => (
+                <div key={index} className="p-4 border rounded-lg space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">變體 {index + 1}</h4>
+                    {variants.length > 1 && (
+                      <Button
+                        type="button"
+                        onClick={() => removeVariant(index)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>顏色</Label>
+                      <Input
+                        value={variant.color}
+                        onChange={(e) => updateVariant(index, 'color', e.target.value)}
+                        placeholder="輸入顏色名稱"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>色碼</Label>
+                      <Input
+                        type="color"
+                        value={variant.color_code}
+                        onChange={(e) => updateVariant(index, 'color_code', e.target.value)}
+                        placeholder="如: #FF0000"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>庫存閾值 (KG)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={variant.stock_thresholds}
+                        onChange={(e) => updateVariant(index, 'stock_thresholds', e.target.value)}
+                        placeholder="如: 100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="color_code">顏色代碼</Label>
-            <Input
-              id="color_code"
-              type="color"
-              value={formData.color_code}
-              onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category">類別</Label>
-            <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="布料">布料</SelectItem>
-                <SelectItem value="胚布">胚布</SelectItem>
-                <SelectItem value="紗線">紗線</SelectItem>
-                <SelectItem value="輔料">輔料</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="unit_of_measure">計量單位</Label>
-            <Select value={formData.unit_of_measure} onValueChange={(value) => setFormData({ ...formData, unit_of_measure: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="KG">公斤 (KG)</SelectItem>
-                <SelectItem value="M">公尺 (M)</SelectItem>
-                <SelectItem value="PCS">件 (PCS)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stock_thresholds">庫存警戒值</Label>
-            <Input
-              id="stock_thresholds"
-              type="number"
-              step="0.01"
-              value={formData.stock_thresholds}
-              onChange={(e) => setFormData({ ...formData, stock_thresholds: e.target.value })}
-              placeholder="輸入庫存警戒值"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">狀態</Label>
-            <Select value={formData.status} onValueChange={(value: 'Available' | 'Unavailable') => setFormData({ ...formData, status: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Available">可用</SelectItem>
-                <SelectItem value="Unavailable">不可用</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>• 產品狀態固定為「可用」</p>
+            <p>• 計量單位固定為「KG」</p>
+            <p>• 每個變體將創建為獨立的產品記錄</p>
           </div>
 
           <div className="flex gap-2 pt-4">
@@ -178,7 +220,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
               取消
             </Button>
             <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? '創建中...' : '創建產品'}
+              {loading ? '創建中...' : `新增 ${variants.length} 個產品`}
             </Button>
           </div>
         </form>
