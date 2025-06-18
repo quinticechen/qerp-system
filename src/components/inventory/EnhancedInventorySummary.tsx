@@ -10,7 +10,7 @@ import { StockBadge } from './StockBadge';
 import { StockAlertBadge } from './StockAlertBadge';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-// 簡化的接口定義，避免複雜的類型推斷
+// 簡化的接口定義
 interface InventoryItem {
   product_id: string;
   product_name: string;
@@ -42,8 +42,8 @@ interface InventoryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  // 簡化 useQuery 的使用，避免複雜的泛型推斷
-  const inventoryQuery = useQuery({
+  // 完全避免複雜的泛型推斷，使用 any 並立即轉換
+  const { data, isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
@@ -54,13 +54,39 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
     enabled: hasOrganization
   });
 
-  const inventorySummary = inventoryQuery.data as InventoryItem[] | undefined;
-  const isLoading = inventoryQuery.isLoading;
+  // 手動轉換數據類型
+  const inventorySummary: InventoryItem[] = data ? data.map((item: any) => ({
+    product_id: item.product_id || '',
+    product_name: item.product_name || '',
+    color: item.color,
+    color_code: item.color_code,
+    total_stock: Number(item.total_stock || 0),
+    total_rolls: Number(item.total_rolls || 0),
+    pending_in_quantity: item.pending_in_quantity ? Number(item.pending_in_quantity) : null,
+    pending_out_quantity: item.pending_out_quantity ? Number(item.pending_out_quantity) : null,
+    stock_thresholds: item.stock_thresholds ? Number(item.stock_thresholds) : null,
+    a_grade_stock: Number(item.a_grade_stock || 0),
+    b_grade_stock: Number(item.b_grade_stock || 0),
+    c_grade_stock: Number(item.c_grade_stock || 0),
+    d_grade_stock: Number(item.d_grade_stock || 0),
+    defective_stock: Number(item.defective_stock || 0),
+    a_grade_rolls: Number(item.a_grade_rolls || 0),
+    b_grade_rolls: Number(item.b_grade_rolls || 0),
+    c_grade_rolls: Number(item.c_grade_rolls || 0),
+    d_grade_rolls: Number(item.d_grade_rolls || 0),
+    defective_rolls: Number(item.defective_rolls || 0),
+    a_grade_details: item.a_grade_details,
+    b_grade_details: item.b_grade_details,
+    c_grade_details: item.c_grade_details,
+    d_grade_details: item.d_grade_details,
+    defective_details: item.defective_details,
+    product_status: item.product_status
+  })) : [];
 
   const columns: TableColumn[] = [
     {
@@ -162,12 +188,12 @@ export const EnhancedInventorySummary = () => {
     );
   }
 
-  const totalProducts = inventorySummary?.length || 0;
-  const totalStock = inventorySummary?.reduce((sum, item) => sum + (item.total_stock || 0), 0) || 0;
-  const totalRolls = inventorySummary?.reduce((sum, item) => sum + (item.total_rolls || 0), 0) || 0;
-  const lowStockItems = inventorySummary?.filter(item => 
+  const totalProducts = inventorySummary.length;
+  const totalStock = inventorySummary.reduce((sum, item) => sum + item.total_stock, 0);
+  const totalRolls = inventorySummary.reduce((sum, item) => sum + item.total_rolls, 0);
+  const lowStockItems = inventorySummary.filter(item => 
     item.stock_thresholds && item.total_stock < item.stock_thresholds
-  ).length || 0;
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -230,7 +256,7 @@ export const EnhancedInventorySummary = () => {
         <CardContent>
           <EnhancedTable
             columns={columns}
-            data={inventorySummary || []}
+            data={inventorySummary}
             loading={isLoading}
             searchPlaceholder="搜尋產品名稱、顏色..."
             emptyMessage="目前沒有庫存資料"
