@@ -1,272 +1,296 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { 
+  Package, 
+  Users, 
+  ShoppingCart, 
+  Truck, 
+  TrendingUp, 
+  AlertTriangle,
+  Plus,
+  Eye,
+  Edit
+} from 'lucide-react';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Package, Users, ShoppingCart, TrendingUp } from 'lucide-react';
+import { CreateProductDialog } from '@/components/product/CreateProductDialog';
+import { CreateCustomerDialog } from '@/components/customer/CreateCustomerDialog';
 import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog';
 import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-  const [isPurchaseDialogOpen, setIsPurchaseDialogOpen] = useState(false);
-  const [isShippingDialogOpen, setIsShippingDialogOpen] = useState(false);
+  const { organization, organizationId, hasOrganization } = useCurrentOrganization();
+  const navigate = useNavigate();
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
+  const [createPurchaseOpen, setCreatePurchaseOpen] = useState(false);
+  const [createShippingOpen, setCreateShippingOpen] = useState(false);
 
-  // 獲取總體統計數據
+  // 獲取組織統計資料
   const { data: stats } = useQuery({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', organizationId],
     queryFn: async () => {
-      const [
-        { count: totalProducts },
-        { count: totalOrders },
-        { count: totalCustomers },
-        { data: inventoryData }
-      ] = await Promise.all([
-        supabase.from('products_new').select('*', { count: 'exact', head: true }),
-        supabase.from('orders').select('*', { count: 'exact', head: true }),
-        supabase.from('customers').select('*', { count: 'exact', head: true }),
-        supabase.from('inventory_summary').select('total_stock').limit(1000)
-      ]);
+      if (!organizationId) return null;
 
-      const totalInventory = inventoryData?.reduce((sum, item) => sum + (item.total_stock || 0), 0) || 0;
+      // 獲取訂單統計
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('id, status, shipping_status')
+        .eq('organization_id', organizationId);
+
+      // 獲取產品統計
+      const { data: products } = await supabase
+        .from('products_new')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+      // 獲取客戶統計
+      const { data: customers } = await supabase
+        .from('customers')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+      // 獲取待出貨訂單（修正邏輯）
+      const { data: pendingShipments } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .in('shipping_status', ['not_started', 'partial_shipped']);
 
       return {
-        totalProducts: totalProducts || 0,
-        totalOrders: totalOrders || 0,
-        totalCustomers: totalCustomers || 0,
-        totalInventory
+        totalOrders: orders?.length || 0,
+        totalProducts: products?.length || 0,
+        totalCustomers: customers?.length || 0,
+        pendingShipments: pendingShipments?.length || 0
       };
-    }
+    },
+    enabled: hasOrganization
   });
 
   // 獲取最近訂單
   const { data: recentOrders } = useQuery({
-    queryKey: ['recent-orders'],
+    queryKey: ['recent-orders', organizationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!organizationId) return [];
+
+      const { data } = await supabase
         .from('orders')
         .select(`
-          *,
-          customers (name),
-          order_products (
-            quantity,
-            unit_price,
-            products_new (name)
-          )
+          id,
+          order_number,
+          status,
+          created_at,
+          customers (name)
         `)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(4);
 
-      if (error) throw error;
-      return data;
-    }
+      return data || [];
+    },
+    enabled: hasOrganization
   });
 
-  // 獲取庫存警報
-  const { data: lowStockItems } = useQuery({
-    queryKey: ['low-stock-items'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('inventory_summary_enhanced')
-        .select('*')
-        .not('stock_thresholds', 'is', null)
-        .order('product_name')
-        .limit(10);
+  const statsData = [
+    { title: '總訂單', value: stats?.totalOrders || 0, change: '+12%', icon: ShoppingCart, color: 'text-blue-600' },
+    { title: '庫存產品', value: stats?.totalProducts || 0, change: '+5%', icon: Package, color: 'text-green-600' },
+    { title: '活躍客戶', value: stats?.totalCustomers || 0, change: '+8%', icon: Users, color: 'text-purple-600' },
+    { title: '待出貨', value: stats?.pendingShipments || 0, change: '-3%', icon: Truck, color: 'text-orange-600' }
+  ];
 
-      if (error) throw error;
-      
-      return data?.filter(item => 
-        item.stock_thresholds && 
-        item.total_stock !== null && 
-        Number(item.total_stock) < Number(item.stock_thresholds)
-      ) || [];
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed': return 'bg-blue-100 text-blue-800';
+      case 'shipped': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-emerald-100 text-emerald-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
-  });
-
-  const getOrderStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      'pending': '待處理',
-      'confirmed': '已確認',
-      'in_production': '製作中',
-      'completed': '已完成',
-      'cancelled': '已取消',
-      'factory_ordered': '已向工廠下單'
-    };
-    return statusMap[status] || status;
   };
 
-  const getOrderStatusBadge = (status: string) => {
-    const statusMap: Record<string, string> = {
-      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'confirmed': 'bg-blue-100 text-blue-800 border-blue-200',
-      'in_production': 'bg-purple-100 text-purple-800 border-purple-200',
-      'completed': 'bg-green-100 text-green-800 border-green-200',
-      'cancelled': 'bg-red-100 text-red-800 border-red-200',
-      'factory_ordered': 'bg-indigo-100 text-indigo-800 border-indigo-200'
-    };
-    return statusMap[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return '待處理';
+      case 'confirmed': return '已確認';
+      case 'shipped': return '已出貨';
+      case 'completed': return '已完成';
+      default: return status;
+    }
   };
+
+  const handleProductCreated = () => {
+    setCreateProductOpen(false);
+    navigate('/product');
+  };
+
+  const handleCustomerCreated = () => {
+    setCreateCustomerOpen(false);
+    navigate('/customer');
+  };
+
+  const handlePurchaseCreated = () => {
+    setCreatePurchaseOpen(false);
+    navigate('/purchase');
+  };
+
+  const handleShippingCreated = () => {
+    setCreateShippingOpen(false);
+    navigate('/shipping');
+  };
+
+  if (!hasOrganization) {
+    return (
+      <Layout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center text-gray-700">請先選擇組織</div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">系統總覽</h1>
-          <div className="flex gap-2">
-            <Button 
-              onClick={() => setIsPurchaseDialogOpen(true)}
-              className="bg-green-600 text-white hover:bg-green-700"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新增採購
-            </Button>
-            <Button 
-              onClick={() => setIsShippingDialogOpen(true)}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              新增出貨
-            </Button>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
+            <p className="text-slate-600 mt-1">{organization?.name} 的營運儀表板</p>
           </div>
         </div>
 
         {/* 統計卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Package className="h-8 w-8 text-blue-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">總產品數</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalProducts || 0}</p>
+          {statsData.map((stat, index) => (
+            <Card key={index} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-600 mb-1">{stat.title}</p>
+                    <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+                    <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                      {stat.change} 較上月
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
+                    <stat.icon size={24} />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <ShoppingCart className="h-8 w-8 text-green-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">總訂單數</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalOrders || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="h-8 w-8 text-purple-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">總客戶數</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalCustomers || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-orange-600" />
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">總庫存 (KG)</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats?.totalInventory?.toFixed(2) || '0.00'}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
+        {/* 最近訂單 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 最近訂單 */}
           <Card>
-            <CardHeader>
-              <CardTitle>最近訂單</CardTitle>
-              <CardDescription>最新的10筆訂單記錄</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">最近訂單</h3>
+                <Button variant="outline" size="sm" onClick={() => navigate('/order')}>
+                  <Eye size={16} className="mr-2" />
+                  查看全部
+                </Button>
+              </div>
+              <p className="text-sm text-slate-600 mb-4">最新的客戶訂單記錄</p>
               <div className="space-y-4">
                 {recentOrders?.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{order.order_number}</span>
-                        <Badge variant="outline" className={getOrderStatusBadge(order.status)}>
-                          {getOrderStatusText(order.status)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-gray-600">{order.customers?.name}</p>
-                      <p className="text-xs text-gray-500">
+                  <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <p className="font-medium text-slate-800">{order.order_number}</p>
+                      <p className="text-sm text-slate-600">{order.customers?.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge className={getStatusColor(order.status)}>
+                        {getStatusText(order.status)}
+                      </Badge>
+                      <p className="text-sm text-slate-600 mt-1">
                         {new Date(order.created_at).toLocaleDateString('zh-TW')}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">
-                        ${order.order_products?.reduce((total: number, item: any) => 
-                          total + (item.quantity * item.unit_price), 0
-                        )?.toFixed(2) || '0.00'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {order.order_products?.length || 0} 項產品
-                      </p>
-                    </div>
                   </div>
-                ))}
-                {(!recentOrders || recentOrders.length === 0) && (
-                  <p className="text-center text-gray-500 py-4">暫無訂單記錄</p>
+                )) || (
+                  <div className="text-center py-4 text-slate-500">暫無訂單資料</div>
                 )}
               </div>
-            </CardContent>
+            </div>
           </Card>
 
-          {/* 庫存警報 */}
+          {/* 快速操作 */}
           <Card>
-            <CardHeader>
-              <CardTitle>庫存警報</CardTitle>
-              <CardDescription>低於安全庫存的產品</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {lowStockItems?.map((item) => (
-                  <div key={item.product_id} className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.product_name}</p>
-                      {item.color && (
-                        <p className="text-sm text-gray-600">{item.color}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-orange-600">
-                        {Number(item.total_stock).toFixed(2)} KG
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        警戒值: {Number(item.stock_thresholds).toFixed(2)} KG
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {(!lowStockItems || lowStockItems.length === 0) && (
-                  <p className="text-center text-gray-500 py-4">目前沒有庫存警報</p>
-                )}
+            <div className="p-6">
+              <div className="flex items-center text-blue-600 mb-4">
+                <TrendingUp size={20} className="mr-2" />
+                <h3 className="text-lg font-semibold">快速操作</h3>
               </div>
-            </CardContent>
+              <p className="text-sm text-slate-600 mb-4">常用功能快速入口</p>
+              <div className="space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateProductOpen(true)}
+                >
+                  <Package size={16} className="mr-2" />
+                  新增產品
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateCustomerOpen(true)}
+                >
+                  <Users size={16} className="mr-2" />
+                  新增客戶
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreatePurchaseOpen(true)}
+                >
+                  <ShoppingCart size={16} className="mr-2" />
+                  建立採購單
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setCreateShippingOpen(true)}
+                >
+                  <Truck size={16} className="mr-2" />
+                  安排出貨
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
 
-        <CreatePurchaseDialog
-          open={isPurchaseDialogOpen}
-          onOpenChange={setIsPurchaseDialogOpen}
+        {/* 對話框 */}
+        <CreateProductDialog
+          open={createProductOpen}
+          onOpenChange={setCreateProductOpen}
+          onProductCreated={handleProductCreated}
         />
-
+        <CreateCustomerDialog
+          open={createCustomerOpen}
+          onOpenChange={setCreateCustomerOpen}
+          onCustomerCreated={handleCustomerCreated}
+        />
+        <CreatePurchaseDialog
+          open={createPurchaseOpen}
+          onOpenChange={setCreatePurchaseOpen}
+        />
         <CreateShippingDialog
-          open={isShippingDialogOpen}
-          onOpenChange={setIsShippingDialogOpen}
+          open={createShippingOpen}
+          onOpenChange={setCreateShippingOpen}
         />
       </div>
     </Layout>

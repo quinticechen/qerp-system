@@ -43,76 +43,20 @@ export const useInventorySummary = () => {
     try {
       setLoading(true);
       
-      // Get current user's organization
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.log('No user found');
-        setInventoryData([]);
-        setLoading(false);
-        return;
-      }
-
-      // Get user's organization
-      const { data: userOrgs } = await supabase
-        .from('user_organizations')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .limit(1);
-
-      if (!userOrgs || userOrgs.length === 0) {
-        console.log('No organization found for user');
-        setInventoryData([]);
-        setLoading(false);
-        return;
-      }
-
-      const organizationId = userOrgs[0].organization_id;
-      console.log('Loading inventory for organization:', organizationId);
-
-      // Get products for this organization first
-      let productQuery = supabase
-        .from('products_new')
-        .select('id')
-        .eq('organization_id', organizationId);
-
-      if (searchTerm) {
-        productQuery = productQuery.or(`name.ilike.%${searchTerm}%,color.ilike.%${searchTerm}%`);
-      }
-
-      const { data: orgProducts, error: productError } = await productQuery;
-      
-      if (productError) {
-        console.error('Error fetching organization products:', productError);
-        throw productError;
-      }
-
-      if (!orgProducts || orgProducts.length === 0) {
-        console.log('No products found for organization');
-        setInventoryData([]);
-        setLoading(false);
-        return;
-      }
-
-      const productIds = orgProducts.map(p => p.id);
-      console.log('Found products for organization:', productIds.length);
-
-      // Now get inventory summary for these products
       let query = supabase
         .from('inventory_summary_enhanced')
         .select('*')
-        .in('product_id', productIds)
         .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1)
         .order('product_name');
 
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('Error fetching inventory summary:', error);
-        throw error;
+      // 應用搜尋過濾
+      if (searchTerm) {
+        query = query.or(`product_name.ilike.%${searchTerm}%,color.ilike.%${searchTerm}%`);
       }
 
-      console.log('Inventory summary data:', data?.length || 0, 'items');
+      const { data, error } = await query;
+
+      if (error) throw error;
 
       const newData = (data || []).map(item => ({
         product_id: item.product_id || '',

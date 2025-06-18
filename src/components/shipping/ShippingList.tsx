@@ -1,56 +1,57 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, Edit } from 'lucide-react';
+import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ViewShippingDialog } from './ViewShippingDialog';
 import { EditShippingDialog } from './EditShippingDialog';
-import { useDebounce } from '@/hooks/useDebounce';
+import { ViewShippingDialog } from './ViewShippingDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export const ShippingList = () => {
   const [selectedShipping, setSelectedShipping] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: shippings, isLoading } = useQuery({
-    queryKey: ['shippings'],
+  const { data: shippings, isLoading, refetch } = useQuery({
+    queryKey: ['shippings', organizationId],
     queryFn: async () => {
+      if (!organizationId) {
+        console.log('No organization ID available');
+        return [];
+      }
+
+      console.log('Fetching shippings for organization:', organizationId);
       const { data, error } = await supabase
         .from('shippings')
         .select(`
           *,
+          orders (order_number, status),
           customers (name),
-          orders (order_number),
           shipping_items (
             id,
             shipped_quantity,
             inventory_rolls (
+              id,
               roll_number,
               products_new (name, color)
             )
           )
         `)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data;
-    }
-  });
+      if (error) {
+        console.error('Error fetching shippings:', error);
+        throw error;
+      }
 
-  const { data: customers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, name')
-        .order('name');
-      
-      if (error) throw error;
+      console.log('Fetched shippings:', data);
       return data;
-    }
+    },
+    enabled: hasOrganization
   });
 
   const handleView = (shipping: any) => {
@@ -72,43 +73,18 @@ export const ShippingList = () => {
       render: (value) => <span className="font-medium text-gray-900">{value}</span>
     },
     {
+      key: 'orders.order_number',
+      title: '訂單號',
+      sortable: true,
+      filterable: false,
+      render: (value, row) => <span className="text-gray-700">{row.orders?.order_number}</span>
+    },
+    {
       key: 'customers.name',
       title: '客戶',
       sortable: true,
-      filterable: true,
-      filterOptions: customers?.map(customer => ({
-        value: customer.id,
-        label: customer.name
-      })) || [],
+      filterable: false,
       render: (value, row) => <span className="text-gray-700">{row.customers?.name}</span>
-    },
-    {
-      key: 'orders.order_number',
-      title: '關聯訂單',
-      sortable: true,
-      filterable: false,
-      render: (value, row) => <span className="text-gray-700">{row.orders?.order_number || '-'}</span>
-    },
-    {
-      key: 'total_shipped_quantity',
-      title: '總重量',
-      sortable: true,
-      filterable: false,
-      render: (value) => <span className="text-gray-700">{value} 公斤</span>
-    },
-    {
-      key: 'total_shipped_rolls',
-      title: '總卷數',
-      sortable: true,
-      filterable: false,
-      render: (value) => <span className="text-gray-700">{value}</span>
-    },
-    {
-      key: 'items_count',
-      title: '項目數',
-      sortable: true,
-      filterable: false,
-      render: (value, row) => <span className="text-gray-700">{row.shipping_items?.length || 0}</span>
     },
     {
       key: 'shipping_date',
@@ -120,6 +96,27 @@ export const ShippingList = () => {
           {new Date(value).toLocaleDateString('zh-TW')}
         </span>
       )
+    },
+    {
+      key: 'total_shipped_quantity',
+      title: '總出貨量',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value} KG</span>
+    },
+    {
+      key: 'total_shipped_rolls',
+      title: '總卷數',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value}</span>
+    },
+    {
+      key: 'note',
+      title: '備註',
+      sortable: false,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
     },
     {
       key: 'actions',
@@ -149,23 +146,39 @@ export const ShippingList = () => {
     }
   ];
 
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) {
-    return <div className="text-center py-8 text-gray-500">載入中...</div>;
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">載入中...</div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">出貨單列表</CardTitle>
+          <CardTitle className="text-gray-900">出貨記錄列表</CardTitle>
         </CardHeader>
         <CardContent>
           <EnhancedTable
             columns={columns}
             data={shippings || []}
             loading={isLoading}
-            searchPlaceholder="搜尋出貨單號、客戶名稱、訂單號..."
-            emptyMessage="沒有找到出貨單"
+            searchPlaceholder="搜尋出貨單號、訂單號、客戶名稱..."
+            emptyMessage="沒有找到出貨記錄"
           />
         </CardContent>
       </Card>

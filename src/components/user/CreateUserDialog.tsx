@@ -4,11 +4,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useQuery } from '@tanstack/react-query';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -17,102 +19,135 @@ interface CreateUserDialogProps {
 
 interface CreateUserForm {
   email: string;
-  password: string;
   full_name: string;
   phone: string;
-  roles: string[];
+  role_id: string;
 }
 
-const roleOptions = [
-  { value: 'admin', label: '管理員' },
-  { value: 'sales', label: '業務' },
-  { value: 'assistant', label: '助理' },
-  { value: 'accounting', label: '會計' },
-  { value: 'warehouse', label: '倉管' }
-];
-
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
-  const { register, handleSubmit, reset, watch, setValue } = useForm<CreateUserForm>();
+  const { register, handleSubmit, reset, setValue, watch } = useForm<CreateUserForm>();
   const queryClient = useQueryClient();
-  const selectedRoles = watch('roles') || [];
+  const { organizationId, hasOrganization } = useCurrentOrganization();
+  
+  const selectedRoleId = watch('role_id');
 
-  const handleRoleChange = (roleValue: string, checked: boolean) => {
-    const currentRoles = selectedRoles;
-    if (checked) {
-      setValue('roles', [...currentRoles, roleValue]);
-    } else {
-      setValue('roles', currentRoles.filter(role => role !== roleValue));
-    }
-  };
+  // 獲取組織角色列表，排除組織擁有者角色
+  const { data: roles = [] } = useQuery({
+    queryKey: ['organization-roles', organizationId],
+    queryFn: async () => {
+      if (!organizationId) return [];
+
+      const { data, error } = await supabase
+        .from('organization_roles')
+        .select('id, name, display_name')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .neq('name', 'owner') // 排除組織擁有者角色
+        .order('display_name');
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: hasOrganization,
+  });
 
   const onSubmit = async (data: CreateUserForm) => {
+    if (!organizationId) {
+      toast.error('請先選擇組織');
+      return;
+    }
+
     try {
-      // 創建使用者帳號
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      console.log('Creating user with data:', data);
+      
+      // 使用 signUp 而不是 admin.inviteUserByEmail
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
-        password: data.password,
+        password: Math.random().toString(36).slice(-8), // 臨時密碼
         options: {
           data: {
             full_name: data.full_name,
-            phone: data.phone
-          }
+            phone: data.phone,
+            organization_id: organizationId,
+            role_id: data.role_id
+          },
+          emailRedirectTo: `${window.location.origin}/auth`
         }
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('用戶創建失敗');
+      if (signUpError) {
+        console.error('SignUp error:', signUpError);
+        throw signUpError;
+      }
 
-      // 更新 profiles 表
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: authData.user.id,
-          email: data.email,
-          full_name: data.full_name,
-          phone: data.phone,
-          is_active: true
-        });
+      if (signUpData.user) {
+        // 創建 profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: signUpData.user.id,
+            email: data.email,
+            full_name: data.full_name,
+            phone: data.phone
+          });
 
-      if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
 
-      // 分配角色
-      if (data.roles && data.roles.length > 0) {
-        const currentUser = await supabase.auth.getUser();
-        const roleInserts = data.roles.map(role => ({
-          user_id: authData.user!.id,
-          role: role as any,
-          granted_by: currentUser.data.user?.id
-        }));
+        // 將用戶加入組織
+        const { error: orgError } = await supabase
+          .from('user_organizations')
+          .insert({
+            user_id: signUpData.user.id,
+            organization_id: organizationId,
+            is_active: true
+          });
 
-        const { error: rolesError } = await supabase
-          .from('user_roles')
-          .insert(roleInserts);
+        if (orgError) {
+          console.error('Organization membership error:', orgError);
+        }
 
-        if (rolesError) throw rolesError;
+        // 分配角色
+        const { error: roleError } = await supabase
+          .from('user_organization_roles')
+          .insert({
+            user_id: signUpData.user.id,
+            organization_id: organizationId,
+            role_id: data.role_id,
+            granted_by: (await supabase.auth.getUser()).data.user?.id,
+            is_active: true
+          });
+
+        if (roleError) {
+          console.error('Role assignment error:', roleError);
+        }
       }
 
       // 記錄操作日誌
       const currentUser = await supabase.auth.getUser();
-      await supabase
-        .from('user_operation_logs')
-        .insert({
-          operator_id: currentUser.data.user?.id,
-          target_user_id: authData.user.id,
-          operation_type: 'create',
-          operation_details: {
-            email: data.email,
-            full_name: data.full_name,
-            roles: data.roles
-          }
-        });
+      if (currentUser.data.user) {
+        await supabase
+          .from('user_operation_logs')
+          .insert({
+            operator_id: currentUser.data.user.id,
+            target_user_id: signUpData.user?.id,
+            operation_type: 'create',
+            operation_details: {
+              email: data.email,
+              full_name: data.full_name,
+              organization_id: organizationId
+            }
+          });
+      }
 
-      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
-      toast.success('使用者創建成功');
+      queryClient.invalidateQueries({ queryKey: ['organization_users'] });
+      toast.success('使用者已創建，邀請郵件已發送');
       reset();
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating user:', error);
-      toast.error('創建使用者失敗');
+      toast.error(`創建使用者失敗: ${error.message}`);
     }
   };
 
@@ -122,7 +157,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         <DialogHeader>
           <DialogTitle>新增使用者</DialogTitle>
           <DialogDescription>
-            填寫以下資訊來創建新的使用者帳號
+            輸入使用者資訊，系統將發送邀請郵件讓用戶完成註冊
           </DialogDescription>
         </DialogHeader>
 
@@ -134,16 +169,6 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               type="email"
               {...register('email', { required: true })}
               placeholder="請輸入電子信箱"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">密碼 *</Label>
-            <Input
-              id="password"
-              type="password"
-              {...register('password', { required: true })}
-              placeholder="請輸入密碼"
             />
           </div>
 
@@ -166,21 +191,19 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           </div>
 
           <div className="space-y-2">
-            <Label>角色</Label>
-            <div className="space-y-2">
-              {roleOptions.map((option) => (
-                <div key={option.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={option.value}
-                    checked={selectedRoles.includes(option.value)}
-                    onCheckedChange={(checked) => handleRoleChange(option.value, checked as boolean)}
-                  />
-                  <Label htmlFor={option.value} className="text-sm">
-                    {option.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
+            <Label htmlFor="role_id">角色 *</Label>
+            <Select onValueChange={(value) => setValue('role_id', value)} value={selectedRoleId}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇角色" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.display_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex justify-end space-x-2">
@@ -192,7 +215,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               取消
             </Button>
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              創建
+              創建使用者
             </Button>
           </div>
         </form>
