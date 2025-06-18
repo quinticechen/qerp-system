@@ -13,14 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { ProductFormData } from '@/hooks/useProducts';
 
 interface CreateProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProductCreated?: () => void;
+  onSubmit: (data: ProductFormData) => Promise<boolean>;
 }
 
 interface ProductVariant {
@@ -35,10 +33,8 @@ const CATEGORIES = ['布料', '胚布', '紗線', '輔料'];
 export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
   open,
   onOpenChange,
-  onProductCreated,
+  onSubmit,
 }) => {
-  const { toast } = useToast();
-  const { organizationId } = useCurrentOrganization();
   const [productName, setProductName] = useState('');
   const [category, setCategory] = useState('布料');
   const [variants, setVariants] = useState<ProductVariant[]>([
@@ -72,66 +68,35 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!organizationId) {
-      toast({
-        title: "錯誤",
-        description: "請先選擇組織",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "錯誤",
-          description: "請先登入",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // 為每個變體創建產品
       for (const variant of variants) {
-        const { error } = await supabase
-          .from('products_new')
-          .insert({
-            name: productName,
-            category: category,
-            color: variant.color || null,
-            color_code: variant.color_code || null,
-            stock_thresholds: variant.stock_thresholds || null,
-            status: 'Available',
-            unit_of_measure: 'KG',
-            user_id: user.id,
-            organization_id: organizationId,
-          });
+        const productData: ProductFormData = {
+          name: productName,
+          category: category,
+          color: variant.color || undefined,
+          color_code: variant.color_code || undefined,
+          stock_thresholds: variant.stock_thresholds,
+          status: 'Available', // 固定為可用
+          unit_of_measure: 'KG', // 固定為KG
+        };
 
-        if (error) {
-          throw error;
+        const success = await onSubmit(productData);
+        if (!success) {
+          setLoading(false);
+          return;
         }
       }
 
-      toast({
-        title: "成功",
-        description: `成功新增 ${variants.length} 個產品`,
-      });
-
       // 重置表單
-      resetForm();
+      setProductName('');
+      setCategory('布料');
+      setVariants([{ id: '1', color: '', color_code: '', stock_thresholds: undefined }]);
       onOpenChange(false);
-      onProductCreated?.();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to create products:', error);
-      toast({
-        title: "新增失敗",
-        description: error.message,
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }

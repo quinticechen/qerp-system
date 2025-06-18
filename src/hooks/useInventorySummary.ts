@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export type InventorySummaryItem = {
   product_id: string;
@@ -32,7 +31,6 @@ export type InventorySummaryItem = {
 };
 
 export const useInventorySummary = () => {
-  const { organizationId, hasOrganization } = useCurrentOrganization();
   const [inventoryData, setInventoryData] = useState<InventorySummaryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,22 +41,11 @@ export const useInventorySummary = () => {
 
   const loadInventorySummary = async (page = 0, isAppend = false) => {
     try {
-      if (!organizationId) {
-        setInventoryData([]);
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
       
-      // 直接查詢 inventory_summary_enhanced，但通過 products_new 進行組織過濾
       let query = supabase
         .from('inventory_summary_enhanced')
-        .select(`
-          *,
-          products_new!inner(organization_id)
-        `)
-        .eq('products_new.organization_id', organizationId)
+        .select('*')
         .range(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE - 1)
         .order('product_name');
 
@@ -129,10 +116,8 @@ export const useInventorySummary = () => {
   };
 
   useEffect(() => {
-    if (hasOrganization) {
-      loadInventorySummary();
-    }
-  }, [organizationId, hasOrganization]);
+    loadInventorySummary();
+  }, []);
 
   return {
     inventoryData,

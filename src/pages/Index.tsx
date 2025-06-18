@@ -1,72 +1,59 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { supabase } from '@/integrations/supabase/client';
+import Login from './Login';
 
 const Index = () => {
-  const { user, loading: authLoading } = useAuth();
-  const { hasNoOrganizations, loading: orgLoading } = useOrganizationContext();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const [hasNavigated, setHasNavigated] = useState(false);
 
   useEffect(() => {
-    // 避免重複導航
-    if (hasNavigated) return;
+    // 檢查用戶登入狀態
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+        navigate('/dashboard');
+      } else {
+        setIsLoggedIn(false);
+      }
+      setLoading(false);
+    };
 
-    console.log('Index navigation check:', { 
-      user: !!user, 
-      hasNoOrganizations, 
-      authLoading, 
-      orgLoading,
-      hasNavigated 
+    checkAuth();
+
+    // 監聽認證狀態變化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setIsLoggedIn(true);
+        navigate('/dashboard');
+      } else {
+        setIsLoggedIn(false);
+      }
     });
 
-    // 如果還在載入認證或組織資料，等待
-    if (authLoading) {
-      console.log('Still loading auth, waiting...');
-      return;
-    }
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
-    // 未登入用戶導向登入頁面
-    if (!user) {
-      console.log('Redirecting to login - no user');
-      setHasNavigated(true);
-      navigate('/login', { replace: true });
-      return;
-    }
-
-    // 用戶已登入，但組織資料還在載入中
-    if (orgLoading) {
-      console.log('User logged in, but organizations still loading...');
-      return;
-    }
-
-    // 已登入但沒有組織的用戶導向創建組織頁面
-    if (hasNoOrganizations) {
-      console.log('Redirecting to create organization - no organizations');
-      setHasNavigated(true);
-      navigate('/create-organization', { replace: true });
-      return;
-    }
-
-    // 已登入且有組織的用戶導向儀表板
-    console.log('Redirecting to dashboard - user has organizations');
-    setHasNavigated(true);
-    navigate('/dashboard', { replace: true });
-  }, [user, hasNoOrganizations, authLoading, orgLoading, navigate, hasNavigated]);
-
-  // 顯示載入狀態
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-slate-600">
-          {authLoading ? '載入用戶資料中...' : orgLoading ? '載入組織資料中...' : '載入中...'}
-        </p>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">載入中...</p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (!isLoggedIn) {
+    navigate('/login');
+    return null;
+  }
+
+  return null;
 };
 
 export default Index;

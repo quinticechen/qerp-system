@@ -1,875 +1,862 @@
 
-# 類別圖設計文檔
+# 紡織業 ERP 系統類別圖文檔
 
-## 1. 概述
+## 概述
 
-本文檔基於 DTDD (Document-driven Test-driven Development) 方法論，詳細描述紡織業多租戶組織 ERP 系統的類別設計。系統採用多租戶架構，支援組織層級的權限管理和數據隔離。
+本文檔包含紡織業 ERP 系統的完整類別圖設計，基於 PRD 和序列圖建立。每個類別都詳細描述了其屬性、方法和與其他類別的關係，確保架構設計與業務需求完全對應。
 
-## 2. 組織管理核心類別
+## 1. 核心實體類別 (Entity Classes)
 
-### 2.1 組織管理類別
+### 1.1 使用者管理
 
+#### User
 ```typescript
-// 組織實體類別
-class Organization {
-  id: string;
-  name: string;
-  description?: string;
-  settings: Record<string, any>;
-  owner_id: string;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
-
-  // 關聯關係
-  owner: User;
-  members: UserOrganization[];
-  roles: OrganizationRole[];
-  
-  // 業務方法
-  addMember(userId: string, invitedBy: string): Promise<UserOrganization>;
-  removeMember(userId: string): Promise<void>;
-  updateSettings(settings: Record<string, any>): Promise<void>;
-  isOwner(userId: string): boolean;
-}
-
-// 使用者組織關聯類別
-class UserOrganization {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  is_active: boolean;
-  joined_at: Date;
-  invited_by?: string;
-  created_at: Date;
-  updated_at: Date;
-
-  // 關聯關係
-  user: User;
-  organization: Organization;
-  inviter?: User;
-  roles: UserOrganizationRole[];
-
-  // 業務方法
-  activate(): Promise<void>;
-  deactivate(): Promise<void>;
-  getRoles(): Promise<OrganizationRole[]>;
-}
-
-// 組織角色類別
-class OrganizationRole {
-  id: string;
-  organization_id: string;
-  name: string;
-  display_name: string;
-  description?: string;
-  permissions: Record<string, boolean>;
-  is_system_role: boolean;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
-  created_by?: string;
-
-  // 關聯關係
-  organization: Organization;
-  creator?: User;
-  userRoles: UserOrganizationRole[];
-
-  // 業務方法
-  hasPermission(permission: string): boolean;
-  updatePermissions(permissions: Record<string, boolean>): Promise<void>;
-  assignToUser(userId: string, grantedBy: string): Promise<UserOrganizationRole>;
-  getPermissionCount(): number;
-}
-
-// 使用者角色分配類別
-class UserOrganizationRole {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  role_id: string;
-  granted_by?: string;
-  granted_at: Date;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
-
-  // 關聯關係
-  user: User;
-  organization: Organization;
-  role: OrganizationRole;
-  grantor?: User;
-
-  // 業務方法
-  revoke(): Promise<void>;
-  renew(): Promise<void>;
-}
-```
-
-### 2.2 使用者管理類別
-
-```typescript
-// 擴展的使用者類別
 class User {
-  id: string;
-  email: string;
-  full_name?: string;
-  phone?: string;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
+  // 屬性
+  private id: string
+  private email: string
+  private password: string
+  private role: UserRole
+  private isActive: boolean
+  private createdAt: Date
+  private updatedAt: Date
 
-  // 關聯關係
-  ownedOrganizations: Organization[];
-  organizationMemberships: UserOrganization[];
-  roles: UserOrganizationRole[];
-
-  // 業務方法
-  getOrganizations(): Promise<Organization[]>;
-  getCurrentOrganization(): Organization | null;
-  setCurrentOrganization(organizationId: string): void;
-  hasPermissionInOrganization(organizationId: string, permission: string): Promise<boolean>;
-  isOwnerOfOrganization(organizationId: string): boolean;
-  getRolesInOrganization(organizationId: string): Promise<OrganizationRole[]>;
-}
-
-// 使用者檔案類別
-class UserProfile {
-  id: string;
-  email: string;
-  role: UserRole;
-  phone?: string;
-  full_name?: string;
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
-
-  // 關聯關係
-  user: User;
-  organizationRoles: UserOrganizationRole[];
-
-  // 業務方法
-  updateProfile(data: Partial<UserProfile>): Promise<void>;
-  getSystemRole(): UserRole;
+  // 方法
+  public constructor(email: string, password: string, role: UserRole)
+  public authenticate(password: string): boolean
+  public updateProfile(data: UserUpdateData): void
+  public changePassword(oldPassword: string, newPassword: string): boolean
+  public deactivate(): void
+  public hasPermission(permission: Permission): boolean
 }
 ```
 
-## 3. 業務實體類別
-
-### 3.1 產品管理類別
-
+#### UserRole
 ```typescript
-// 產品類別 (多租戶支援)
+enum UserRole {
+  SALES = "業務",
+  ASSISTANT = "助理",
+  ACCOUNTANT = "會計",
+  WAREHOUSE_MANAGER = "倉庫管理員",
+  EXECUTIVE = "高層"
+}
+```
+
+#### Permission
+```typescript
+enum Permission {
+  CREATE_PRODUCT = "CREATE_PRODUCT",
+  VIEW_ORDERS = "VIEW_ORDERS",
+  CREATE_ORDER = "CREATE_ORDER",
+  UPDATE_ORDER_STATUS = "UPDATE_ORDER_STATUS",
+  UPDATE_PAYMENT_STATUS = "UPDATE_PAYMENT_STATUS",
+  CREATE_PURCHASE_ORDER = "CREATE_PURCHASE_ORDER",
+  MANAGE_INVENTORY = "MANAGE_INVENTORY",
+  CREATE_SHIPMENT = "CREATE_SHIPMENT",
+  VIEW_REPORTS = "VIEW_REPORTS",
+  MANAGE_USERS = "MANAGE_USERS"
+}
+```
+
+### 1.2 產品管理
+
+#### Product
+```typescript
 class Product {
-  id: string;
-  organization_id: string; // 新增：組織隔離
-  name: string;
-  category: string;
-  color?: string;
-  color_code?: string;
-  unit_of_measure: string;
-  status: ProductStatus;
-  stock_thresholds?: number;
-  user_id: string;
-  updated_by?: string;
-  created_at: Date;
-  updated_at: Date;
+  // 屬性
+  private id: string
+  private name: string
+  private category: string = "布料"
+  private color: string
+  private colorCode: string
+  private unit: string = "KG"
+  private stockThreshold: number
+  private createdBy: string
+  private createdAt: Date
+  private updatedAt: Date
 
-  // 關聯關係
-  organization: Organization; // 新增：組織關聯
-  creator: User;
-  updater?: User;
-  inventoryRolls: InventoryRoll[];
-  orderProducts: OrderProduct[];
-  purchaseItems: PurchaseOrderItem[];
-
-  // 業務方法
-  updateStatus(status: ProductStatus): Promise<void>;
-  setStockThreshold(threshold: number): Promise<void>;
-  getCurrentStock(): Promise<number>;
-  getStockByQuality(): Promise<Record<FabricQuality, number>>;
-  isLowStock(): Promise<boolean>;
-  belongsToOrganization(organizationId: string): boolean;
+  // 方法
+  public constructor(name: string, color: string, colorCode: string)
+  public updateInfo(data: ProductUpdateData): void
+  public setStockThreshold(threshold: number): void
+  public isLowStock(currentStock: number): boolean
+  public getDisplayName(): string
 }
 ```
 
-### 3.2 客戶管理類別
+### 1.3 客戶與供應商管理
 
+#### Customer
 ```typescript
-// 客戶類別 (多租戶支援)
 class Customer {
-  id: string;
-  organization_id: string; // 新增：組織隔離
-  name: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  contact_person?: string;
-  created_at: Date;
-  updated_at: Date;
+  // 屬性
+  private id: string
+  private name: string
+  private contactPerson: string
+  private phone: string
+  private email: string
+  private address: string
+  private isActive: boolean
+  private createdAt: Date
+  private updatedAt: Date
 
-  // 關聯關係
-  organization: Organization; // 新增：組織關聯
-  orders: Order[];
-  shippings: Shipping[];
-
-  // 業務方法
-  addOrder(orderData: CreateOrderData): Promise<Order>;
-  getOrderHistory(): Promise<Order[]>;
-  getTotalOrderValue(): Promise<number>;
-  belongsToOrganization(organizationId: string): boolean;
+  // 方法
+  public constructor(name: string, contactPerson: string, phone: string)
+  public updateContactInfo(data: CustomerUpdateData): void
+  public deactivate(): void
+  public getFullInfo(): CustomerInfo
 }
 ```
 
-### 3.3 訂單管理類別
-
+#### Supplier
 ```typescript
-// 訂單類別 (多租戶支援)
+class Supplier {
+  // 屬性
+  private id: string
+  private name: string
+  private contactPerson: string
+  private phone: string
+  private email: string
+  private address: string
+  private isActive: boolean
+  private createdAt: Date
+  private updatedAt: Date
+
+  // 方法
+  public constructor(name: string, contactPerson: string, phone: string)
+  public updateContactInfo(data: SupplierUpdateData): void
+  public deactivate(): void
+  public getFullInfo(): SupplierInfo
+}
+```
+
+### 1.4 訂單管理
+
+#### Order
+```typescript
 class Order {
-  id: string;
-  organization_id: string; // 新增：組織隔離
-  order_number: string;
-  customer_id: string;
-  status: OrderStatus;
-  shipping_status: ShippingStatus;
-  payment_status: PaymentStatus;
-  note?: string;
-  user_id: string;
-  created_at: Date;
-  updated_at: Date;
+  // 屬性
+  private id: string
+  private orderNumber: string
+  private customerId: string
+  private status: OrderStatus
+  private paymentStatus: PaymentStatus
+  private shippingStatus: ShippingStatus
+  private totalAmount: number
+  private totalWeight: number
+  private notes: string
+  private createdBy: string
+  private createdAt: Date
+  private updatedAt: Date
+  private orderItems: OrderItem[]
 
-  // 關聯關係
-  organization: Organization; // 新增：組織關聯
-  customer: Customer;
-  creator: User;
-  products: OrderProduct[];
-  factories: OrderFactory[];
-  shippings: Shipping[];
-  purchaseOrders: PurchaseOrder[];
-
-  // 業務方法
-  addProduct(productData: AddOrderProductData): Promise<OrderProduct>;
-  updateStatus(status: OrderStatus): Promise<void>;
-  calculateTotalValue(): Promise<number>;
-  getShippingProgress(): Promise<ShippingProgress>;
-  canShip(): Promise<boolean>;
-  belongsToOrganization(organizationId: string): boolean;
+  // 方法
+  public constructor(customerId: string, createdBy: string)
+  public addItem(item: OrderItem): void
+  public removeItem(itemId: string): void
+  public updateStatus(status: OrderStatus): void
+  public updatePaymentStatus(status: PaymentStatus): void
+  public updateShippingStatus(status: ShippingStatus): void
+  public calculateTotals(): void
+  public canBeModified(): boolean
+  public canBeCancelled(): boolean
 }
 ```
 
-## 4. 權限管理類別
-
-### 4.1 權限檢查類別
-
+#### OrderItem
 ```typescript
-// 組織權限管理服務
-class OrganizationPermissionService {
-  // 檢查使用者是否屬於組織
-  static async userBelongsToOrganization(userId: string, organizationId: string): Promise<boolean>;
-  
-  // 檢查使用者是否為組織擁有者
-  static async isOrganizationOwner(userId: string, organizationId: string): Promise<boolean>;
-  
-  // 檢查使用者在組織中是否有特定權限
-  static async userHasPermission(userId: string, organizationId: string, permission: string): Promise<boolean>;
-  
-  // 獲取使用者在組織中的所有權限
-  static async getUserPermissions(userId: string, organizationId: string): Promise<Record<string, boolean>>;
-  
-  // 獲取使用者在組織中的角色
-  static async getUserRoles(userId: string, organizationId: string): Promise<OrganizationRole[]>;
-}
+class OrderItem {
+  // 屬性
+  private id: string
+  private orderId: string
+  private productId: string
+  private specifications: string
+  private quantity: number
+  private estimatedRolls: number
+  private unitPrice: number
+  private totalPrice: number
 
-// 權限守衛類別
-class PermissionGuard {
-  private userId: string;
-  private organizationId: string;
-
-  constructor(userId: string, organizationId: string) {
-    this.userId = userId;
-    this.organizationId = organizationId;
-  }
-
-  // 檢查功能權限
-  async hasPermission(permission: string): Promise<boolean>;
-  
-  // 檢查多個權限中的任一個
-  async hasAnyPermission(permissions: string[]): Promise<boolean>;
-  
-  // 檢查所有權限
-  async hasAllPermissions(permissions: string[]): Promise<boolean>;
-  
-  // 檢查組織存取權限
-  async canAccessOrganization(): Promise<boolean>;
-  
-  // 檢查資源擁有權
-  async ownsResource(resourceId: string, resourceType: string): Promise<boolean>;
+  // 方法
+  public constructor(productId: string, quantity: number, unitPrice: number)
+  public updateQuantity(quantity: number): void
+  public updatePrice(unitPrice: number): void
+  public updateSpecifications(specs: string): void
+  public calculateTotalPrice(): void
 }
 ```
 
-### 4.2 權限常量類別
-
+#### OrderStatus
 ```typescript
-// 權限定義常量
-class Permissions {
-  // 產品管理權限
-  static readonly CAN_VIEW_PRODUCTS = 'canViewProducts';
-  static readonly CAN_CREATE_PRODUCTS = 'canCreateProducts';
-  static readonly CAN_EDIT_PRODUCTS = 'canEditProducts';
-  static readonly CAN_DELETE_PRODUCTS = 'canDeleteProducts';
-
-  // 庫存管理權限
-  static readonly CAN_VIEW_INVENTORY = 'canViewInventory';
-  static readonly CAN_CREATE_INVENTORY = 'canCreateInventory';
-  static readonly CAN_EDIT_INVENTORY = 'canEditInventory';
-
-  // 訂單管理權限
-  static readonly CAN_VIEW_ORDERS = 'canViewOrders';
-  static readonly CAN_CREATE_ORDERS = 'canCreateOrders';
-  static readonly CAN_EDIT_ORDERS = 'canEditOrders';
-
-  // 組織管理權限
-  static readonly CAN_MANAGE_ORGANIZATION = 'canManageOrganization';
-  static readonly CAN_MANAGE_USERS = 'canManageUsers';
-  static readonly CAN_MANAGE_ROLES = 'canManageRoles';
-
-  // 獲取所有權限列表
-  static getAllPermissions(): string[];
-  
-  // 獲取權限分組
-  static getPermissionGroups(): Record<string, string[]>;
-}
-
-// 角色模板類別
-class RoleTemplates {
-  // 預設系統角色
-  static readonly SYSTEM_ROLES = {
-    OWNER: {
-      name: 'owner',
-      display_name: '組織擁有者',
-      permissions: { /* 所有權限 */ }
-    },
-    ADMIN: {
-      name: 'admin',
-      display_name: '管理員',
-      permissions: { /* 管理員權限 */ }
-    },
-    SALES: {
-      name: 'sales',
-      display_name: '業務',
-      permissions: { /* 業務權限 */ }
-    }
-    // ... 其他角色
-  };
-
-  // 創建系統角色
-  static async createSystemRoles(organizationId: string): Promise<OrganizationRole[]>;
-  
-  // 獲取角色模板
-  static getRoleTemplate(roleName: string): RoleTemplate | null;
+enum OrderStatus {
+  PENDING = "待處理",
+  CONFIRMED = "已確認",
+  PARTIAL_SHIPPED = "部分出貨",
+  COMPLETED = "已完成",
+  CANCELLED = "已取消"
 }
 ```
 
-## 5. 服務類別
-
-### 5.1 組織服務類別
-
+#### PaymentStatus
 ```typescript
-// 組織管理服務
-class OrganizationService {
-  // 創建新組織
-  static async createOrganization(data: CreateOrganizationData, ownerId: string): Promise<Organization>;
-  
-  // 獲取使用者的組織列表
-  static async getUserOrganizations(userId: string): Promise<UserOrganization[]>;
-  
-  // 切換當前組織
-  static async switchOrganization(userId: string, organizationId: string): Promise<void>;
-  
-  // 邀請使用者加入組織
-  static async inviteUser(organizationId: string, email: string, roleIds: string[], inviterId: string): Promise<UserOrganization>;
-  
-  // 移除組織成員
-  static async removeMember(organizationId: string, userId: string, removedBy: string): Promise<void>;
-  
-  // 更新組織設定
-  static async updateOrganization(organizationId: string, data: UpdateOrganizationData): Promise<Organization>;
-}
-
-// 角色管理服務
-class OrganizationRoleService {
-  // 創建自定義角色
-  static async createRole(organizationId: string, data: CreateRoleData, createdBy: string): Promise<OrganizationRole>;
-  
-  // 更新角色權限
-  static async updateRole(roleId: string, data: UpdateRoleData): Promise<OrganizationRole>;
-  
-  // 分配角色給使用者
-  static async assignRole(userId: string, organizationId: string, roleId: string, grantedBy: string): Promise<UserOrganizationRole>;
-  
-  // 撤銷使用者角色
-  static async revokeRole(userId: string, organizationId: string, roleId: string): Promise<void>;
-  
-  // 獲取組織角色列表
-  static async getOrganizationRoles(organizationId: string): Promise<OrganizationRole[]>;
+enum PaymentStatus {
+  UNPAID = "未付款",
+  PARTIAL_PAID = "部分付款",
+  PAID = "已付款"
 }
 ```
 
-### 5.2 數據存取服務類別
-
+#### ShippingStatus
 ```typescript
-// 多租戶數據存取基礎類別
-abstract class MultiTenantDataService<T> {
-  protected tableName: string;
-  protected organizationId: string;
-
-  constructor(tableName: string, organizationId: string) {
-    this.tableName = tableName;
-    this.organizationId = organizationId;
-  }
-
-  // 基礎 CRUD 操作（自動加入組織過濾）
-  async findById(id: string): Promise<T | null>;
-  async findAll(filters?: Record<string, any>): Promise<T[]>;
-  async create(data: Partial<T>): Promise<T>;
-  async update(id: string, data: Partial<T>): Promise<T>;
-  async delete(id: string): Promise<void>;
-  
-  // 組織數據隔離檢查
-  protected async ensureOrganizationAccess(resourceId: string): Promise<void>;
-  
-  // 自動添加組織 ID 到查詢條件
-  protected addOrganizationFilter(query: any): any;
-}
-
-// 具體的數據服務實現
-class ProductDataService extends MultiTenantDataService<Product> {
-  constructor(organizationId: string) {
-    super('products_new', organizationId);
-  }
-
-  // 產品特定查詢方法
-  async findByCategory(category: string): Promise<Product[]>;
-  async findLowStockProducts(): Promise<Product[]>;
-  async updateStockThreshold(productId: string, threshold: number): Promise<Product>;
-}
-
-class OrderDataService extends MultiTenantDataService<Order> {
-  constructor(organizationId: string) {
-    super('orders', organizationId);
-  }
-
-  // 訂單特定查詢方法
-  async findByCustomer(customerId: string): Promise<Order[]>;
-  async findByStatus(status: OrderStatus): Promise<Order[]>;
-  async findPendingOrders(): Promise<Order[]>;
+enum ShippingStatus {
+  NOT_STARTED = "未開始",
+  PARTIAL_SHIPPED = "部分出貨",
+  SHIPPED = "已出貨"
 }
 ```
 
-## 6. Hook 類別設計
+### 1.5 採購管理
 
-### 6.1 組織管理 Hooks
-
+#### PurchaseOrder
 ```typescript
-// 組織管理 Hook
-interface UseOrganizationReturn {
-  organizations: UserOrganization[];
-  currentOrganization: Organization | null;
-  loading: boolean;
-  hasNoOrganizations: boolean;
-  switchOrganization: (organizationId: string) => void;
-  createOrganization: (name: string, description?: string) => Promise<Organization>;
-  refreshOrganizations: () => Promise<void>;
-}
+class PurchaseOrder {
+  // 屬性
+  private id: string
+  private purchaseNumber: string
+  private supplierId: string
+  private linkedOrderId?: string
+  private status: PurchaseStatus
+  private orderDate: Date
+  private expectedDeliveryDate: Date
+  private actualDeliveryDate?: Date
+  private totalAmount: number
+  private totalWeight: number
+  private createdBy: string
+  private createdAt: Date
+  private updatedAt: Date
+  private purchaseItems: PurchaseItem[]
 
-class UseOrganization {
-  static hook(): UseOrganizationReturn;
-}
-
-// 組織權限 Hook
-interface UseOrganizationPermissionsReturn {
-  userRoles: UserOrganizationRole[];
-  permissions: Record<string, boolean>;
-  isOwner: boolean;
-  loading: boolean;
-  hasPermission: (permission: string) => boolean;
-  hasAnyPermission: (permissions: string[]) => boolean;
-  refreshPermissions: () => Promise<void>;
-}
-
-class UseOrganizationPermissions {
-  static hook(): UseOrganizationPermissionsReturn;
+  // 方法
+  public constructor(supplierId: string, expectedDeliveryDate: Date, createdBy: string)
+  public addItem(item: PurchaseItem): void
+  public removeItem(itemId: string): void
+  public updateStatus(status: PurchaseStatus): void
+  public confirmOrder(): void
+  public markAsDelivered(deliveryDate: Date): void
+  public calculateTotals(): void
+  public canBeModified(): boolean
 }
 ```
 
-### 6.2 數據查詢 Hooks
-
+#### PurchaseItem
 ```typescript
-// 多租戶數據查詢 Hook 基礎類別
-abstract class UseMultiTenantData<T> {
-  protected queryKey: string[];
-  protected organizationId: string;
+class PurchaseItem {
+  // 屬性
+  private id: string
+  private purchaseOrderId: string
+  private productId: string
+  private specifications: string
+  private quantity: number
+  private estimatedRolls: number
+  private unitPrice: number
+  private totalPrice: number
 
-  constructor(queryKey: string[], organizationId: string) {
-    this.queryKey = queryKey;
-    this.organizationId = organizationId;
-  }
-
-  // 基礎查詢方法
-  abstract fetchData(): Promise<T[]>;
-  
-  // Hook 實現
-  useQuery(): {
-    data: T[];
-    loading: boolean;
-    error: Error | null;
-    refetch: () => Promise<void>;
-  };
-}
-
-// 具體實現
-class UseOrganizationProducts extends UseMultiTenantData<Product> {
-  async fetchData(): Promise<Product[]> {
-    // 實現產品查詢邏輯
-  }
-}
-
-class UseOrganizationOrders extends UseMultiTenantData<Order> {
-  async fetchData(): Promise<Order[]> {
-    // 實現訂單查詢邏輯
-  }
+  // 方法
+  public constructor(productId: string, quantity: number, unitPrice: number)
+  public updateQuantity(quantity: number): void
+  public updatePrice(unitPrice: number): void
+  public updateSpecifications(specs: string): void
+  public calculateTotalPrice(): void
 }
 ```
 
-## 7. 組件類別設計
-
-### 7.1 組織管理組件
-
+#### PurchaseStatus
 ```typescript
-// 組織切換器組件
-interface OrganizationSwitcherProps {
-  className?: string;
-}
-
-class OrganizationSwitcher {
-  props: OrganizationSwitcherProps;
-  
-  // 組織列表顯示
-  renderOrganizationList(): JSX.Element;
-  
-  // 切換處理
-  handleSwitchOrganization(organizationId: string): void;
-  
-  // 組件渲染
-  render(): JSX.Element;
-}
-
-// 創建組織對話框
-interface CreateOrganizationDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-class CreateOrganizationDialog {
-  props: CreateOrganizationDialogProps;
-  
-  // 表單提交處理
-  handleSubmit(data: CreateOrganizationForm): Promise<void>;
-  
-  // 組件渲染
-  render(): JSX.Element;
-}
-
-// 組織角色管理組件
-interface OrganizationRoleManagementProps {
-  organizationId: string;
-}
-
-class OrganizationRoleManagement {
-  props: OrganizationRoleManagementProps;
-  
-  // 角色列表顯示
-  renderRoleList(): JSX.Element;
-  
-  // 創建角色
-  handleCreateRole(data: CreateRoleData): Promise<void>;
-  
-  // 編輯角色
-  handleEditRole(roleId: string, data: UpdateRoleData): Promise<void>;
-  
-  // 刪除角色
-  handleDeleteRole(roleId: string): Promise<void>;
-  
-  // 組件渲染
-  render(): JSX.Element;
+enum PurchaseStatus {
+  PENDING = "待確認",
+  CONFIRMED = "已下單",
+  PARTIAL_DELIVERED = "部分到貨",
+  COMPLETED = "已完成",
+  CANCELLED = "已取消"
 }
 ```
 
-### 7.2 權限控制組件
+### 1.6 庫存管理
 
+#### InventoryBatch
 ```typescript
-// 權限守衛組件
-interface PermissionGuardProps {
-  permission: string;
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-}
+class InventoryBatch {
+  // 屬性
+  private id: string
+  private purchaseOrderId: string
+  private receivedDate: Date
+  private totalQuantity: number
+  private totalRolls: number
+  private createdBy: string
+  private createdAt: Date
+  private rolls: FabricRoll[]
 
-class PermissionGuard {
-  props: PermissionGuardProps;
-  
-  // 權限檢查
-  checkPermission(): boolean;
-  
-  // 條件渲染
-  render(): JSX.Element;
-}
-
-// 組織守衛組件
-interface OrganizationGuardProps {
-  children: React.ReactNode;
-}
-
-class OrganizationGuard {
-  props: OrganizationGuardProps;
-  
-  // 組織檢查
-  checkOrganizationAccess(): boolean;
-  
-  // 載入狀態處理
-  renderLoading(): JSX.Element;
-  
-  // 無組織狀態處理
-  renderNoOrganization(): JSX.Element;
-  
-  // 組件渲染
-  render(): JSX.Element;
+  // 方法
+  public constructor(purchaseOrderId: string, receivedDate: Date, createdBy: string)
+  public addRoll(roll: FabricRoll): void
+  public calculateTotals(): void
+  public getRollsByProduct(productId: string): FabricRoll[]
+  public getAvailableRolls(): FabricRoll[]
 }
 ```
 
-## 8. 工具類別
-
-### 8.1 權限工具類別
-
+#### FabricRoll
 ```typescript
-// 權限檢查工具
-class PermissionUtils {
-  // 檢查權限
-  static hasPermission(userPermissions: Record<string, boolean>, permission: string): boolean;
-  
-  // 檢查多個權限
-  static hasAnyPermission(userPermissions: Record<string, boolean>, permissions: string[]): boolean;
-  
-  // 檢查所有權限
-  static hasAllPermissions(userPermissions: Record<string, boolean>, permissions: string[]): boolean;
-  
-  // 合併權限
-  static mergePermissions(...permissionSets: Record<string, boolean>[]): Record<string, boolean>;
-  
-  // 權限差異比較
-  static comparePermissions(oldPermissions: Record<string, boolean>, newPermissions: Record<string, boolean>): {
-    added: string[];
-    removed: string[];
-    unchanged: string[];
-  };
-}
+class FabricRoll {
+  // 屬性
+  private id: string
+  private rollNumber: string
+  private productId: string
+  private warehouseId: string
+  private shelfLocation: string
+  private originalWeight: number
+  private currentWeight: number
+  private qualityGrade: QualityGrade
+  private isAvailable: boolean
+  private inventoryBatchId: string
+  private createdAt: Date
+  private updatedAt: Date
 
-// 組織工具類別
-class OrganizationUtils {
-  // 驗證組織存取權限
-  static async validateOrganizationAccess(userId: string, organizationId: string): Promise<boolean>;
-  
-  // 獲取使用者當前組織
-  static getCurrentOrganization(): Organization | null;
-  
-  // 設定當前組織
-  static setCurrentOrganization(organizationId: string): void;
-  
-  // 清除組織快取
-  static clearOrganizationCache(): void;
+  // 方法
+  public constructor(rollNumber: string, productId: string, weight: number, qualityGrade: QualityGrade)
+  public updateLocation(warehouseId: string, shelfLocation: string): void
+  public reduceWeight(usedWeight: number): void
+  public markAsUnavailable(): void
+  public getUsagePercentage(): number
+  public canBeUsed(): boolean
 }
 ```
 
-### 8.2 數據驗證類別
-
+#### Warehouse
 ```typescript
-// 組織數據驗證
-class OrganizationValidation {
-  // 驗證組織名稱
-  static validateOrganizationName(name: string): ValidationResult;
-  
-  // 驗證角色名稱
-  static validateRoleName(name: string): ValidationResult;
-  
-  // 驗證權限配置
-  static validatePermissions(permissions: Record<string, boolean>): ValidationResult;
-  
-  // 驗證使用者邀請
-  static validateUserInvitation(email: string, roleIds: string[]): ValidationResult;
-}
+class Warehouse {
+  // 屬性
+  private id: string
+  private name: string
+  private location: string
+  private capacity: number
+  private isActive: boolean
 
-// 多租戶數據驗證
-class MultiTenantValidation {
-  // 驗證資源歸屬
-  static async validateResourceOwnership(resourceId: string, resourceType: string, organizationId: string): Promise<boolean>;
-  
-  // 驗證組織隔離
-  static validateOrganizationIsolation(data: any): ValidationResult;
-  
-  // 驗證跨組織操作
-  static validateCrossOrganizationOperation(sourceOrgId: string, targetOrgId: string, userId: string): Promise<boolean>;
+  // 方法
+  public constructor(name: string, location: string, capacity: number)
+  public updateInfo(data: WarehouseUpdateData): void
+  public getCurrentUsage(): number
+  public getAvailableSpace(): number
 }
 ```
 
-## 9. 類別關係圖
-
-### 9.1 組織管理關係圖
-
-```
-Organization (1) ←──→ (n) UserOrganization ←──→ (1) User
-     ↓                        ↓
-     (1)                      (1)
-     ↓                        ↓
-OrganizationRole (n) ←──→ (n) UserOrganizationRole
-```
-
-### 9.2 業務實體關係圖
-
-```
-Organization (1) ───→ (n) Product
-     ↓                    ↓
-     (1)                  (1)
-     ↓                    ↓
-Customer (n) ←──→ (n) Order ←──→ (n) OrderProduct
-     ↓                    ↓
-     (1)                  (1)
-     ↓                    ↓
-Shipping (n) ←──────────→ (1) InventoryRoll
-```
-
-### 9.3 權限管理關係圖
-
-```
-User (1) ───→ (n) UserOrganizationRole ←──→ (1) OrganizationRole
-     ↓                                              ↓
-     (1)                                            (1)
-     ↓                                              ↓
-UserOrganization ←──────→ (1) Organization ←──→ (n) OrganizationRole
-```
-
-## 10. 設計模式應用
-
-### 10.1 工廠模式
-
+#### QualityGrade
 ```typescript
-// 角色工廠
-class RoleFactory {
-  static createSystemRole(organizationId: string, roleType: SystemRoleType): OrganizationRole;
-  static createCustomRole(organizationId: string, data: CreateRoleData): OrganizationRole;
-}
-
-// 權限檢查器工廠
-class PermissionCheckerFactory {
-  static createChecker(userId: string, organizationId: string): PermissionGuard;
-  static createOrganizationChecker(userId: string): OrganizationAccessChecker;
+enum QualityGrade {
+  A_GRADE = "A級",
+  B_GRADE = "B級",
+  DEFECTIVE = "瑕疵品"
 }
 ```
 
-### 10.2 觀察者模式
+### 1.7 出貨管理
 
+#### Shipment
 ```typescript
-// 組織變更觀察者
-interface OrganizationChangeObserver {
-  onOrganizationSwitch(newOrganizationId: string): void;
-  onOrganizationUpdate(organization: Organization): void;
-  onMembershipChange(membership: UserOrganization): void;
-}
+class Shipment {
+  // 屬性
+  private id: string
+  private shipmentNumber: string
+  private orderId: string
+  private shipmentDate: Date
+  private totalWeight: number
+  private totalRolls: number
+  private createdBy: string
+  private createdAt: Date
+  private shipmentItems: ShipmentItem[]
 
-class OrganizationChangeNotifier {
-  private observers: OrganizationChangeObserver[] = [];
-  
-  addObserver(observer: OrganizationChangeObserver): void;
-  removeObserver(observer: OrganizationChangeObserver): void;
-  notifyOrganizationSwitch(organizationId: string): void;
-  notifyOrganizationUpdate(organization: Organization): void;
+  // 方法
+  public constructor(orderId: string, shipmentDate: Date, createdBy: string)
+  public addItem(item: ShipmentItem): void
+  public removeItem(itemId: string): void
+  public calculateTotals(): void
+  public updateOrderStatus(): void
+  public getShipmentSummary(): ShipmentSummary
 }
 ```
 
-### 10.3 策略模式
-
+#### ShipmentItem
 ```typescript
-// 權限檢查策略
-interface PermissionStrategy {
-  check(userId: string, organizationId: string, permission: string): Promise<boolean>;
-}
+class ShipmentItem {
+  // 屬性
+  private id: string
+  private shipmentId: string
+  private fabricRollId: string
+  private shippedWeight: number
+  private isWholeRoll: boolean
 
-class OwnerPermissionStrategy implements PermissionStrategy {
-  async check(userId: string, organizationId: string): Promise<boolean> {
-    // 組織擁有者檢查邏輯
-  }
-}
-
-class RoleBasedPermissionStrategy implements PermissionStrategy {
-  async check(userId: string, organizationId: string, permission: string): Promise<boolean> {
-    // 角色權限檢查邏輯
-  }
-}
-
-class PermissionChecker {
-  private strategies: PermissionStrategy[];
-  
-  constructor(strategies: PermissionStrategy[]) {
-    this.strategies = strategies;
-  }
-  
-  async hasPermission(userId: string, organizationId: string, permission: string): Promise<boolean> {
-    for (const strategy of this.strategies) {
-      if (await strategy.check(userId, organizationId, permission)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  // 方法
+  public constructor(fabricRollId: string, shippedWeight: number, isWholeRoll: boolean)
+  public updateShippedWeight(weight: number): void
+  public updateInventory(): void
+  public getFabricRollInfo(): FabricRoll
 }
 ```
 
-## 11. 測試類別設計
+## 2. 服務類別 (Service Classes)
 
-### 11.1 單元測試類別
+### 2.1 認證與授權服務
 
+#### AuthService
 ```typescript
-// 組織管理測試
-class OrganizationServiceTest {
-  testCreateOrganization(): void;
-  testInviteUser(): void;
-  testSwitchOrganization(): void;
-  testOrganizationPermissions(): void;
-}
-
-// 權限檢查測試
-class PermissionGuardTest {
-  testOwnerPermissions(): void;
-  testRolePermissions(): void;
-  testPermissionInheritance(): void;
-  testCrossOrganizationAccess(): void;
+class AuthService {
+  // 方法
+  public login(email: string, password: string): Promise<AuthResult>
+  public logout(): Promise<void>
+  public verifyToken(token: string): Promise<User>
+  public refreshToken(refreshToken: string): Promise<string>
+  public checkPermission(userId: string, permission: Permission): Promise<boolean>
+  public resetPassword(email: string): Promise<void>
+  public changePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean>
 }
 ```
 
-### 11.2 整合測試類別
+### 2.2 產品服務
 
+#### ProductService
 ```typescript
-// 多租戶整合測試
-class MultiTenantIntegrationTest {
-  testDataIsolation(): void;
-  testOrganizationSwitching(): void;
-  testPermissionInheritance(): void;
-  testCrossOrganizationSecurity(): void;
+class ProductService {
+  // 方法
+  public createProduct(data: CreateProductData): Promise<Product>
+  public getProductById(id: string): Promise<Product>
+  public updateProduct(id: string, data: UpdateProductData): Promise<Product>
+  public deleteProduct(id: string): Promise<void>
+  public searchProducts(criteria: ProductSearchCriteria): Promise<Product[]>
+  public setStockThreshold(productId: string, threshold: number): Promise<void>
+  public getProductsWithLowStock(): Promise<Product[]>
 }
 ```
 
----
+### 2.3 客戶服務
 
-**文檔版本**: 2.0  
-**最後更新**: 2025-06-17  
-**負責人**: 架構團隊  
-**審查週期**: 每週一次
+#### CustomerService
+```typescript
+class CustomerService {
+  // 方法
+  public createCustomer(data: CreateCustomerData): Promise<Customer>
+  public getCustomerById(id: string): Promise<Customer>
+  public updateCustomer(id: string, data: UpdateCustomerData): Promise<Customer>
+  public deleteCustomer(id: string): Promise<void>
+  public searchCustomers(criteria: CustomerSearchCriteria): Promise<Customer[]>
+  public getCustomerOrders(customerId: string): Promise<Order[]>
+}
+```
+
+### 2.4 供應商服務
+
+#### SupplierService
+```typescript
+class SupplierService {
+  // 方法
+  public createSupplier(data: CreateSupplierData): Promise<Supplier>
+  public getSupplierById(id: string): Promise<Supplier>
+  public updateSupplier(id: string, data: UpdateSupplierData): Promise<Supplier>
+  public deleteSupplier(id: string): Promise<void>
+  public searchSuppliers(criteria: SupplierSearchCriteria): Promise<Supplier[]>
+  public getSupplierPurchaseOrders(supplierId: string): Promise<PurchaseOrder[]>
+}
+```
+
+### 2.5 訂單服務
+
+#### OrderService
+```typescript
+class OrderService {
+  // 方法
+  public createOrder(data: CreateOrderData): Promise<Order>
+  public getOrderById(id: string): Promise<Order>
+  public updateOrder(id: string, data: UpdateOrderData): Promise<Order>
+  public updateOrderStatus(id: string, status: OrderStatus): Promise<Order>
+  public updatePaymentStatus(id: string, status: PaymentStatus): Promise<Order>
+  public cancelOrder(id: string): Promise<Order>
+  public searchOrders(criteria: OrderSearchCriteria): Promise<Order[]>
+  public getOrdersByCustomer(customerId: string): Promise<Order[]>
+  public getOrdersByDateRange(startDate: Date, endDate: Date): Promise<Order[]>
+  public addOrderItem(orderId: string, item: CreateOrderItemData): Promise<OrderItem>
+  public removeOrderItem(orderId: string, itemId: string): Promise<void>
+}
+```
+
+### 2.6 採購服務
+
+#### PurchaseService
+```typescript
+class PurchaseService {
+  // 方法
+  public createPurchaseOrder(data: CreatePurchaseOrderData): Promise<PurchaseOrder>
+  public getPurchaseOrderById(id: string): Promise<PurchaseOrder>
+  public updatePurchaseOrder(id: string, data: UpdatePurchaseOrderData): Promise<PurchaseOrder>
+  public updatePurchaseStatus(id: string, status: PurchaseStatus): Promise<PurchaseOrder>
+  public confirmPurchaseOrder(id: string): Promise<PurchaseOrder>
+  public cancelPurchaseOrder(id: string): Promise<PurchaseOrder>
+  public searchPurchaseOrders(criteria: PurchaseSearchCriteria): Promise<PurchaseOrder[]>
+  public getPurchaseOrdersBySupplier(supplierId: string): Promise<PurchaseOrder[]>
+  public addPurchaseItem(poId: string, item: CreatePurchaseItemData): Promise<PurchaseItem>
+  public removePurchaseItem(poId: string, itemId: string): Promise<void>
+}
+```
+
+### 2.7 庫存服務
+
+#### InventoryService
+```typescript
+class InventoryService {
+  // 方法
+  public createInventoryBatch(data: CreateInventoryBatchData): Promise<InventoryBatch>
+  public addFabricRoll(batchId: string, rollData: CreateFabricRollData): Promise<FabricRoll>
+  public updateFabricRollLocation(rollId: string, warehouseId: string, shelfLocation: string): Promise<FabricRoll>
+  public getFabricRollById(id: string): Promise<FabricRoll>
+  public searchInventory(criteria: InventorySearchCriteria): Promise<FabricRoll[]>
+  public getAvailableRollsForProduct(productId: string): Promise<FabricRoll[]>
+  public getCurrentStock(productId: string): Promise<number>
+  public getTotalStockByWarehouse(warehouseId: string): Promise<InventoryStockSummary>
+  public getStockHistory(rollId: string): Promise<StockHistoryEntry[]>
+  public checkLowStockProducts(): Promise<Product[]>
+}
+```
+
+### 2.8 出貨服務
+
+#### ShipmentService
+```typescript
+class ShipmentService {
+  // 方法
+  public createShipment(data: CreateShipmentData): Promise<Shipment>
+  public getShipmentById(id: string): Promise<Shipment>
+  public addShipmentItem(shipmentId: string, item: CreateShipmentItemData): Promise<ShipmentItem>
+  public removeShipmentItem(shipmentId: string, itemId: string): Promise<void>
+  public processShipment(shipmentId: string): Promise<void>
+  public getShipmentsByOrder(orderId: string): Promise<Shipment[]>
+  public getShipmentHistory(criteria: ShipmentSearchCriteria): Promise<Shipment[]>
+  public getShipmentsByDateRange(startDate: Date, endDate: Date): Promise<Shipment[]>
+}
+```
+
+### 2.9 報表服務
+
+#### ReportService
+```typescript
+class ReportService {
+  // 方法
+  public generateSalesReport(criteria: SalesReportCriteria): Promise<SalesReport>
+  public generateInventoryReport(criteria: InventoryReportCriteria): Promise<InventoryReport>
+  public generateMonthlySalesReport(year: number, month: number): Promise<MonthlySalesReport>
+  public generateCustomerReport(customerId: string, criteria: CustomerReportCriteria): Promise<CustomerReport>
+  public generateSupplierReport(supplierId: string, criteria: SupplierReportCriteria): Promise<SupplierReport>
+  public getDashboardMetrics(): Promise<DashboardMetrics>
+  public getBusinessPerformanceReport(salesPersonId: string, criteria: PerformanceReportCriteria): Promise<BusinessPerformanceReport>
+}
+```
+
+### 2.10 預警服務
+
+#### AlertService
+```typescript
+class AlertService {
+  // 方法
+  public checkLowStockAlerts(): Promise<void>
+  public sendLowStockAlert(productId: string, currentStock: number, threshold: number): Promise<void>
+  public createCustomAlert(criteria: AlertCriteria): Promise<Alert>
+  public getActiveAlerts(userId: string): Promise<Alert[]>
+  public markAlertAsRead(alertId: string): Promise<void>
+  public deleteAlert(alertId: string): Promise<void>
+  public scheduleRecurringCheck(): Promise<void>
+}
+```
+
+## 3. 控制器類別 (Controller Classes)
+
+### 3.1 API 控制器
+
+#### AuthController
+```typescript
+class AuthController {
+  private authService: AuthService
+
+  public login(request: LoginRequest): Promise<LoginResponse>
+  public logout(request: LogoutRequest): Promise<void>
+  public refreshToken(request: RefreshTokenRequest): Promise<RefreshTokenResponse>
+  public resetPassword(request: ResetPasswordRequest): Promise<void>
+  public changePassword(request: ChangePasswordRequest): Promise<void>
+}
+```
+
+#### ProductController
+```typescript
+class ProductController {
+  private productService: ProductService
+
+  public create(request: CreateProductRequest): Promise<ProductResponse>
+  public getById(id: string): Promise<ProductResponse>
+  public update(id: string, request: UpdateProductRequest): Promise<ProductResponse>
+  public delete(id: string): Promise<void>
+  public search(request: SearchProductRequest): Promise<ProductListResponse>
+  public setStockThreshold(id: string, request: SetThresholdRequest): Promise<void>
+}
+```
+
+#### OrderController
+```typescript
+class OrderController {
+  private orderService: OrderService
+
+  public create(request: CreateOrderRequest): Promise<OrderResponse>
+  public getById(id: string): Promise<OrderResponse>
+  public update(id: string, request: UpdateOrderRequest): Promise<OrderResponse>
+  public updateStatus(id: string, request: UpdateStatusRequest): Promise<OrderResponse>
+  public updatePaymentStatus(id: string, request: UpdatePaymentStatusRequest): Promise<OrderResponse>
+  public cancel(id: string): Promise<OrderResponse>
+  public search(request: SearchOrderRequest): Promise<OrderListResponse>
+  public addItem(id: string, request: AddOrderItemRequest): Promise<OrderItemResponse>
+  public removeItem(id: string, itemId: string): Promise<void>
+}
+```
+
+#### InventoryController
+```typescript
+class InventoryController {
+  private inventoryService: InventoryService
+
+  public createBatch(request: CreateInventoryBatchRequest): Promise<InventoryBatchResponse>
+  public addRoll(batchId: string, request: AddFabricRollRequest): Promise<FabricRollResponse>
+  public updateRollLocation(rollId: string, request: UpdateLocationRequest): Promise<FabricRollResponse>
+  public searchInventory(request: SearchInventoryRequest): Promise<InventoryListResponse>
+  public getCurrentStock(productId: string): Promise<StockResponse>
+  public getStockHistory(rollId: string): Promise<StockHistoryResponse>
+}
+```
+
+#### ShipmentController
+```typescript
+class ShipmentController {
+  private shipmentService: ShipmentService
+
+  public create(request: CreateShipmentRequest): Promise<ShipmentResponse>
+  public getById(id: string): Promise<ShipmentResponse>
+  public addItem(id: string, request: AddShipmentItemRequest): Promise<ShipmentItemResponse>
+  public removeItem(id: string, itemId: string): Promise<void>
+  public process(id: string): Promise<void>
+  public getHistory(request: SearchShipmentRequest): Promise<ShipmentListResponse>
+}
+```
+
+#### ReportController
+```typescript
+class ReportController {
+  private reportService: ReportService
+
+  public generateSalesReport(request: SalesReportRequest): Promise<SalesReportResponse>
+  public generateInventoryReport(request: InventoryReportRequest): Promise<InventoryReportResponse>
+  public getMonthlySalesReport(year: number, month: number): Promise<MonthlySalesReportResponse>
+  public getDashboardMetrics(): Promise<DashboardMetricsResponse>
+  public getBusinessPerformanceReport(salesPersonId: string, request: PerformanceReportRequest): Promise<BusinessPerformanceReportResponse>
+}
+```
+
+## 4. 資料傳輸物件 (DTO Classes)
+
+### 4.1 請求 DTO
+
+#### CreateProductRequest
+```typescript
+interface CreateProductRequest {
+  name: string
+  color: string
+  colorCode: string
+  stockThreshold?: number
+}
+```
+
+#### CreateOrderRequest
+```typescript
+interface CreateOrderRequest {
+  customerId: string
+  notes?: string
+  items: CreateOrderItemRequest[]
+}
+```
+
+#### CreateOrderItemRequest
+```typescript
+interface CreateOrderItemRequest {
+  productId: string
+  specifications: string
+  quantity: number
+  estimatedRolls: number
+  unitPrice: number
+}
+```
+
+#### CreateShipmentRequest
+```typescript
+interface CreateShipmentRequest {
+  orderId: string
+  shipmentDate: Date
+  items: CreateShipmentItemRequest[]
+}
+```
+
+#### CreateShipmentItemRequest
+```typescript
+interface CreateShipmentItemRequest {
+  fabricRollId: string
+  shippedWeight: number
+  isWholeRoll: boolean
+}
+```
+
+### 4.2 回應 DTO
+
+#### ProductResponse
+```typescript
+interface ProductResponse {
+  id: string
+  name: string
+  color: string
+  colorCode: string
+  unit: string
+  stockThreshold: number
+  createdAt: Date
+  updatedAt: Date
+}
+```
+
+#### OrderResponse
+```typescript
+interface OrderResponse {
+  id: string
+  orderNumber: string
+  customer: CustomerBasicInfo
+  status: OrderStatus
+  paymentStatus: PaymentStatus
+  shippingStatus: ShippingStatus
+  totalAmount: number
+  totalWeight: number
+  notes: string
+  createdAt: Date
+  updatedAt: Date
+  items: OrderItemResponse[]
+}
+```
+
+#### OrderItemResponse
+```typescript
+interface OrderItemResponse {
+  id: string
+  product: ProductBasicInfo
+  specifications: string
+  quantity: number
+  estimatedRolls: number
+  unitPrice: number
+  totalPrice: number
+}
+```
+
+## 5. 工具類別 (Utility Classes)
+
+### 5.1 驗證工具
+
+#### Validator
+```typescript
+class Validator {
+  public static validateEmail(email: string): boolean
+  public static validatePhone(phone: string): boolean
+  public static validatePassword(password: string): ValidationResult
+  public static validateColorCode(colorCode: string): boolean
+  public static validateWeight(weight: number): boolean
+  public static validateQuantity(quantity: number): boolean
+}
+```
+
+### 5.2 格式化工具
+
+#### Formatter
+```typescript
+class Formatter {
+  public static formatCurrency(amount: number): string
+  public static formatWeight(weight: number): string
+  public static formatDate(date: Date): string
+  public static formatDateTime(date: Date): string
+  public static formatOrderNumber(orderNumber: string): string
+  public static formatRollNumber(rollNumber: string): string
+}
+```
+
+### 5.3 計算工具
+
+#### Calculator
+```typescript
+class Calculator {
+  public static calculateOrderTotal(items: OrderItem[]): number
+  public static calculateWeightTotal(items: OrderItem[]): number
+  public static calculateShipmentTotal(items: ShipmentItem[]): number
+  public static calculateStockUsagePercentage(originalWeight: number, currentWeight: number): number
+  public static calculateTax(amount: number, taxRate: number): number
+}
+```
+
+## 6. 類別關係圖
+
+### 6.1 繼承關係
+- BaseEntity ← User, Product, Customer, Supplier, Order, PurchaseOrder
+- BaseService ← ProductService, OrderService, InventoryService, etc.
+- BaseController ← ProductController, OrderController, etc.
+
+### 6.2 組合關係
+- Order → OrderItem (1:N)
+- PurchaseOrder → PurchaseItem (1:N)
+- InventoryBatch → FabricRoll (1:N)
+- Shipment → ShipmentItem (1:N)
+
+### 6.3 聚合關係
+- Customer → Order (1:N)
+- Supplier → PurchaseOrder (1:N)
+- Product → OrderItem (1:N)
+- Product → PurchaseItem (1:N)
+- Product → FabricRoll (1:N)
+
+### 6.4 依賴關係
+- Controller → Service
+- Service → Entity
+- Service → Repository
+- Entity → DTO
+
+## 7. 設計模式應用
+
+### 7.1 Factory Pattern
+- OrderFactory: 用於建立不同類型的訂單
+- ReportFactory: 用於建立不同類型的報表
+
+### 7.2 Strategy Pattern
+- AlertStrategy: 不同的預警策略
+- ReportStrategy: 不同的報表生成策略
+
+### 7.3 Observer Pattern
+- OrderStatusObserver: 監聽訂單狀態變更
+- InventoryObserver: 監聽庫存變更
+
+### 7.4 Command Pattern
+- OrderCommand: 處理訂單相關操作
+- InventoryCommand: 處理庫存相關操作
+
+## 總結
+
+這個類別圖設計涵蓋了紡織業 ERP 系統的所有核心功能：
+
+1. **完整的實體模型**：包含使用者、產品、訂單、採購、庫存、出貨等核心業務實體
+2. **清晰的服務架構**：每個業務領域都有對應的服務類別
+3. **標準的 API 介面**：控制器類別提供標準的 REST API 介面
+4. **完善的資料傳輸**：DTO 類別確保資料的正確傳輸
+5. **實用的工具支援**：驗證、格式化、計算等工具類別
+6. **良好的設計模式**：應用工廠、策略、觀察者等設計模式
+
+這個設計與 PRD 和序列圖完全對應，為後續的單元測試撰寫和程式實作提供了清晰的藍圖。

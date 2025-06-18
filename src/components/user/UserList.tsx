@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,98 +10,24 @@ import { ViewUserDialog } from './ViewUserDialog';
 import { EditUserDialog } from './EditUserDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { toast } from 'sonner';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export const UserList = () => {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['organization_users', organizationId],
+    queryKey: ['users_with_roles'],
     queryFn: async () => {
-      if (!organizationId) {
-        console.log('No organization ID available');
-        return [];
-      }
+      const { data, error } = await supabase
+        .from('users_with_roles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      console.log('Fetching users for organization:', organizationId);
-      
-      // First get all user_organization relationships for this organization
-      const { data: userOrgs, error: userOrgsError } = await supabase
-        .from('user_organizations')
-        .select('user_id, is_active, joined_at')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true);
-
-      if (userOrgsError) {
-        console.error('Error fetching user organizations:', userOrgsError);
-        throw userOrgsError;
-      }
-
-      if (!userOrgs || userOrgs.length === 0) {
-        return [];
-      }
-
-      // Get user IDs
-      const userIds = userOrgs.map(uo => uo.user_id);
-
-      // Get profiles for these users
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, phone, is_active, created_at')
-        .in('id', userIds);
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-
-      // Get roles for these users
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_organization_roles')
-        .select(`
-          user_id,
-          organization_roles (
-            name,
-            display_name
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .in('user_id', userIds)
-        .eq('is_active', true);
-
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-        throw rolesError;
-      }
-
-      // Combine the data
-      const processedData = profiles?.map(profile => {
-        const userOrg = userOrgs.find(uo => uo.user_id === profile.id);
-        const roles = userRoles?.filter(ur => ur.user_id === profile.id) || [];
-        
-        return {
-          id: profile.id,
-          email: profile.email,
-          full_name: profile.full_name,
-          phone: profile.phone,
-          is_active: profile.is_active,
-          created_at: profile.created_at,
-          joined_at: userOrg?.joined_at,
-          roles: roles.map(role => ({
-            role: role.organization_roles?.name,
-            display_name: role.organization_roles?.display_name
-          }))
-        };
-      }) || [];
-
-      console.log('Fetched organization users:', processedData);
-      return processedData;
-    },
-    enabled: hasOrganization
+      if (error) throw error;
+      return data;
+    }
   });
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
@@ -123,7 +50,7 @@ export const UserList = () => {
           operation_details: { previous_status: currentStatus, new_status: !currentStatus }
         });
 
-      queryClient.invalidateQueries({ queryKey: ['organization_users'] });
+      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
       toast.success(currentStatus ? '使用者已停用' : '使用者已啟用');
     } catch (error) {
       console.error('Error toggling user status:', error);
@@ -172,7 +99,7 @@ export const UserList = () => {
       render: (value) => <span className="font-medium text-gray-900">{value}</span>
     },
     {
-      key: 'full_name', 
+      key: 'full_name',
       title: '姓名',
       sortable: true,
       filterable: false,
@@ -189,14 +116,21 @@ export const UserList = () => {
       key: 'roles',
       title: '角色',
       sortable: false,
-      filterable: false,
+      filterable: true,
+      filterOptions: [
+        { value: 'admin', label: '管理員' },
+        { value: 'sales', label: '業務' },
+        { value: 'assistant', label: '助理' },
+        { value: 'accounting', label: '會計' },
+        { value: 'warehouse', label: '倉管' }
+      ],
       render: (value, row) => {
         const roles = Array.isArray(row.roles) ? row.roles : [];
         return (
           <div className="flex flex-wrap gap-1">
             {roles.length > 0 ? roles.map((roleInfo: any, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                {roleInfo.display_name || roleInfo.role}
+              <Badge key={index} variant="outline" className={`text-xs ${getRoleBadge(roleInfo.role)}`}>
+                {getRoleText(roleInfo.role)}
               </Badge>
             )) : (
               <span className="text-gray-500">無角色</span>
@@ -221,8 +155,8 @@ export const UserList = () => {
       )
     },
     {
-      key: 'joined_at',
-      title: '加入時間',
+      key: 'created_at',
+      title: '建立時間',
       sortable: true,
       filterable: false,
       render: (value) => (
@@ -270,16 +204,6 @@ export const UserList = () => {
     }
   ];
 
-  if (!hasOrganization) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-700">請先選擇組織</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (isLoading) {
     return <div className="text-center py-8 text-gray-500">載入中...</div>;
   }
@@ -288,7 +212,7 @@ export const UserList = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-gray-900">組織成員列表</CardTitle>
+          <CardTitle className="text-gray-900">使用者列表</CardTitle>
         </CardHeader>
         <CardContent>
           <EnhancedTable

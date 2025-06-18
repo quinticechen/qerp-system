@@ -1,29 +1,52 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Eye } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditOrderDialog } from './EditOrderDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+
+interface OrderFactory {
+  id: string;
+  factories: {
+    name: string;
+  } | null;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  customer_id: string;
+  status: string;
+  payment_status: string;
+  shipping_status: string;
+  note: string | null;
+  created_at: string;
+  customers: {
+    name: string;
+  } | null;
+  order_products: Array<{
+    id: string;
+    quantity: number;
+    unit_price: number;
+    products_new: {
+      name: string;
+      color: string;
+    } | null;
+  }> | null;
+  order_factories: OrderFactory[] | null;
+}
 
 export const OrderList = () => {
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const { organizationId, hasOrganization } = useCurrentOrganization();
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
-  const { data: orders, isLoading, refetch } = useQuery({
-    queryKey: ['orders', organizationId],
+  const { data: orders, isLoading, error, refetch } = useQuery({
+    queryKey: ['orders'],
     queryFn: async () => {
-      if (!organizationId) {
-        console.log('No organization ID available');
-        return [];
-      }
-
-      console.log('Fetching orders for organization:', organizationId);
+      console.log('Fetching orders...');
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -33,10 +56,14 @@ export const OrderList = () => {
             id,
             quantity,
             unit_price,
+            shipped_quantity,
             products_new (name, color)
+          ),
+          order_factories (
+            id,
+            factories (name)
           )
         `)
-        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -45,44 +72,69 @@ export const OrderList = () => {
       }
 
       console.log('Fetched orders:', data);
-      return data;
-    },
-    enabled: hasOrganization
+      return data as Order[];
+    }
   });
-
-  const handleEdit = (order: any) => {
-    setSelectedOrder(order);
-    setEditDialogOpen(true);
-  };
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'confirmed': 'bg-blue-100 text-blue-800 border-blue-200',
-      'in_production': 'bg-purple-100 text-purple-800 border-purple-200',
-      'factory_ordered': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      'completed': 'bg-green-100 text-green-800 border-green-200',
-      'cancelled': 'bg-red-100 text-red-800 border-red-200'
+      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      confirmed: 'bg-blue-100 text-blue-800 border-blue-200',
+      factory_ordered: 'bg-purple-100 text-purple-800 border-purple-200',
+      completed: 'bg-green-100 text-green-800 border-green-200',
+      cancelled: 'bg-red-100 text-red-800 border-red-200'
+    };
+    return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getPaymentStatusBadge = (status: string) => {
+    const statusMap = {
+      unpaid: 'bg-red-100 text-red-800 border-red-200',
+      partial_paid: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      paid: 'bg-green-100 text-green-800 border-green-200'
+    };
+    return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const getShippingStatusBadge = (status: string) => {
+    const statusMap = {
+      not_started: 'bg-gray-100 text-gray-800 border-gray-200',
+      partial_shipped: 'bg-orange-100 text-orange-800 border-orange-200',
+      shipped: 'bg-green-100 text-green-800 border-green-200'
     };
     return statusMap[status as keyof typeof statusMap] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   const getStatusText = (status: string) => {
     const textMap = {
-      'pending': '待處理',
-      'confirmed': '已確認',
-      'in_production': '生產中',
-      'factory_ordered': '已向工廠下單',
-      'completed': '已完成',
-      'cancelled': '已取消'
+      pending: '待處理',
+      confirmed: '已確認',
+      factory_ordered: '已向工廠下單',
+      completed: '已完成',
+      cancelled: '已取消',
+      unpaid: '未付款',
+      partial_paid: '部分付款',
+      paid: '已付款',
+      not_started: '未開始',
+      partial_shipped: '部分出貨',
+      shipped: '已出貨'
     };
     return textMap[status as keyof typeof textMap] || status;
+  };
+
+  const calculateOrderTotal = (order: Order) => {
+    if (!order.order_products || !Array.isArray(order.order_products)) {
+      return 0;
+    }
+    return order.order_products.reduce((total, product) => 
+      total + (product.quantity * product.unit_price), 0
+    );
   };
 
   const columns: TableColumn[] = [
     {
       key: 'order_number',
-      title: '訂單號',
+      title: '訂單編號',
       sortable: true,
       filterable: false,
       render: (value) => <span className="font-medium text-gray-900">{value}</span>
@@ -92,17 +144,35 @@ export const OrderList = () => {
       title: '客戶',
       sortable: true,
       filterable: false,
-      render: (value, row) => <span className="text-gray-700">{row.customers?.name}</span>
+      render: (value, row) => <span className="text-gray-700">{row.customers?.name || '未知客戶'}</span>
+    },
+    {
+      key: 'order_factories',
+      title: '關聯工廠',
+      sortable: false,
+      filterable: false,
+      render: (value, row) => (
+        row.order_factories && row.order_factories.length > 0 ? (
+          <div className="space-y-1">
+            {row.order_factories.map((orderFactory: OrderFactory, index: number) => (
+              <div key={index} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                {orderFactory.factories?.name}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="text-gray-500 text-sm">無關聯工廠</span>
+        )
+      )
     },
     {
       key: 'status',
-      title: '狀態',
+      title: '訂單狀態',
       sortable: true,
       filterable: true,
       filterOptions: [
         { value: 'pending', label: '待處理' },
         { value: 'confirmed', label: '已確認' },
-        { value: 'in_production', label: '生產中' },
         { value: 'factory_ordered', label: '已向工廠下單' },
         { value: 'completed', label: '已完成' },
         { value: 'cancelled', label: '已取消' }
@@ -117,29 +187,44 @@ export const OrderList = () => {
       key: 'payment_status',
       title: '付款狀態',
       sortable: true,
-      filterable: false,
-      render: (value) => {
-        const paymentStatusMap = {
-          'unpaid': '未付款',
-          'partial_paid': '部分付款',
-          'paid': '已付款'
-        };
-        return <span className="text-gray-700">{paymentStatusMap[value as keyof typeof paymentStatusMap] || value}</span>;
-      }
+      filterable: true,
+      filterOptions: [
+        { value: 'unpaid', label: '未付款' },
+        { value: 'partial_paid', label: '部分付款' },
+        { value: 'paid', label: '已付款' }
+      ],
+      render: (value) => (
+        <Badge variant="outline" className={getPaymentStatusBadge(value)}>
+          {getStatusText(value)}
+        </Badge>
+      )
     },
     {
       key: 'shipping_status',
       title: '出貨狀態',
       sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'not_started', label: '未開始' },
+        { value: 'partial_shipped', label: '部分出貨' },
+        { value: 'shipped', label: '已出貨' }
+      ],
+      render: (value) => (
+        <Badge variant="outline" className={getShippingStatusBadge(value)}>
+          {getStatusText(value)}
+        </Badge>
+      )
+    },
+    {
+      key: 'total_amount',
+      title: '總金額',
+      sortable: true,
       filterable: false,
-      render: (value) => {
-        const shippingStatusMap = {
-          'not_started': '未開始',
-          'partial_shipped': '部分出貨',
-          'shipped': '已出貨'
-        };
-        return <span className="text-gray-700">{shippingStatusMap[value as keyof typeof shippingStatusMap] || value}</span>;
-      }
+      render: (value, row) => (
+        <span className="text-gray-900 font-medium">
+          ${calculateOrderTotal(row).toLocaleString()}
+        </span>
+      )
     },
     {
       key: 'created_at',
@@ -158,29 +243,17 @@ export const OrderList = () => {
       sortable: false,
       filterable: false,
       render: (value, row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setEditingOrder(row)}
+          className="text-gray-800 hover:text-gray-900 hover:bg-gray-100 border-gray-300"
+        >
+          <Edit className="h-4 w-4" />
+        </Button>
       )
     }
   ];
-
-  if (!hasOrganization) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-700">請先選擇組織</div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -192,32 +265,42 @@ export const OrderList = () => {
     );
   }
 
-  return (
-    <div className="space-y-6">
+  if (error) {
+    return (
       <Card>
-        <CardHeader>
-          <CardTitle className="text-gray-900">訂單列表</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EnhancedTable
-            columns={columns}
-            data={orders || []}
-            loading={isLoading}
-            searchPlaceholder="搜尋訂單號、客戶名稱..."
-            emptyMessage="沒有找到訂單"
-          />
+        <CardContent className="p-6">
+          <div className="text-center text-red-600">載入訂單時發生錯誤</div>
         </CardContent>
       </Card>
+    );
+  }
 
-      {/* 編輯對話框 */}
-      {selectedOrder && (
-        <EditOrderDialog
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
-          order={selectedOrder}
-          onOrderUpdated={refetch}
+  return (
+    <Card className="border-gray-200 shadow-sm">
+      <CardHeader className="border-b border-gray-100">
+        <CardTitle className="text-gray-900">訂單列表</CardTitle>
+        <CardDescription className="text-gray-600">
+          管理客戶訂單
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-6">
+        <EnhancedTable
+          columns={columns}
+          data={orders || []}
+          loading={isLoading}
+          searchPlaceholder="搜尋訂單編號、客戶名稱..."
+          emptyMessage="暫無訂單"
         />
-      )}
-    </div>
+
+        {editingOrder && (
+          <EditOrderDialog
+            order={editingOrder}
+            open={!!editingOrder}
+            onOpenChange={(open) => !open && setEditingOrder(null)}
+            onOrderUpdated={refetch}
+          />
+        )}
+      </CardContent>
+    </Card>
   );
 };

@@ -8,22 +8,14 @@ import { Eye, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewInventoryDialog } from './ViewInventoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export const InventoryList = () => {
   const [selectedInventory, setSelectedInventory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: inventories, isLoading } = useQuery({
-    queryKey: ['inventories', organizationId],
+    queryKey: ['inventories'],
     queryFn: async () => {
-      if (!organizationId) {
-        console.log('No organization ID available');
-        return [];
-      }
-
-      console.log('Fetching inventories for organization:', organizationId);
       const { data, error } = await supabase
         .from('inventories')
         .select(`
@@ -39,35 +31,24 @@ export const InventoryList = () => {
             products_new (name, color)
           )
         `)
-        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching inventories:', error);
-        throw error;
-      }
-
-      console.log('Fetched inventories:', data);
+      if (error) throw error;
       return data;
-    },
-    enabled: hasOrganization
+    }
   });
 
   const { data: factories } = useQuery({
-    queryKey: ['factories', organizationId],
+    queryKey: ['factories'],
     queryFn: async () => {
-      if (!organizationId) return [];
-      
       const { data, error } = await supabase
         .from('factories')
         .select('id, name')
-        .eq('organization_id', organizationId)
         .order('name');
       
       if (error) throw error;
       return data;
-    },
-    enabled: hasOrganization
+    }
   });
 
   const getQualityBadge = (quality: string) => {
@@ -185,24 +166,8 @@ export const InventoryList = () => {
     }
   ];
 
-  if (!hasOrganization) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-700">請先選擇組織</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-700">載入中...</div>
-        </CardContent>
-      </Card>
-    );
+    return <div className="text-center py-8 text-gray-500">載入中...</div>;
   }
 
   return (
