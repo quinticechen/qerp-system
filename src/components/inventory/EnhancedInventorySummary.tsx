@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,6 @@ interface InventorySummaryData {
   pending_in_quantity: number | null;
   pending_out_quantity: number | null;
   stock_thresholds: number | null;
-  organization_id?: string;
   a_grade_stock: number;
   b_grade_stock: number;
   c_grade_stock: number;
@@ -52,7 +52,7 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as InventorySummaryData[];
     },
     enabled: hasOrganization
   });
