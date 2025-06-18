@@ -22,7 +22,7 @@ interface InventoryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary = [], isLoading } = useQuery<InventoryItem[]>({
+  const { data: inventorySummary = [], isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
@@ -34,7 +34,8 @@ export const EnhancedInventorySummary = () => {
       
       if (error) throw error;
       
-      return (data || []).map((item: any): InventoryItem => ({
+      // Transform data to match our interface
+      const transformedData: InventoryItem[] = (data || []).map((item) => ({
         product_id: item.product_id || '',
         product_name: item.product_name || '',
         color: item.color,
@@ -45,6 +46,8 @@ export const EnhancedInventorySummary = () => {
         pending_out_quantity: item.pending_out_quantity ? Number(item.pending_out_quantity) : null,
         stock_thresholds: item.stock_thresholds ? Number(item.stock_thresholds) : null,
       }));
+
+      return transformedData;
     },
     enabled: hasOrganization
   });

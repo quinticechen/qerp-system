@@ -287,12 +287,10 @@ const Dashboard = () => {
         <CreatePurchaseDialog
           open={createPurchaseOpen}
           onOpenChange={setCreatePurchaseOpen}
-          onPurchaseCreated={handlePurchaseCreated}
         />
         <CreateShippingDialog
           open={createShippingOpen}
           onOpenChange={setCreateShippingOpen}
-          onShippingCreated={handleShippingCreated}
         />
       </div>
     </Layout>
