@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +9,25 @@ import { StockBadge } from './StockBadge';
 import { StockAlertBadge } from './StockAlertBadge';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
+interface InventorySummaryData {
+  product_id: string;
+  product_name: string;
+  color: string | null;
+  color_code: string | null;
+  total_stock: number;
+  total_rolls: number;
+  pending_in_quantity: number | null;
+  pending_out_quantity: number | null;
+  stock_thresholds: number | null;
+  organization_id: string;
+}
+
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary, isLoading } = useQuery({
+  const { data: inventorySummary, isLoading } = useQuery<InventorySummaryData[]>({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<InventorySummaryData[]> => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
@@ -24,7 +36,7 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as InventorySummaryData[];
     },
     enabled: hasOrganization
   });
