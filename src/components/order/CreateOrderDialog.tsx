@@ -97,6 +97,24 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // 生成訂單編號
+      const currentDate = new Date();
+      const year = currentDate.getFullYear().toString().slice(-2);
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}K${month}${day}`;
+      
+      // 獲取當日訂單數量來生成流水號
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gte('created_at', `${currentDate.toISOString().split('T')[0]}T00:00:00`)
+        .lt('created_at', `${currentDate.toISOString().split('T')[0]}T23:59:59`);
+
+      const sequenceNumber = String((count || 0) + 1).padStart(3, '0');
+      const orderNumber = `${dateStr}-${sequenceNumber}`;
+
       // 創建訂單
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -104,8 +122,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           customer_id: orderData.customer_id,
           organization_id: organizationId,
           note: orderData.note,
-          status: 'pending',
-          user_id: user.id
+          status: 'pending' as const,
+          user_id: user.id,
+          order_number: orderNumber
         })
         .select()
         .single();
@@ -236,6 +255,15 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     });
   };
 
+  // 生成顯示用的訂單編號
+  const generateDisplayOrderNumber = () => {
+    const currentDate = new Date();
+    const year = currentDate.getFullYear().toString().slice(-2);
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    return `${year}K${month}${day}-009`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -250,7 +278,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           {/* 訂單編號 */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <Label className="text-sm font-medium text-blue-800">訂單編號（自動生成）</Label>
-            <p className="text-lg font-bold text-blue-900">25K0618-009</p>
+            <p className="text-lg font-bold text-blue-900">{generateDisplayOrderNumber()}</p>
             <p className="text-xs text-blue-700">格式：年份K月份日期-流水號</p>
           </div>
 

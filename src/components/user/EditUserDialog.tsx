@@ -71,7 +71,7 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
         })
         .eq('id', user.id);
 
-      if (error) throw profileError;
+      if (profileError) throw profileError;
 
       // 更新角色 - 先刪除現有角色，再添加新角色
       const { error: deleteRoleError } = await supabase
