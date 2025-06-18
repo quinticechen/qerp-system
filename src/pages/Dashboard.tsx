@@ -170,7 +170,6 @@ const Dashboard = () => {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
-            <p className="text-slate-600 mt-1">{organization?.name} 的營運儀表板</p>
           </div>
         </div>
 
