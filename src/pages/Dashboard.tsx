@@ -139,10 +139,6 @@ const Dashboard = () => {
             <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
             <p className="text-slate-600 mt-1">{organization?.name} 的營運儀表板</p>
           </div>
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Plus size={16} className="mr-2" />
-            新增訂單
-          </Button>
         </div>
 
         {/* 統計卡片 */}
