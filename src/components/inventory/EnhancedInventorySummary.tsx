@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,22 +10,10 @@ import { StockBadge } from './StockBadge';
 import { StockAlertBadge } from './StockAlertBadge';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-type InventoryData = {
-  product_id: string;
-  product_name: string;
-  color: string | null;
-  color_code: string | null;
-  total_stock: number;
-  total_rolls: number;
-  pending_in_quantity: number;
-  pending_out_quantity: number;
-  stock_thresholds: number | null;
-};
-
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary, isLoading } = useQuery<InventoryData[]>({
+  const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
