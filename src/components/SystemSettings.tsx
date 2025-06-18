@@ -32,7 +32,6 @@ const SystemSettings = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
-          <p className="text-slate-600 mt-1">管理 {organization?.name} 的系統設定</p>
         </div>
       </div>
 
