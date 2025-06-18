@@ -9,10 +9,22 @@ import { StockBadge } from './StockBadge';
 import { StockAlertBadge } from './StockAlertBadge';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
+type InventoryData = {
+  product_id: string;
+  product_name: string;
+  color: string | null;
+  color_code: string | null;
+  total_stock: number;
+  total_rolls: number;
+  pending_in_quantity: number;
+  pending_out_quantity: number;
+  stock_thresholds: number | null;
+};
+
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary, isLoading } = useQuery({
+  const { data: inventorySummary, isLoading } = useQuery<InventoryData[]>({
     queryKey: ['inventory-summary-enhanced', organizationId],
     queryFn: async () => {
       if (!organizationId) return [];
@@ -23,7 +35,7 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: hasOrganization
   });
@@ -69,7 +81,7 @@ export const EnhancedInventorySummary = () => {
         <StockBadge 
           currentStock={value} 
           threshold={row.stock_thresholds}
-          type="current"
+          type="stock"
         />
       )
     },
