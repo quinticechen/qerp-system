@@ -1,16 +1,118 @@
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Package, TrendingDown, TrendingUp } from 'lucide-react';
-import { useInventorySummary, InventorySummaryItem } from '@/hooks/useInventorySummary';
+import { supabase } from '@/integrations/supabase/client';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { StockBadge } from './StockBadge';
 
+interface InventorySummaryItem {
+  product_id: string;
+  product_name: string;
+  color: string | null;
+  color_code: string | null;
+  stock_thresholds: number | null;
+  product_status: 'Available' | 'Unavailable';
+  total_stock: number;
+  total_rolls: number;
+  a_grade_stock: number;
+  b_grade_stock: number;
+  c_grade_stock: number;
+  d_grade_stock: number;
+  defective_stock: number;
+  a_grade_rolls: number;
+  b_grade_rolls: number;
+  c_grade_rolls: number;
+  d_grade_rolls: number;
+  defective_rolls: number;
+  a_grade_details: string[] | null;
+  b_grade_details: string[] | null;
+  c_grade_details: string[] | null;
+  d_grade_details: string[] | null;
+  defective_details: string[] | null;
+  pending_in_quantity: number;
+  pending_out_quantity: number;
+}
+
 export const EnhancedInventorySummary = () => {
-  const { inventoryData, loading, hasMore, searchTerm, loadMore, search } = useInventorySummary();
+  const { organizationId, hasOrganization } = useCurrentOrganization();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const { data: inventoryData = [], isLoading } = useQuery({
+    queryKey: ['inventory-summary-enhanced', organizationId],
+    queryFn: async (): Promise<InventorySummaryItem[]> => {
+      if (!organizationId) return [];
+
+      console.log('Fetching inventory for organization:', organizationId);
+
+      // First, get all products for this organization to filter the inventory
+      const { data: orgProducts, error: productsError } = await supabase
+        .from('products_new')
+        .select('id')
+        .eq('organization_id', organizationId);
+
+      if (productsError) {
+        console.error('Error fetching organization products:', productsError);
+        throw productsError;
+      }
+
+      if (!orgProducts || orgProducts.length === 0) {
+        console.log('No products found for organization');
+        return [];
+      }
+
+      const productIds = orgProducts.map(p => p.id);
+
+      // Then fetch inventory summary for these products
+      const { data, error } = await supabase
+        .from('inventory_summary_enhanced')
+        .select('*')
+        .in('product_id', productIds);
+      
+      if (error) {
+        console.error('Error fetching inventory:', error);
+        throw error;
+      }
+      
+      console.log('Raw inventory data:', data);
+      
+      // Transform data to match our interface
+      const transformedData: InventorySummaryItem[] = (data || []).map((item: any) => ({
+        product_id: item.product_id || '',
+        product_name: item.product_name || '未知產品',
+        color: item.color,
+        color_code: item.color_code,
+        stock_thresholds: item.stock_thresholds,
+        product_status: item.product_status || 'Available',
+        total_stock: Number(item.total_stock || 0),
+        total_rolls: Number(item.total_rolls || 0),
+        a_grade_stock: Number(item.a_grade_stock || 0),
+        b_grade_stock: Number(item.b_grade_stock || 0),
+        c_grade_stock: Number(item.c_grade_stock || 0),
+        d_grade_stock: Number(item.d_grade_stock || 0),
+        defective_stock: Number(item.defective_stock || 0),
+        a_grade_rolls: Number(item.a_grade_rolls || 0),
+        b_grade_rolls: Number(item.b_grade_rolls || 0),
+        c_grade_rolls: Number(item.c_grade_rolls || 0),
+        d_grade_rolls: Number(item.d_grade_rolls || 0),
+        defective_rolls: Number(item.defective_rolls || 0),
+        a_grade_details: item.a_grade_details,
+        b_grade_details: item.b_grade_details,
+        c_grade_details: item.c_grade_details,
+        d_grade_details: item.d_grade_details,
+        defective_details: item.defective_details,
+        pending_in_quantity: Number(item.pending_in_quantity || 0),
+        pending_out_quantity: Number(item.pending_out_quantity || 0),
+      }));
+
+      console.log('Transformed inventory data:', transformedData);
+      return transformedData;
+    },
+    enabled: hasOrganization
+  });
 
   const formatRollDetails = (details: string[] | null) => {
     if (!details || details.length === 0) return '0 kg';
@@ -44,6 +146,16 @@ export const EnhancedInventorySummary = () => {
   const getTotalPendingOut = () => {
     return inventoryData.reduce((sum, item) => sum + item.pending_out_quantity, 0);
   };
+
+  const search = (term: string) => {
+    setSearchTerm(term);
+  };
+
+  const filteredData = inventoryData.filter(item =>
+    !searchTerm || 
+    item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.color && item.color.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const columns: TableColumn[] = [
     {
@@ -218,7 +330,17 @@ export const EnhancedInventorySummary = () => {
     }
   ];
 
-  if (loading && inventoryData.length === 0) {
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
     return (
       <Card>
         <CardHeader>
@@ -297,12 +419,10 @@ export const EnhancedInventorySummary = () => {
         <CardContent>
           <EnhancedTable
             columns={columns}
-            data={inventoryData}
-            loading={loading}
-            hasMore={hasMore}
+            data={filteredData}
+            loading={isLoading}
             searchTerm={searchTerm}
             onSearch={search}
-            onLoadMore={loadMore}
             searchPlaceholder="搜尋產品名稱、顏色..."
             emptyMessage="暫無庫存數據"
           />

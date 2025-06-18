@@ -9,6 +9,7 @@ import { Plus, Edit, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface Customer {
   id: string;
@@ -17,6 +18,7 @@ interface Customer {
   phone: string | null;
   email: string | null;
   address: string | null;
+  organization_id: string | null;
   created_at: string;
 }
 
@@ -33,13 +35,21 @@ const CustomerManagement = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: customers, isLoading, error } = useQuery({
-    queryKey: ['customers'],
+  const { data: customers, isLoading, error, refetch } = useQuery({
+    queryKey: ['customers', organizationId],
     queryFn: async () => {
+      if (!organizationId) {
+        console.log('No organization ID available');
+        return [];
+      }
+
+      console.log('Fetching customers for organization:', organizationId);
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -47,22 +57,30 @@ const CustomerManagement = () => {
         throw error;
       }
 
+      console.log('Fetched customers:', data);
       return data as Customer[];
-    }
+    },
+    enabled: hasOrganization
   });
 
   const createCustomerMutation = useMutation({
-    mutationFn: async (newCustomer: Omit<Customer, 'id' | 'created_at'>) => {
+    mutationFn: async (newCustomer: Omit<Customer, 'id' | 'created_at' | 'organization_id'>) => {
+      if (!organizationId) {
+        throw new Error('No organization selected');
+      }
+
       const { data, error } = await supabase
         .from('customers')
-        .insert([newCustomer]);
+        .insert([{ ...newCustomer, organization_id: organizationId }])
+        .select()
+        .single();
 
       if (error) {
         console.error('Error creating customer:', error);
         throw error;
       }
 
-      return data;
+      return data as Customer;
     },
     onSuccess: () => {
       toast({
@@ -70,7 +88,6 @@ const CustomerManagement = () => {
         description: "客戶已成功建立",
       });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      setIsCreateDialogOpen(false);
       setNewCustomer({
         name: '',
         contact_person: '',
@@ -78,6 +95,7 @@ const CustomerManagement = () => {
         email: '',
         address: ''
       });
+      setIsCreateDialogOpen(false);
     },
     onError: (error) => {
       console.error('Error creating customer:', error);
@@ -201,17 +219,6 @@ const CustomerManagement = () => {
       render: (value) => <span className="text-gray-800">{value || '-'}</span>
     },
     {
-      key: 'created_at',
-      title: '建立時間',
-      sortable: true,
-      filterable: false,
-      render: (value) => (
-        <span className="text-gray-800">
-          {new Date(value).toLocaleDateString('zh-TW')}
-        </span>
-      )
-    },
-    {
       key: 'actions',
       title: '操作',
       sortable: false,
@@ -238,6 +245,16 @@ const CustomerManagement = () => {
       )
     }
   ];
+
+  if (!hasOrganization) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-700">請先選擇組織</div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

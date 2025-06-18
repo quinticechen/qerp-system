@@ -12,6 +12,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { FactorySelector } from './FactorySelector';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface CreateOrderDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId } = useCurrentOrganization();
   
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedFactoryIds, setSelectedFactoryIds] = useState<string[]>([]);
@@ -102,11 +104,12 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
   // Fetch customers
   const { data: customers } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customers')
         .select('id, name')
+        .eq('organization_id', organizationId)
         .order('name');
       
       if (error) throw error;
@@ -116,11 +119,13 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
   // Fetch all products
   const { data: allProducts } = useQuery({
-    queryKey: ['all-products'],
+    queryKey: ['all-products', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products_new')
         .select('id, name, color, color_code')
+        .eq('organization_id', organizationId)
+        .eq('status', 'Available')
         .order('name, color, color_code');
       
       if (error) throw error;
@@ -152,6 +157,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         .from('orders')
         .insert({
           customer_id: orderData.customer_id,
+          organization_id: organizationId,
           user_id: user.id,
           note: orderData.note,
           status: 'pending' as const,
