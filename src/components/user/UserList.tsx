@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,50 +27,75 @@ export const UserList = () => {
       }
 
       console.log('Fetching users for organization:', organizationId);
-      const { data, error } = await supabase
+      
+      // First get all user_organization relationships for this organization
+      const { data: userOrgs, error: userOrgsError } = await supabase
         .from('user_organizations')
-        .select(`
-          user_id,
-          is_active,
-          joined_at,
-          profiles (
-            id,
-            email,
-            full_name,
-            phone,
-            is_active,
-            created_at
-          ),
-          user_organization_roles (
-            role_id,
-            organization_roles (
-              name,
-              display_name
-            )
-          )
-        `)
+        .select('user_id, is_active, joined_at')
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 
-      if (error) {
-        console.error('Error fetching organization users:', error);
-        throw error;
+      if (userOrgsError) {
+        console.error('Error fetching user organizations:', userOrgsError);
+        throw userOrgsError;
       }
 
-      // 轉換資料格式
-      const processedData = data.map(item => ({
-        id: item.profiles?.id,
-        email: item.profiles?.email,
-        full_name: item.profiles?.full_name,
-        phone: item.profiles?.phone,
-        is_active: item.profiles?.is_active,
-        created_at: item.profiles?.created_at,
-        joined_at: item.joined_at,
-        roles: item.user_organization_roles?.map(role => ({
-          role: role.organization_roles?.name,
-          display_name: role.organization_roles?.display_name
-        })) || []
-      }));
+      if (!userOrgs || userOrgs.length === 0) {
+        return [];
+      }
+
+      // Get user IDs
+      const userIds = userOrgs.map(uo => uo.user_id);
+
+      // Get profiles for these users
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, phone, is_active, created_at')
+        .in('id', userIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
+
+      // Get roles for these users
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_organization_roles')
+        .select(`
+          user_id,
+          organization_roles (
+            name,
+            display_name
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .in('user_id', userIds)
+        .eq('is_active', true);
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        throw rolesError;
+      }
+
+      // Combine the data
+      const processedData = profiles?.map(profile => {
+        const userOrg = userOrgs.find(uo => uo.user_id === profile.id);
+        const roles = userRoles?.filter(ur => ur.user_id === profile.id) || [];
+        
+        return {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name,
+          phone: profile.phone,
+          is_active: profile.is_active,
+          created_at: profile.created_at,
+          joined_at: userOrg?.joined_at,
+          roles: roles.map(role => ({
+            role: role.organization_roles?.name,
+            display_name: role.organization_roles?.display_name
+          }))
+        };
+      }) || [];
 
       console.log('Fetched organization users:', processedData);
       return processedData;
@@ -148,7 +172,7 @@ export const UserList = () => {
       render: (value) => <span className="font-medium text-gray-900">{value}</span>
     },
     {
-      key: 'full_name',
+      key: 'full_name', 
       title: '姓名',
       sortable: true,
       filterable: false,
