@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -196,7 +195,6 @@ export const ShippingList = () => {
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             shipping={selectedShipping}
-            onShippingUpdated={refetch}
           />
         </>
       )}

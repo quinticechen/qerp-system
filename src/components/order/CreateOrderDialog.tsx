@@ -55,8 +55,9 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       const { data, error } = await supabase
         .from('orders')
         .insert({
-          ...orderData,
-          user_id: user.id,
+          customer_id: orderData.customer_id,
+          note: orderData.note,
+          organization_id: orderData.organization_id,
           status: 'pending',
           payment_status: 'unpaid',
           shipping_status: 'not_started'
