@@ -42,25 +42,27 @@ interface InventoryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  // 完全避免複雜的泛型推斷，使用 any 並立即轉換
-  const { data, isLoading } = useQuery({
-    queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async () => {
-      if (!organizationId) return [];
+  // 分離查詢邏輯以避免類型推斷問題
+  const fetchInventoryData = async (): Promise<any[]> => {
+    if (!organizationId) return [];
 
-      const { data, error } = await supabase
-        .from('inventory_summary_enhanced')
-        .select('*')
-        .eq('organization_id', organizationId);
-      
-      if (error) throw error;
-      return (data || []) as any[];
-    },
+    const { data, error } = await supabase
+      .from('inventory_summary_enhanced')
+      .select('*')
+      .eq('organization_id', organizationId);
+    
+    if (error) throw error;
+    return data || [];
+  };
+
+  const { data: rawData, isLoading } = useQuery({
+    queryKey: ['inventory-summary-enhanced', organizationId],
+    queryFn: fetchInventoryData,
     enabled: hasOrganization
   });
 
   // 手動轉換數據類型
-  const inventorySummary: InventoryItem[] = data ? data.map((item: any) => ({
+  const inventorySummary: InventoryItem[] = rawData ? rawData.map((item: any) => ({
     product_id: item.product_id || '',
     product_name: item.product_name || '',
     color: item.color,
