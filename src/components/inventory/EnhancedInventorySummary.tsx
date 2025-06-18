@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,8 @@ import { StockBadge } from './StockBadge';
 import { StockAlertBadge } from './StockAlertBadge';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-interface InventorySummaryData {
+// 簡化的接口定義，避免複雜的類型推斷
+interface InventoryItem {
   product_id: string;
   product_name: string;
   color: string | null;
@@ -40,9 +42,10 @@ interface InventorySummaryData {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary, isLoading } = useQuery({
+  // 簡化 useQuery 的使用，避免複雜的泛型推斷
+  const inventoryQuery = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async (): Promise<InventorySummaryData[]> => {
+    queryFn: async () => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
@@ -55,6 +58,9 @@ export const EnhancedInventorySummary = () => {
     },
     enabled: hasOrganization
   });
+
+  const inventorySummary = inventoryQuery.data as InventoryItem[] | undefined;
+  const isLoading = inventoryQuery.isLoading;
 
   const columns: TableColumn[] = [
     {
