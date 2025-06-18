@@ -9,7 +9,6 @@ import { Plus, Edit, Trash } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface Factory {
   id: string;
@@ -18,7 +17,6 @@ interface Factory {
   phone: string | null;
   email: string | null;
   address: string | null;
-  organization_id: string | null;
   created_at: string;
 }
 
@@ -35,21 +33,13 @@ const FactoryManagement = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: factories, isLoading, error, refetch } = useQuery({
-    queryKey: ['factories', organizationId],
+    queryKey: ['factories'],
     queryFn: async () => {
-      if (!organizationId) {
-        console.log('No organization ID available');
-        return [];
-      }
-
-      console.log('Fetching factories for organization:', organizationId);
       const { data, error } = await supabase
         .from('factories')
         .select('*')
-        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -57,21 +47,15 @@ const FactoryManagement = () => {
         throw error;
       }
 
-      console.log('Fetched factories:', data);
       return data as Factory[];
-    },
-    enabled: hasOrganization
+    }
   });
 
   const createFactoryMutation = useMutation({
-    mutationFn: async (newFactory: Omit<Factory, 'id' | 'created_at' | 'organization_id'>) => {
-      if (!organizationId) {
-        throw new Error('No organization selected');
-      }
-
+    mutationFn: async (newFactory: Omit<Factory, 'id' | 'created_at'>) => {
       const { data, error } = await supabase
         .from('factories')
-        .insert([{ ...newFactory, organization_id: organizationId }])
+        .insert([newFactory])
         .select()
         .single();
 
@@ -235,16 +219,6 @@ const FactoryManagement = () => {
       )
     }
   ];
-
-  if (!hasOrganization) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-gray-700">請先選擇組織</div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-6">

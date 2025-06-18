@@ -7,33 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Settings, Bell, Shield, Database, Users, Mail } from 'lucide-react';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 const SystemSettings = () => {
-  const { organization, hasOrganization } = useCurrentOrganization();
-
-  if (!hasOrganization) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
-        </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center text-gray-700">請先選擇組織</div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
-          <p className="text-slate-600 mt-1">管理 {organization?.name} 的系統設定</p>
-        </div>
+        <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -45,7 +24,7 @@ const SystemSettings = () => {
               通知設定
             </CardTitle>
             <CardDescription>
-              管理組織內的通知和警告設定
+              管理系統通知和警告設定
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -63,7 +42,7 @@ const SystemSettings = () => {
               <div className="space-y-0.5">
                 <Label className="text-base">新訂單通知</Label>
                 <p className="text-sm text-muted-foreground">
-                  收到新訂單時即時通知組織成員
+                  收到新訂單時即時通知相關人員
                 </p>
               </div>
               <Switch />
@@ -89,7 +68,7 @@ const SystemSettings = () => {
               權限管理
             </CardTitle>
             <CardDescription>
-              管理組織內使用者角色和權限設定
+              管理使用者角色和權限設定
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -107,7 +86,7 @@ const SystemSettings = () => {
               <div className="space-y-0.5">
                 <Label className="text-base">自動帳號啟用</Label>
                 <p className="text-sm text-muted-foreground">
-                  新邀請使用者自動啟用帳號
+                  新註冊使用者自動啟用帳號
                 </p>
               </div>
               <Switch />
@@ -123,7 +102,7 @@ const SystemSettings = () => {
               庫存設定
             </CardTitle>
             <CardDescription>
-              設定組織的庫存管理相關參數
+              設定庫存管理相關參數
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -160,7 +139,7 @@ const SystemSettings = () => {
               郵件設定
             </CardTitle>
             <CardDescription>
-              配置組織的郵件發送設定
+              配置系統郵件發送設定
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -202,39 +181,39 @@ const SystemSettings = () => {
           </CardContent>
         </Card>
 
-        {/* 組織資訊 */}
+        {/* 公司資訊 */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center">
               <Users className="mr-2" size={20} />
-              組織資訊
+              公司資訊
             </CardTitle>
             <CardDescription>
-              更新組織基本資訊
+              更新公司基本資訊
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="organization-name">組織名稱</Label>
+                <Label htmlFor="company-name">公司名稱</Label>
                 <Input
-                  id="organization-name"
-                  placeholder="請輸入組織名稱"
-                  defaultValue={organization?.name || ''}
+                  id="company-name"
+                  placeholder="請輸入公司名稱"
+                  defaultValue="紡織業股份有限公司"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="organization-phone">組織電話</Label>
+                <Label htmlFor="company-phone">公司電話</Label>
                 <Input
-                  id="organization-phone"
-                  placeholder="請輸入組織電話"
+                  id="company-phone"
+                  placeholder="請輸入公司電話"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="organization-address">組織地址</Label>
+              <Label htmlFor="company-address">公司地址</Label>
               <Input
-                id="organization-address"
+                id="company-address"
                 placeholder="請輸入完整地址"
               />
             </div>
