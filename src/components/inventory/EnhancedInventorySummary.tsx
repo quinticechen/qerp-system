@@ -19,15 +19,31 @@ interface InventorySummaryData {
   pending_in_quantity: number | null;
   pending_out_quantity: number | null;
   stock_thresholds: number | null;
-  organization_id: string;
+  organization_id?: string;
+  a_grade_stock: number;
+  b_grade_stock: number;
+  c_grade_stock: number;
+  d_grade_stock: number;
+  defective_stock: number;
+  a_grade_rolls: number;
+  b_grade_rolls: number;
+  c_grade_rolls: number;
+  d_grade_rolls: number;
+  defective_rolls: number;
+  a_grade_details: string[] | null;
+  b_grade_details: string[] | null;
+  c_grade_details: string[] | null;
+  d_grade_details: string[] | null;
+  defective_details: string[] | null;
+  product_status: string | null;
 }
 
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: inventorySummary, isLoading } = useQuery<InventorySummaryData[]>({
+  const { data: inventorySummary, isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
-    queryFn: async (): Promise<InventorySummaryData[]> => {
+    queryFn: async () => {
       if (!organizationId) return [];
 
       const { data, error } = await supabase
@@ -36,7 +52,7 @@ export const EnhancedInventorySummary = () => {
         .eq('organization_id', organizationId);
       
       if (error) throw error;
-      return (data || []) as InventorySummaryData[];
+      return data || [];
     },
     enabled: hasOrganization
   });
