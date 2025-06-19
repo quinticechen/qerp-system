@@ -1,4 +1,3 @@
-
 User-agent: *
 Allow: /
 Disallow: /api/
@@ -21,4 +20,4 @@ User-agent: facebookexternalhit
 Allow: /
 
 # Sitemap location
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://qerp.qwizai.com/sitemap.xml
