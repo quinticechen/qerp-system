@@ -1,0 +1,75 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://yourdomain.com/</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/login</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/login" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/dashboard</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/dashboard" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/product</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/product" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/customer</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/customer" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/factory</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/factory" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/order</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/order" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/purchase</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/purchase" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/inventory</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/inventory" />
+  </url>
+  <url>
+    <loc>https://yourdomain.com/shipping</loc>
+    <lastmod>2025-06-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/shipping" />
+  </url>
+</urlset>

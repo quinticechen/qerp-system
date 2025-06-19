@@ -1,5 +1,7 @@
+
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -165,138 +167,163 @@ const Dashboard = () => {
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">系統總覽</h2>
+    <>
+      <SEO
+        title="系統總覽"
+        description="紡織業 ERP 系統總覽儀表板，查看訂單統計、庫存狀態、客戶資訊及待出貨項目。即時掌握企業營運狀況。"
+        keywords="ERP儀表板, 紡織業管理, 訂單統計, 庫存管理, 營運總覽"
+      />
+      <Layout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-800 mb-2">系統總覽</h1>
+              <p className="text-slate-600">掌握您的紡織業務營運狀況</p>
+            </div>
           </div>
-        </div>
 
-        {/* 統計卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statsData.map((stat, index) => (
-            <Card key={index} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-600 mb-1">{stat.title}</p>
-                    <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-                    <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                      {stat.change} 較上月
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
-                    <stat.icon size={24} />
-                  </div>
+          {hasOrganization ? (
+            <>
+              {/* 統計卡片 */}
+              <section>
+                <h2 className="text-xl font-semibold text-slate-800 mb-4">營運統計</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {statsData.map((stat, index) => (
+                    <Card key={index} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-sm text-slate-600 mb-1">{stat.title}</h3>
+                            <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
+                            <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                              {stat.change} 較上月
+                            </p>
+                          </div>
+                          <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
+                            <stat.icon size={24} />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
+              </section>
+
+              {/* 最近訂單和快速操作 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <section>
+                  <Card>
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold">最近訂單</h2>
+                        <Button variant="outline" size="sm" onClick={() => navigate('/order')}>
+                          <Eye size={16} className="mr-2" />
+                          查看全部
+                        </Button>
+                      </div>
+                      <h3 className="text-sm text-slate-600 mb-4">最新的客戶訂單記錄</h3>
+                      <div className="space-y-4">
+                        {recentOrders?.map((order) => (
+                          <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-slate-800">{order.order_number}</p>
+                              <p className="text-sm text-slate-600">{order.customers?.name}</p>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={getStatusColor(order.status)}>
+                                {getStatusText(order.status)}
+                              </Badge>
+                              <p className="text-sm text-slate-600 mt-1">
+                                {new Date(order.created_at).toLocaleDateString('zh-TW')}
+                              </p>
+                            </div>
+                          </div>
+                        )) || (
+                          <div className="text-center py-4 text-slate-500">暫無訂單資料</div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                </section>
+
+                {/* 快速操作 */}
+                <section>
+                  <Card>
+                    <div className="p-6">
+                      <div className="flex items-center text-blue-600 mb-4">
+                        <TrendingUp size={20} className="mr-2" />
+                        <h2 className="text-lg font-semibold">快速操作</h2>
+                      </div>
+                      <h3 className="text-sm text-slate-600 mb-4">常用功能快速入口</h3>
+                      <div className="space-y-3">
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setCreateProductOpen(true)}
+                        >
+                          <Package size={16} className="mr-2" />
+                          新增產品
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setCreateCustomerOpen(true)}
+                        >
+                          <Users size={16} className="mr-2" />
+                          新增客戶
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setCreatePurchaseOpen(true)}
+                        >
+                          <ShoppingCart size={16} className="mr-2" />
+                          建立採購單
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setCreateShippingOpen(true)}
+                        >
+                          <Truck size={16} className="mr-2" />
+                          安排出貨
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                </section>
+              </div>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center text-gray-700">請先選擇組織</div>
               </CardContent>
             </Card>
-          ))}
+          )}
+
+          {/* 對話框 */}
+          <CreateProductDialog
+            open={createProductOpen}
+            onOpenChange={setCreateProductOpen}
+            onProductCreated={handleProductCreated}
+          />
+          <CreateCustomerDialog
+            open={createCustomerOpen}
+            onOpenChange={setCreateCustomerOpen}
+            onCustomerCreated={handleCustomerCreated}
+          />
+          <CreatePurchaseDialog
+            open={createPurchaseOpen}
+            onOpenChange={setCreatePurchaseOpen}
+          />
+          <CreateShippingDialog
+            open={createShippingOpen}
+            onOpenChange={setCreateShippingOpen}
+          />
         </div>
-
-        {/* 最近訂單 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">最近訂單</h3>
-                <Button variant="outline" size="sm" onClick={() => navigate('/order')}>
-                  <Eye size={16} className="mr-2" />
-                  查看全部
-                </Button>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">最新的客戶訂單記錄</p>
-              <div className="space-y-4">
-                {recentOrders?.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-slate-800">{order.order_number}</p>
-                      <p className="text-sm text-slate-600">{order.customers?.name}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge className={getStatusColor(order.status)}>
-                        {getStatusText(order.status)}
-                      </Badge>
-                      <p className="text-sm text-slate-600 mt-1">
-                        {new Date(order.created_at).toLocaleDateString('zh-TW')}
-                      </p>
-                    </div>
-                  </div>
-                )) || (
-                  <div className="text-center py-4 text-slate-500">暫無訂單資料</div>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* 快速操作 */}
-          <Card>
-            <div className="p-6">
-              <div className="flex items-center text-blue-600 mb-4">
-                <TrendingUp size={20} className="mr-2" />
-                <h3 className="text-lg font-semibold">快速操作</h3>
-              </div>
-              <p className="text-sm text-slate-600 mb-4">常用功能快速入口</p>
-              <div className="space-y-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setCreateProductOpen(true)}
-                >
-                  <Package size={16} className="mr-2" />
-                  新增產品
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setCreateCustomerOpen(true)}
-                >
-                  <Users size={16} className="mr-2" />
-                  新增客戶
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setCreatePurchaseOpen(true)}
-                >
-                  <ShoppingCart size={16} className="mr-2" />
-                  建立採購單
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setCreateShippingOpen(true)}
-                >
-                  <Truck size={16} className="mr-2" />
-                  安排出貨
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* 對話框 */}
-        <CreateProductDialog
-          open={createProductOpen}
-          onOpenChange={setCreateProductOpen}
-          onProductCreated={handleProductCreated}
-        />
-        <CreateCustomerDialog
-          open={createCustomerOpen}
-          onOpenChange={setCreateCustomerOpen}
-          onCustomerCreated={handleCustomerCreated}
-        />
-        <CreatePurchaseDialog
-          open={createPurchaseOpen}
-          onOpenChange={setCreatePurchaseOpen}
-        />
-        <CreateShippingDialog
-          open={createShippingOpen}
-          onOpenChange={setCreateShippingOpen}
-        />
-      </div>
-    </Layout>
+      </Layout>
+    </>
   );
 };
 
