@@ -1,75 +1,74 @@
-
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://yourdomain.com/</loc>
+    <loc>https://qerp.qwizai.com/</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/" />
   </url>
   <url>
-    <loc>https://yourdomain.com/login</loc>
+    <loc>https://qerp.qwizai.com/login</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/login" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/login" />
   </url>
   <url>
-    <loc>https://yourdomain.com/dashboard</loc>
+    <loc>https://qerp.qwizai.com/dashboard</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/dashboard" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/dashboard" />
   </url>
   <url>
-    <loc>https://yourdomain.com/product</loc>
+    <loc>https://qerp.qwizai.com/product</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/product" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/product" />
   </url>
   <url>
-    <loc>https://yourdomain.com/customer</loc>
+    <loc>https://qerp.qwizai.com/customer</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/customer" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/customer" />
   </url>
   <url>
-    <loc>https://yourdomain.com/factory</loc>
+    <loc>https://qerp.qwizai.com/factory</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/factory" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/factory" />
   </url>
   <url>
-    <loc>https://yourdomain.com/order</loc>
+    <loc>https://qerp.qwizai.com/order</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/order" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/order" />
   </url>
   <url>
-    <loc>https://yourdomain.com/purchase</loc>
+    <loc>https://qerp.qwizai.com/purchase</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/purchase" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/purchase" />
   </url>
   <url>
-    <loc>https://yourdomain.com/inventory</loc>
+    <loc>https://qerp.qwizai.com/inventory</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/inventory" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/inventory" />
   </url>
   <url>
-    <loc>https://yourdomain.com/shipping</loc>
+    <loc>https://qerp.qwizai.com/shipping</loc>
     <lastmod>2025-06-19</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://yourdomain.com/shipping" />
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/shipping" />
   </url>
 </urlset>
