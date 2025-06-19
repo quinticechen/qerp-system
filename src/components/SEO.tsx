@@ -33,8 +33,8 @@ export const SEO: React.FC<SEOProps> = ({
       <link rel="canonical" href={currentUrl} />
       
       {/* Hreflang Tag */}
-      <link rel="alternate" hreflang="zh-TW" href={currentUrl} />
-      <link rel="alternate" hreflang="x-default" href={currentUrl} />
+      <link rel="alternate" hrefLang="zh-TW" href={currentUrl} />
+      <link rel="alternate" hrefLang="x-default" href={currentUrl} />
       
       {/* Open Graph Meta Tags */}
       <meta property="og:title" content={fullTitle} />
