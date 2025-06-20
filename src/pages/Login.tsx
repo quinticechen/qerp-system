@@ -208,7 +208,7 @@ const Login = () => {
       <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       
       {/* 主要內容 */}
-      <div className="w-full max-w-md space-y-8 relative z-10 px-4">
+      <div className="w-full max-w-md m-8 space-y-8 relative z-10 px-4">
         {/* Logo 和標題區域 */}
         <div className="text-center space-y-6">
           <div className="flex justify-center">
