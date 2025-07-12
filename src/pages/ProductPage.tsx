@@ -14,10 +14,6 @@ const ProductPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">產品管理</h1>
-            <p className="text-slate-600">管理所有紡織產品的詳細資訊與庫存狀況</p>
-          </div>
           <ProductManagement />
         </div>
       </Layout>
