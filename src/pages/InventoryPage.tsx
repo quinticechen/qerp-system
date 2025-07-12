@@ -14,10 +14,6 @@ const InventoryPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">庫存管理</h1>
-            <p className="text-slate-600">即時監控庫存狀況，管理進出庫作業</p>
-          </div>
           <InventoryManagement />
         </div>
       </Layout>
