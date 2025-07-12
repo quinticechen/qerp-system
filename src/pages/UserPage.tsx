@@ -16,10 +16,6 @@ const UserPage = () => {
       <Layout>
         <PermissionGuard permission="canViewUsers">
           <div className="space-y-6">
-            <div className="border-b border-gray-200 pb-4">
-              <h1 className="text-3xl font-bold text-slate-800 mb-2">使用者管理</h1>
-              <p className="text-slate-600">管理系統使用者與權限設定</p>
-            </div>
             <UserManagement />
           </div>
         </PermissionGuard>
