@@ -14,10 +14,6 @@ const SystemPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">系統設定</h1>
-            <p className="text-slate-600">調整系統參數與功能設定</p>
-          </div>
           <SystemSettings />
         </div>
       </Layout>

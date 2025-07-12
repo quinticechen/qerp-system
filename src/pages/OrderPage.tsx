@@ -14,10 +14,6 @@ const OrderPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">訂單管理</h1>
-            <p className="text-slate-600">處理客戶訂單，追蹤訂單狀態與出貨進度</p>
-          </div>
           <OrderManagement />
         </div>
       </Layout>
