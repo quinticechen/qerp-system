@@ -506,24 +506,8 @@ const Login = () => {
 
         {/* 底部資訊 - 保持不變 */}
         <div className="text-center space-y-4">
-          <div className="flex flex-wrap justify-center gap-2 text-xs">
-            {[
-              { role: '業務', color: 'bg-blue-100 text-blue-700' },
-              { role: '助理', color: 'bg-green-100 text-green-700' },
-              { role: '會計', color: 'bg-purple-100 text-purple-700' },
-              { role: '倉庫管理員', color: 'bg-orange-100 text-orange-700' },
-              { role: '高層', color: 'bg-indigo-100 text-indigo-700' }
-            ].map(({ role, color }) => (
-              <span
-                key={role}
-                className={`px-3 py-1 rounded-full font-medium ${color} border border-current/20`}
-              >
-                {role}
-              </span>
-            ))}
-          </div>
           <p className="text-slate-500 text-sm font-medium">
-            © 2025 紡織業 ERP 系統. 版權所有.
+            © 2025 QERP 系統. QWIZ AI LLC 版權所有.
           </p>
         </div>
       </div>
