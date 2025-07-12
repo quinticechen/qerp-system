@@ -14,10 +14,6 @@ const CustomerPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">客戶管理</h1>
-            <p className="text-slate-600">維護客戶資料與關係，追蹤客戶互動歷史</p>
-          </div>
           <CustomerManagement />
         </div>
       </Layout>
