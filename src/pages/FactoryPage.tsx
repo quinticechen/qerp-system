@@ -14,10 +14,6 @@ const FactoryPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">工廠管理</h1>
-            <p className="text-slate-600">管理合作工廠，協調生產製造作業</p>
-          </div>
           <FactoryManagement />
         </div>
       </Layout>
