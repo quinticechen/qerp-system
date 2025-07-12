@@ -175,12 +175,6 @@ const Dashboard = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-800 mb-2">系統總覽</h1>
-              <p className="text-slate-600">掌握您的紡織業務營運狀況</p>
-            </div>
-          </div>
 
           {hasOrganization ? (
             <>
