@@ -14,10 +14,6 @@ const ShippingPage = () => {
       />
       <Layout>
         <div className="space-y-6">
-          <div className="border-b border-gray-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">出貨管理</h1>
-            <p className="text-slate-600">安排出貨作業，追蹤物流配送狀態</p>
-          </div>
           <ShippingManagement />
         </div>
       </Layout>
