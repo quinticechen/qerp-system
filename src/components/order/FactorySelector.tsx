@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
 import { X, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface Factory {
   id: string;
@@ -22,17 +23,23 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
   selectedFactoryIds,
   onFactoriesChange,
 }) => {
+  const { organizationId } = useCurrentOrganization();
+  
   const { data: factories } = useQuery({
-    queryKey: ['factories'],
+    queryKey: ['factories', organizationId],
     queryFn: async () => {
+      if (!organizationId) return [];
+      
       const { data, error } = await supabase
         .from('factories')
         .select('id, name')
+        .eq('organization_id', organizationId)
         .order('name');
       
       if (error) throw error;
       return data as Factory[];
-    }
+    },
+    enabled: !!organizationId
   });
 
   const handleAddFactory = (factoryId: string) => {
