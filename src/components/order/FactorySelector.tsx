@@ -67,36 +67,37 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-gray-900 flex items-center justify-between">
-          關聯工廠 (可選擇多個)
-          {availableFactories.length > 0 && (
-            <Combobox
-              options={factoryOptions}
-              onValueChange={handleAddFactory}
-              placeholder="選擇工廠..."
-              searchPlaceholder="搜尋工廠..."
-              emptyText="未找到工廠"
-              className="w-48"
-            />
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4 pt-4">
+        {/* Factory Selection Dropdown */}
+        <div className="space-y-2">
+          <Combobox
+            options={factoryOptions}
+            onValueChange={handleAddFactory}
+            placeholder="選擇工廠..."
+            searchPlaceholder="搜尋工廠..."
+            emptyText="未找到工廠"
+            className="w-full"
+          />
+        </div>
+        
+        {/* Selected Factories Display */}
         {selectedFactories.length > 0 ? (
-          selectedFactories.map((factory) => (
-            <div key={factory.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
-              <span className="text-gray-800">{factory.name}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRemoveFactory(factory.id)}
-                className="text-red-600 hover:text-red-700"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ))
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-700">已選擇的工廠：</div>
+            {selectedFactories.map((factory) => (
+              <div key={factory.id} className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                <span className="text-gray-800">{factory.name}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRemoveFactory(factory.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="text-gray-500 text-sm">尚未選擇工廠</div>
         )}
