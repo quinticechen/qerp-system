@@ -10,6 +10,9 @@ import { Plus, Trash } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 import { FactorySelector } from './FactorySelector';
+import { CreateCustomerDialog } from '../customer/CreateCustomerDialog';
+import { CreateFactoryDialog } from '../factory/CreateFactoryDialog';
+import { CreateProductDialog } from '../product/CreateProductDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -53,6 +56,11 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     unit_price: 0,
     specifications: {}
   }]);
+  
+  // Dialog states for creating new entities
+  const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
+  const [isCreateFactoryOpen, setIsCreateFactoryOpen] = useState(false);
+  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
 
   // Generate next order number preview when dialog opens
   useEffect(() => {
@@ -130,7 +138,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       
       if (error) throw error;
       return data as Product[];
-    }
+    },
+    enabled: !!organizationId
   });
 
   // Get unique product names
@@ -243,6 +252,22 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     }]);
   };
 
+  // Handlers for creating new entities
+  const handleCustomerCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ['customers', organizationId] });
+    setIsCreateCustomerOpen(false);
+  };
+
+  const handleFactoryCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ['factories', organizationId] });
+    setIsCreateFactoryOpen(false);
+  };
+
+  const handleProductCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ['all-products', organizationId] });
+    setIsCreateProductOpen(false);
+  };
+
   const addProduct = () => {
     setProducts([...products, {
       base_product_name: '',
@@ -331,7 +356,18 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
 
           {/* Customer Selection */}
           <div className="space-y-2">
-            <Label className="text-gray-800">客戶 *</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-800">客戶 *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateCustomerOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                新增客戶
+              </Button>
+            </div>
             <Combobox
               options={customerOptions}
               value={selectedCustomer}
@@ -344,19 +380,44 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           </div>
 
           {/* Factory Selection */}
-          <FactorySelector 
-            selectedFactoryIds={selectedFactoryIds}
-            onFactoriesChange={setSelectedFactoryIds}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-gray-800">關聯工廠 (可選擇多個)</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateFactoryOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                新增工廠
+              </Button>
+            </div>
+            <FactorySelector 
+              selectedFactoryIds={selectedFactoryIds}
+              onFactoriesChange={setSelectedFactoryIds}
+            />
+          </div>
 
           {/* Products Section */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <Label className="text-gray-800">產品明細 *</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addProduct}>
-                <Plus className="h-4 w-4 mr-2" />
-                新增產品
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateProductOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  新增產品
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={addProduct}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  新增明細
+                </Button>
+              </div>
             </div>
 
             {products.map((product, index) => {
@@ -492,6 +553,25 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Create dialogs */}
+      <CreateCustomerDialog
+        open={isCreateCustomerOpen}
+        onOpenChange={setIsCreateCustomerOpen}
+        onCustomerCreated={handleCustomerCreated}
+      />
+      
+      <CreateFactoryDialog
+        open={isCreateFactoryOpen}
+        onOpenChange={setIsCreateFactoryOpen}
+        onFactoryCreated={handleFactoryCreated}
+      />
+      
+      <CreateProductDialog
+        open={isCreateProductOpen}
+        onOpenChange={setIsCreateProductOpen}
+        onProductCreated={handleProductCreated}
+      />
     </Dialog>
   );
 };
