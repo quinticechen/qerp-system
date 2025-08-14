@@ -92,6 +92,10 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
             value: variant.id,
             label: displayText,
             extra: variant.color_code ? (
+              <div 
+                className="w-4 h-4 rounded border border-gray-300 ml-2" 
+                style={{ backgroundColor: variant.color_code }}
+              />
             ) : null,
           };
         });
