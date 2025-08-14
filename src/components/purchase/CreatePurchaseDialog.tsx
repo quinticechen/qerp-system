@@ -233,8 +233,14 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
         title: "成功",
         description: "採購單已成功建立並設為已下單狀態，關聯訂單狀態已更新為「已向工廠下單」",
       });
+      // 刷新所有相關查詢
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['purchases', organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-inventory', organizationId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', organizationId] });
+      
       onOpenChange(false);
       resetForm();
       
