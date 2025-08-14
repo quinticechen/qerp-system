@@ -19,6 +19,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 interface CreateShippingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (shipping: any) => void;
 }
 
 interface OrderProduct {
@@ -46,6 +47,7 @@ interface ShippingItem {
 export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   open,
   onOpenChange,
+  onSuccess,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -67,6 +69,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     customerId?: string;
     orderId?: string;
     selectedItems?: string;
+    shippingItems?: { [key: string]: { rolls?: string; quantities?: string } };
   }>({});
 
   // 獲取客戶
@@ -248,7 +251,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
       return shipping;
     },
-    onSuccess: () => {
+    onSuccess: (shipping) => {
       toast({
         title: "成功",
         description: "出貨單已成功建立",
@@ -258,6 +261,11 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       onOpenChange(false);
       resetForm();
+      
+      // 調用成功回調來打開新創建的出貨單預覽
+      if (onSuccess) {
+        onSuccess(shipping);
+      }
     },
     onError: (error) => {
       console.error('Error creating shipping:', error);
@@ -348,6 +356,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
 
   const handleSubmit = () => {
     const errors: typeof validationErrors = {};
+    const shippingItemErrors: { [key: string]: { rolls?: string; quantities?: string } } = {};
     
     if (!customerId) {
       errors.customerId = "請選擇客戶";
@@ -357,18 +366,53 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       errors.orderId = "請選擇訂單";
     }
 
+    // 檢查是否有選擇任何產品
+    if (selectedItems.length === 0) {
+      errors.selectedItems = "請至少選擇一個產品進行出貨";
+      setValidationErrors({ ...errors, shippingItems: shippingItemErrors });
+      return;
+    }
+
+    // 詳細驗證每個選擇的項目
+    let hasValidItems = false;
+    selectedItems.forEach((item, index) => {
+      const itemErrors: { rolls?: string; quantities?: string } = {};
+      
+      // 檢查是否有選擇卷數
+      const validRolls = item.rolls.filter(roll => roll.inventory_roll_id);
+      if (validRolls.length === 0) {
+        itemErrors.rolls = "請至少選擇一卷布料";
+      }
+      
+      // 檢查每個卷數是否有輸入出貨數量
+      const hasValidQuantities = item.rolls.some(roll => 
+        roll.inventory_roll_id && roll.shipped_quantity > 0
+      );
+      
+      if (validRolls.length > 0 && !hasValidQuantities) {
+        itemErrors.quantities = "請輸入出貨數量";
+      }
+      
+      if (Object.keys(itemErrors).length > 0) {
+        shippingItemErrors[item.order_product_id] = itemErrors;
+      } else {
+        hasValidItems = true;
+      }
+    });
+
+    if (!hasValidItems) {
+      errors.selectedItems = "請確保至少有一個產品選擇了卷數並輸入了出貨數量";
+    }
+
+    if (Object.keys(errors).length > 0 || Object.keys(shippingItemErrors).length > 0) {
+      setValidationErrors({ ...errors, shippingItems: shippingItemErrors });
+      return;
+    }
+
+    // 只包含有效的項目
     const validItems = selectedItems.filter(item => 
       item.rolls.some(roll => roll.inventory_roll_id && roll.shipped_quantity > 0)
     );
-
-    if (validItems.length === 0) {
-      errors.selectedItems = "請至少選擇一個有效的出貨項目";
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      return;
-    }
 
     setValidationErrors({});
     createShippingMutation.mutate({
@@ -590,10 +634,17 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                             )}
                           </div>
 
-                          {availableRollsForProduct.length === 0 ? (
+                           {availableRollsForProduct.length === 0 ? (
                             <p className="text-sm text-red-600">⚠️ 此產品無庫存布卷可供出貨</p>
                           ) : (
-                            selectedItem.rolls.map((roll, rollIndex) => {
+                            <>
+                              {validationErrors.shippingItems?.[product.id]?.rolls && (
+                                <p className="text-sm text-red-600 mb-2">{validationErrors.shippingItems[product.id].rolls}</p>
+                              )}
+                              {validationErrors.shippingItems?.[product.id]?.quantities && (
+                                <p className="text-sm text-red-600 mb-2">{validationErrors.shippingItems[product.id].quantities}</p>
+                              )}
+                              {selectedItem.rolls.map((roll, rollIndex) => {
                               const rollSelectorKey = `${product.id}-${rollIndex}`;
                               const selectedRoll = availableRollsForProduct.find(r => r.id === roll.inventory_roll_id);
                               const maxQuantity = selectedRoll ? selectedRoll.current_quantity : 0;
@@ -704,7 +755,8 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                   </div>
                                 </div>
                               );
-                            })
+                            })}
+                            </>
                           )}
                         </div>
                       )}
