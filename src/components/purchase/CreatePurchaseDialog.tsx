@@ -179,7 +179,21 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchase_orders')
         .insert(insertData)
-        .select()
+        .select(`
+          *,
+          factories (name),
+          purchase_order_items (
+            id,
+            ordered_quantity,
+            received_quantity,
+            unit_price,
+            specifications,
+            products_new (name, color, color_code)
+          ),
+          purchase_order_relations (
+            orders (order_number, note)
+          )
+        `)
         .single();
 
       if (purchaseError) throw purchaseError;
@@ -227,7 +241,34 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
         }
       }
 
-      return purchase;
+      // 重新查詢完整的採購單數據包含所有關聯
+      const { data: completePurchase, error: queryError } = await supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          factories (name),
+          purchase_order_items (
+            id,
+            ordered_quantity,
+            received_quantity,
+            unit_price,
+            specifications,
+            products_new (name, color, color_code)
+          ),
+          purchase_order_relations (
+            orders (order_number, note)
+          )
+        `)
+        .eq('id', purchase.id)
+        .single();
+
+      if (queryError) {
+        console.error('Error fetching complete purchase data:', queryError);
+        // 如果查詢失敗，返回基本數據
+        return purchase;
+      }
+
+      return completePurchase;
     },
     onSuccess: async (purchase) => {
       toast({
