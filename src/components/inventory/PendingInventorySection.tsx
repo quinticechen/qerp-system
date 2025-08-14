@@ -39,7 +39,7 @@ export const PendingInventorySection: React.FC = () => {
           )
         `)
         .eq('purchase_orders.organization_id', organizationId)
-        .in('status', ['pending', 'partial_received']);
+        .in('status', ['pending', 'confirmed', 'partial_received']);
       
       if (error) throw error;
 
