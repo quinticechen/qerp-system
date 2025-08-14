@@ -93,7 +93,7 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
             label: displayText,
             extra: variant.color_code ? (
               <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+                {/* <div className="flex items-center space-x-2">
                   <div 
                     className="w-3 h-3 rounded border border-gray-400"
                     style={{ backgroundColor: variant.color_code }}
@@ -106,7 +106,7 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
                     style={{ backgroundColor: variant.color_code }}
                   ></div>
                   <span className="text-xs text-gray-500">{variant.color_code}</span>
-                </div>
+                </div> */}
               </div>
             ) : null,
           };
