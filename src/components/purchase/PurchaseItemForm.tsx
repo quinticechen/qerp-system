@@ -29,6 +29,7 @@ interface PurchaseItemFormProps {
   setProductNameOpen: (open: boolean) => void;
   colorOpen: boolean;
   setColorOpen: (open: boolean) => void;
+  errors?: { product_id?: string; ordered_quantity?: string; unit_price?: string };
 }
 
 export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
@@ -44,6 +45,7 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
   setProductNameOpen,
   colorOpen,
   setColorOpen,
+  errors,
 }) => {
   console.log(`PurchaseItemForm ${index} - Received item:`, item);
   console.log(`PurchaseItemForm ${index} - selected_product_name:`, item.selected_product_name);
@@ -155,6 +157,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
               </Command>
             </PopoverContent>
           </Popover>
+          {errors?.product_id && (
+            <p className="text-sm text-red-600">{errors.product_id}</p>
+          )}
         </div>
 
         {/* Color/Color Code Selection */}
@@ -226,6 +231,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
               </Command>
             </PopoverContent>
           </Popover>
+          {errors?.product_id && (
+            <p className="text-sm text-red-600">{errors.product_id}</p>
+          )}
         </div>
 
         {/* Quantity Input */}
@@ -239,6 +247,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
             onChange={(e) => updateItem(index, 'ordered_quantity', parseFloat(e.target.value) || 0)}
             placeholder="輸入數量"
           />
+          {errors?.ordered_quantity && (
+            <p className="text-sm text-red-600">{errors.ordered_quantity}</p>
+          )}
         </div>
 
         {/* Unit Price Input */}
@@ -252,6 +263,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
             onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
             placeholder="輸入單價"
           />
+          {errors?.unit_price && (
+            <p className="text-sm text-red-600">{errors.unit_price}</p>
+          )}
         </div>
       </div>
 

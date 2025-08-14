@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { FactorySelector } from './FactorySelector';
 import { OrderSelector } from './OrderSelector';
 import { OrderProductsDisplay } from './OrderProductsDisplay';
@@ -24,6 +25,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId } = useCurrentOrganization();
   
   const [factoryId, setFactoryId] = useState('');
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -42,33 +44,43 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   const [orderSearchOpen, setOrderSearchOpen] = useState(false);
   const [productNameOpens, setProductNameOpens] = useState<Record<number, boolean>>({});
   const [colorOpens, setColorOpens] = useState<Record<number, boolean>>({});
+  
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState<{
+    factoryId?: string;
+    items?: { [index: number]: { product_id?: string; ordered_quantity?: string; unit_price?: string } };
+  }>({});
 
-  // Fetch factories for selection
+  // Fetch factories for selection (organization-specific)
   const { data: factories } = useQuery({
-    queryKey: ['factories'],
+    queryKey: ['factories', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('factories')
         .select('id, name')
+        .eq('organization_id', organizationId)
         .order('name');
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!organizationId
   });
 
-  // Fetch orders for selection
+  // Fetch orders for selection (organization-specific)
   const { data: orders } = useQuery({
-    queryKey: ['orders'],
+    queryKey: ['orders', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
         .select('id, order_number, note')
+        .eq('organization_id', organizationId)
         .order('order_number');
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!organizationId
   });
 
   // Fetch order products for selected orders
@@ -106,14 +118,15 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     }
   });
 
-  // Fetch products for manual addition
+  // Fetch products for manual addition (organization-specific)
   const { data: products } = useQuery({
-    queryKey: ['products'],
+    queryKey: ['products', organizationId],
     queryFn: async () => {
       console.log('Fetching products...');
       const { data, error } = await supabase
         .from('products_new')
         .select('id, name, color, color_code')
+        .eq('organization_id', organizationId)
         .order('name, color');
       
       if (error) {
@@ -122,7 +135,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       }
       console.log('Products fetched:', data?.length || 0, 'products');
       return data;
-    }
+    },
+    enabled: !!organizationId
   });
 
   // Get unique product names
@@ -246,6 +260,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     }]);
     setProductNameOpens({});
     setColorOpens({});
+    setValidationErrors({});
   };
 
   const addItem = () => {
@@ -296,13 +311,55 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     console.log('CreatePurchaseDialog - setItems called with new array');
   };
 
-  const handleSubmit = () => {
+  const validateForm = () => {
+    const errors: typeof validationErrors = {};
+    
+    // Validate factory selection
     if (!factoryId) {
-      toast({
-        title: "錯誤",
-        description: "請選擇工廠",
-        variant: "destructive",
-      });
+      errors.factoryId = "請選擇工廠";
+    }
+    
+    // Validate items
+    const itemErrors: { [index: number]: { product_id?: string; ordered_quantity?: string; unit_price?: string } } = {};
+    let hasValidItem = false;
+    
+    items.forEach((item, index) => {
+      const itemError: { product_id?: string; ordered_quantity?: string; unit_price?: string } = {};
+      
+      if (!item.product_id) {
+        itemError.product_id = "請選擇產品和顏色";
+      }
+      if (!item.ordered_quantity || item.ordered_quantity <= 0) {
+        itemError.ordered_quantity = "請輸入有效的數量";
+      }
+      if (!item.unit_price || item.unit_price <= 0) {
+        itemError.unit_price = "請輸入有效的單價";
+      }
+      
+      if (Object.keys(itemError).length > 0) {
+        itemErrors[index] = itemError;
+      } else {
+        hasValidItem = true;
+      }
+    });
+    
+    if (!hasValidItem) {
+      // If no valid items, ensure at least the first item shows all errors
+      if (!itemErrors[0]) {
+        itemErrors[0] = {};
+      }
+    }
+    
+    if (Object.keys(itemErrors).length > 0) {
+      errors.items = itemErrors;
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validateForm()) {
       return;
     }
 
@@ -311,15 +368,6 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       item.ordered_quantity > 0 && 
       item.unit_price > 0
     );
-
-    if (validItems.length === 0) {
-      toast({
-        title: "錯誤",
-        description: "請至少新增一個有效的產品項目",
-        variant: "destructive",
-      });
-      return;
-    }
 
     createPurchaseMutation.mutate({
       factory_id: factoryId,
@@ -346,9 +394,15 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
             <FactorySelector
               factories={factories}
               factoryId={factoryId}
-              setFactoryId={setFactoryId}
+              setFactoryId={(id) => {
+                setFactoryId(id);
+                if (validationErrors.factoryId) {
+                  setValidationErrors(prev => ({ ...prev, factoryId: undefined }));
+                }
+              }}
               factoryOpen={factoryOpen}
               setFactoryOpen={setFactoryOpen}
+              error={validationErrors.factoryId}
             />
 
             <div className="space-y-2">
@@ -386,11 +440,27 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
             getColorVariants={getColorVariants}
             addItem={addItem}
             removeItem={removeItem}
-            updateItem={updateItem}
+            updateItem={(index, field, value) => {
+              updateItem(index, field, value);
+              // Clear validation errors for this field
+              if (validationErrors.items?.[index]?.[field as keyof PurchaseItem]) {
+                setValidationErrors(prev => ({
+                  ...prev,
+                  items: {
+                    ...prev.items,
+                    [index]: {
+                      ...prev.items?.[index],
+                      [field]: undefined
+                    }
+                  }
+                }));
+              }
+            }}
             productNameOpens={productNameOpens}
             setProductNameOpens={setProductNameOpens}
             colorOpens={colorOpens}
             setColorOpens={setColorOpens}
+            itemErrors={validationErrors.items}
           />
 
           {/* Note */}
