@@ -25,6 +25,7 @@ interface PurchaseItemsSectionProps {
   setProductNameOpens: (opens: Record<number, boolean>) => void;
   colorOpens: Record<number, boolean>;
   setColorOpens: (opens: Record<number, boolean>) => void;
+  itemErrors?: { [index: number]: { product_id?: string; ordered_quantity?: string; unit_price?: string } };
 }
 
 export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
@@ -39,6 +40,7 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
   setProductNameOpens,
   colorOpens,
   setColorOpens,
+  itemErrors,
 }) => {
   console.log('PurchaseItemsSection - items state:', items);
   console.log('PurchaseItemsSection - items length:', items.length);
@@ -63,6 +65,7 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
       <CardContent className="space-y-4">
         {items.map((item, index) => {
           console.log(`PurchaseItemsSection - Rendering item ${index}:`, item);
+          const itemFieldErrors = itemErrors?.[index];
           return (
             <PurchaseItemForm
               key={`item-${index}`}
@@ -84,6 +87,7 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
                 console.log(`Setting colorOpen for index ${index} to:`, open);
                 setColorOpens({ ...colorOpens, [index]: open });
               }}
+              errors={itemFieldErrors}
             />
           );
         })}

@@ -48,8 +48,22 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
 
           {factory.phone && (
             <div className="space-y-2">
-              <Label>電話</Label>
+              <Label>手機</Label>
               <div className="p-2 bg-gray-50 rounded">{factory.phone}</div>
+            </div>
+          )}
+
+          {factory.landline_phone && (
+            <div className="space-y-2">
+              <Label>市話</Label>
+              <div className="p-2 bg-gray-50 rounded">{factory.landline_phone}</div>
+            </div>
+          )}
+
+          {factory.fax && (
+            <div className="space-y-2">
+              <Label>傳真</Label>
+              <div className="p-2 bg-gray-50 rounded">{factory.fax}</div>
             </div>
           )}
 
@@ -64,6 +78,13 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
             <div className="space-y-2">
               <Label>地址</Label>
               <div className="p-2 bg-gray-50 rounded">{factory.address}</div>
+            </div>
+          )}
+
+          {factory.note && (
+            <div className="space-y-2">
+              <Label>備註</Label>
+              <div className="p-2 bg-gray-50 rounded">{factory.note}</div>
             </div>
           )}
 

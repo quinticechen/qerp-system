@@ -35,14 +35,9 @@ export const OrderProductsDisplay: React.FC<OrderProductsDisplayProps> = ({
                     </div>
                     <div className="text-sm text-gray-600">
                       {orderProduct.products_new.color && (
-                        <span className="flex items-center space-x-2">
-                          {orderProduct.products_new.color_code && (
-                            <div 
-                              className="w-4 h-4 rounded border border-gray-400"
-                              style={{ backgroundColor: orderProduct.products_new.color_code }}
-                            ></div>
-                          )}
-                          <span>{orderProduct.products_new.color} {orderProduct.products_new.color_code}</span>
+                        <span>
+                          {orderProduct.products_new.color} 
+                          {orderProduct.products_new.color_code ? ` (${orderProduct.products_new.color_code})` : ''}
                         </span>
                       )}
                     </div>

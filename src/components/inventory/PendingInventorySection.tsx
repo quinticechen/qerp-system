@@ -39,7 +39,7 @@ export const PendingInventorySection: React.FC = () => {
           )
         `)
         .eq('purchase_orders.organization_id', organizationId)
-        .in('status', ['pending', 'partial_received']);
+        .in('status', ['pending', 'confirmed', 'partial_received']);
       
       if (error) throw error;
 
@@ -80,13 +80,7 @@ export const PendingInventorySection: React.FC = () => {
       sortable: false,
       filterable: false,
       render: (value) => value ? (
-        <div className="flex items-center space-x-2">
-          <div 
-            className="w-4 h-4 rounded border border-gray-400"
-            style={{ backgroundColor: value }}
-          />
-          <span className="text-sm text-gray-900">{value}</span>
-        </div>
+        <span className="text-sm text-gray-900">{value}</span>
       ) : (
         <span className="text-gray-500">-</span>
       )

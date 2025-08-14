@@ -32,8 +32,11 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
     name: '',
     contact_person: '',
     phone: '',
+    landline_phone: '',
+    fax: '',
     email: '',
-    address: ''
+    address: '',
+    note: ''
   });
 
   useEffect(() => {
@@ -42,14 +45,32 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
         name: factory.name || '',
         contact_person: factory.contact_person || '',
         phone: factory.phone || '',
+        landline_phone: factory.landline_phone || '',
+        fax: factory.fax || '',
         email: factory.email || '',
-        address: factory.address || ''
+        address: factory.address || '',
+        note: factory.note || ''
       });
     }
   }, [factory]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 驗證必填欄位
+    if (!formData.name.trim()) {
+      toast.error('請輸入工廠名稱');
+      return;
+    }
+    if (!formData.contact_person.trim()) {
+      toast.error('請輸入聯絡人');
+      return;
+    }
+    if (!formData.phone.trim() && !formData.landline_phone.trim()) {
+      toast.error('請至少輸入一個電話號碼（手機或市話）');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -95,20 +116,41 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="contact_person">聯絡人</Label>
+            <Label htmlFor="contact_person">聯絡人 *</Label>
             <Input
               id="contact_person"
               value={formData.contact_person}
               onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">電話</Label>
+            <Label htmlFor="phone">手機 *</Label>
             <Input
               id="phone"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="至少填寫手機或市話其中一個"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="landline_phone">市話 *</Label>
+            <Input
+              id="landline_phone"
+              value={formData.landline_phone}
+              onChange={(e) => setFormData({ ...formData, landline_phone: e.target.value })}
+              placeholder="至少填寫手機或市話其中一個"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="fax">傳真</Label>
+            <Input
+              id="fax"
+              value={formData.fax}
+              onChange={(e) => setFormData({ ...formData, fax: e.target.value })}
             />
           </div>
 
@@ -128,6 +170,16 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
               id="address"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="note">備註</Label>
+            <Textarea
+              id="note"
+              value={formData.note}
+              onChange={(e) => setFormData({ ...formData, note: e.target.value })}
               rows={3}
             />
           </div>

@@ -6,10 +6,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { PurchaseList } from './purchase/PurchaseList';
 import { CreatePurchaseDialog } from './purchase/CreatePurchaseDialog';
+import { ViewPurchaseDialog } from './purchase/ViewPurchaseDialog';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 
 const PurchaseManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+
+  const handleCreateSuccess = (purchase: any) => {
+    // 設置新創建的採購單並打開預覽
+    setSelectedPurchase(purchase);
+    setViewDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -42,7 +51,17 @@ const PurchaseManagement = () => {
       <CreatePurchaseDialog 
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
+        onSuccess={handleCreateSuccess}
       />
+      
+      {/* 新創建採購單的預覽對話框 */}
+      {selectedPurchase && (
+        <ViewPurchaseDialog
+          open={viewDialogOpen}
+          onOpenChange={setViewDialogOpen}
+          purchase={selectedPurchase}
+        />
+      )}
     </div>
   );
 };

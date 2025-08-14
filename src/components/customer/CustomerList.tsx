@@ -69,7 +69,21 @@ export const CustomerList = () => {
     },
     {
       key: 'phone',
-      title: '電話',
+      title: '手機',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'landline_phone',
+      title: '市話',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '-'}</span>
+    },
+    {
+      key: 'fax',
+      title: '傳真',
       sortable: true,
       filterable: false,
       render: (value) => <span className="text-gray-700">{value || '-'}</span>
@@ -93,13 +107,13 @@ export const CustomerList = () => {
       )
     },
     {
-      key: 'created_at',
-      title: '建立時間',
-      sortable: true,
+      key: 'note',
+      title: '備註',
+      sortable: false,
       filterable: false,
       render: (value) => (
-        <span className="text-gray-700">
-          {new Date(value).toLocaleDateString('zh-TW')}
+        <span className="text-gray-700 max-w-xs truncate block">
+          {value || '-'}
         </span>
       )
     },

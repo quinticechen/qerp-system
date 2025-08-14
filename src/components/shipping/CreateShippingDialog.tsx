@@ -14,10 +14,12 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface CreateShippingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (shipping: any) => void;
 }
 
 interface OrderProduct {
@@ -45,9 +47,11 @@ interface ShippingItem {
 export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   open,
   onOpenChange,
+  onSuccess,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId } = useCurrentOrganization();
   
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
@@ -59,19 +63,29 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   const [customerOpen, setCustomerOpen] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
   const [rollSelectors, setRollSelectors] = useState<{[key: string]: boolean}>({});
+  
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState<{
+    customerId?: string;
+    orderId?: string;
+    selectedItems?: string;
+    shippingItems?: { [key: string]: { rolls?: string; quantities?: string } };
+  }>({});
 
   // 獲取客戶
   const { data: customers } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('customers')
         .select('id, name')
+        .eq('organization_id', organizationId)
         .order('name');
       
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!organizationId
   });
 
   // 獲取選中客戶的訂單
@@ -199,6 +213,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
           user_id: user.id,
+          organization_id: organizationId,
           shipping_number: uniqueShippingNumber
         } as any)
         .select()
@@ -235,9 +250,34 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
         }
       }
 
-      return shipping;
+      // 重新查詢完整的出貨單數據包含所有關聯
+      const { data: completeShipping, error: queryError } = await supabase
+        .from('shippings')
+        .select(`
+          *,
+          customers (name),
+          orders (order_number, note),
+          shipping_items (
+            id,
+            shipped_quantity,
+            inventory_rolls (
+              roll_number,
+              products_new (name, color, color_code)
+            )
+          )
+        `)
+        .eq('id', shipping.id)
+        .single();
+
+      if (queryError) {
+        console.error('Error fetching complete shipping data:', queryError);
+        // 如果查詢失敗，返回基本數據
+        return shipping;
+      }
+
+      return completeShipping;
     },
-    onSuccess: () => {
+    onSuccess: (shipping) => {
       toast({
         title: "成功",
         description: "出貨單已成功建立",
@@ -247,6 +287,11 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       onOpenChange(false);
       resetForm();
+      
+      // 調用成功回調來打開新創建的出貨單預覽
+      if (onSuccess) {
+        onSuccess(shipping);
+      }
     },
     onError: (error) => {
       console.error('Error creating shipping:', error);
@@ -336,28 +381,66 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!customerId || !orderId) {
-      toast({
-        title: "錯誤",
-        description: "請選擇客戶和訂單",
-        variant: "destructive",
-      });
+    const errors: typeof validationErrors = {};
+    const shippingItemErrors: { [key: string]: { rolls?: string; quantities?: string } } = {};
+    
+    if (!customerId) {
+      errors.customerId = "請選擇客戶";
+    }
+    
+    if (!orderId) {
+      errors.orderId = "請選擇訂單";
+    }
+
+    // 檢查是否有選擇任何產品
+    if (selectedItems.length === 0) {
+      errors.selectedItems = "請至少選擇一個產品進行出貨";
+      setValidationErrors({ ...errors, shippingItems: shippingItemErrors });
       return;
     }
 
+    // 詳細驗證每個選擇的項目
+    let hasValidItems = false;
+    selectedItems.forEach((item, index) => {
+      const itemErrors: { rolls?: string; quantities?: string } = {};
+      
+      // 檢查是否有選擇卷數
+      const validRolls = item.rolls.filter(roll => roll.inventory_roll_id);
+      if (validRolls.length === 0) {
+        itemErrors.rolls = "請至少選擇一卷布料";
+      }
+      
+      // 檢查每個卷數是否有輸入出貨數量
+      const hasValidQuantities = item.rolls.some(roll => 
+        roll.inventory_roll_id && roll.shipped_quantity > 0
+      );
+      
+      if (validRolls.length > 0 && !hasValidQuantities) {
+        itemErrors.quantities = "請輸入出貨數量";
+      }
+      
+      if (Object.keys(itemErrors).length > 0) {
+        shippingItemErrors[item.order_product_id] = itemErrors;
+      } else {
+        hasValidItems = true;
+      }
+    });
+
+    if (!hasValidItems) {
+      errors.selectedItems = "請確保至少有一個產品選擇了卷數並輸入了出貨數量";
+    }
+
+    if (Object.keys(errors).length > 0 || Object.keys(shippingItemErrors).length > 0) {
+      setValidationErrors({ ...errors, shippingItems: shippingItemErrors });
+      return;
+    }
+
+    // 只包含有效的項目
     const validItems = selectedItems.filter(item => 
       item.rolls.some(roll => roll.inventory_roll_id && roll.shipped_quantity > 0)
     );
 
-    if (validItems.length === 0) {
-      toast({
-        title: "錯誤",
-        description: "請至少選擇一個有效的出貨項目",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setValidationErrors({});
     createShippingMutation.mutate({
       customer_id: customerId,
       order_id: orderId,
@@ -390,7 +473,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50"
+                    className={cn(
+                      "w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50",
+                      validationErrors.customerId && "border-red-500"
+                    )}
                   >
                     <span className="truncate">
                       {selectedCustomer ? selectedCustomer.name : "選擇客戶..."}
@@ -413,6 +499,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                               setOrderId('');
                               setSelectedItems([]);
                               setCustomerOpen(false);
+                              setValidationErrors(prev => ({ ...prev, customerId: undefined }));
                             }}
                             className="cursor-pointer"
                           >
@@ -430,6 +517,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                   </Command>
                 </PopoverContent>
               </Popover>
+              {validationErrors.customerId && (
+                <p className="text-sm text-red-600">{validationErrors.customerId}</p>
+              )}
             </div>
 
             {/* 訂單選擇 */}
@@ -441,7 +531,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                     variant="outline"
                     role="combobox"
                     disabled={!customerId}
-                    className="w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50"
+                    className={cn(
+                      "w-full justify-between border-gray-300 text-gray-900 hover:bg-gray-50 disabled:opacity-50",
+                      validationErrors.orderId && "border-red-500"
+                    )}
                   >
                     <span className="truncate">
                       {selectedOrder ? selectedOrder.order_number : "選擇訂單..."}
@@ -463,6 +556,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                               setOrderId(order.id);
                               setSelectedItems([]);
                               setOrderOpen(false);
+                              setValidationErrors(prev => ({ ...prev, orderId: undefined }));
                             }}
                             className="cursor-pointer"
                           >
@@ -480,6 +574,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                   </Command>
                 </PopoverContent>
               </Popover>
+              {validationErrors.orderId && (
+                <p className="text-sm text-red-600">{validationErrors.orderId}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -524,14 +621,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                           onCheckedChange={(checked) => toggleProductSelection(product, checked as boolean)}
                           className="border-gray-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                         />
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            {product.products_new.color_code && (
-                              <div 
-                                className="w-6 h-6 rounded border border-gray-400 flex-shrink-0"
-                                style={{ backgroundColor: product.products_new.color_code }}
-                              />
-                            )}
+                          <div className="flex-1">
                             <div>
                               <h4 className="font-medium text-gray-900">
                                 {product.products_new.name}
@@ -541,7 +631,6 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                 {product.products_new.color_code && ` (${product.products_new.color_code})`}
                               </p>
                             </div>
-                          </div>
                           <p className="text-sm text-gray-600 mt-1">
                             訂單數量: {product.quantity}kg | 
                             已出貨: {product.shipped_quantity || 0}kg | 
@@ -571,10 +660,17 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                             )}
                           </div>
 
-                          {availableRollsForProduct.length === 0 ? (
+                           {availableRollsForProduct.length === 0 ? (
                             <p className="text-sm text-red-600">⚠️ 此產品無庫存布卷可供出貨</p>
                           ) : (
-                            selectedItem.rolls.map((roll, rollIndex) => {
+                            <>
+                              {validationErrors.shippingItems?.[product.id]?.rolls && (
+                                <p className="text-sm text-red-600 mb-2">{validationErrors.shippingItems[product.id].rolls}</p>
+                              )}
+                              {validationErrors.shippingItems?.[product.id]?.quantities && (
+                                <p className="text-sm text-red-600 mb-2">{validationErrors.shippingItems[product.id].quantities}</p>
+                              )}
+                              {selectedItem.rolls.map((roll, rollIndex) => {
                               const rollSelectorKey = `${product.id}-${rollIndex}`;
                               const selectedRoll = availableRollsForProduct.find(r => r.id === roll.inventory_roll_id);
                               const maxQuantity = selectedRoll ? selectedRoll.current_quantity : 0;
@@ -685,7 +781,8 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                   </div>
                                 </div>
                               );
-                            })
+                            })}
+                            </>
                           )}
                         </div>
                       )}
@@ -694,6 +791,12 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                 })}
               </CardContent>
             </Card>
+          )}
+
+          {validationErrors.selectedItems && (
+            <div className="text-sm text-red-600 mt-2">
+              {validationErrors.selectedItems}
+            </div>
           )}
         </div>
 

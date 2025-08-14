@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -20,8 +20,11 @@ export type Database = {
           contact_person: string | null
           created_at: string
           email: string | null
+          fax: string | null
           id: string
+          landline_phone: string | null
           name: string
+          note: string | null
           organization_id: string | null
           phone: string | null
           updated_at: string
@@ -31,8 +34,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -42,8 +48,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name?: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -64,8 +73,11 @@ export type Database = {
           contact_person: string | null
           created_at: string
           email: string | null
+          fax: string | null
           id: string
+          landline_phone: string | null
           name: string
+          note: string | null
           organization_id: string | null
           phone: string | null
           updated_at: string
@@ -75,8 +87,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -86,8 +101,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name?: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -1249,8 +1267,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["user_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -1259,18 +1277,18 @@ export type Database = {
         Returns: boolean
       }
       is_organization_owner: {
-        Args: { _user_id: string; _organization_id: string }
+        Args: { _organization_id: string; _user_id: string }
         Returns: boolean
       }
       user_belongs_to_organization: {
-        Args: { _user_id: string; _organization_id: string }
+        Args: { _organization_id: string; _user_id: string }
         Returns: boolean
       }
       user_has_organization_permission: {
         Args: {
-          _user_id: string
           _organization_id: string
           _permission: string
+          _user_id: string
         }
         Returns: boolean
       }

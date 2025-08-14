@@ -18,6 +18,7 @@ interface FactorySelectorProps {
   setFactoryId: (id: string) => void;
   factoryOpen: boolean;
   setFactoryOpen: (open: boolean) => void;
+  error?: string;
 }
 
 export const FactorySelector: React.FC<FactorySelectorProps> = ({
@@ -26,6 +27,7 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
   setFactoryId,
   factoryOpen,
   setFactoryOpen,
+  error,
 }) => {
   return (
     <div className="space-y-2">
@@ -74,6 +76,9 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
           </Command>
         </PopoverContent>
       </Popover>
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
     </div>
   );
 };

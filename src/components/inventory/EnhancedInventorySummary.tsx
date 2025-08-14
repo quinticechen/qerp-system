@@ -178,13 +178,7 @@ export const EnhancedInventorySummary = () => {
       sortable: false,
       filterable: false,
       render: (value) => value ? (
-        <div className="flex items-center space-x-2">
-          <div 
-            className="w-4 h-4 rounded border border-gray-300"
-            style={{ backgroundColor: value }}
-          />
-          <span className="text-sm">{value}</span>
-        </div>
+        <span className="text-sm">{value}</span>
       ) : '無'
     },
     {
