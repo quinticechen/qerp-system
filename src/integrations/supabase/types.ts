@@ -20,8 +20,11 @@ export type Database = {
           contact_person: string | null
           created_at: string
           email: string | null
+          fax: string | null
           id: string
+          landline_phone: string | null
           name: string
+          note: string | null
           organization_id: string | null
           phone: string | null
           updated_at: string
@@ -31,8 +34,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -42,8 +48,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name?: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -64,8 +73,11 @@ export type Database = {
           contact_person: string | null
           created_at: string
           email: string | null
+          fax: string | null
           id: string
+          landline_phone: string | null
           name: string
+          note: string | null
           organization_id: string | null
           phone: string | null
           updated_at: string
@@ -75,8 +87,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string
@@ -86,8 +101,11 @@ export type Database = {
           contact_person?: string | null
           created_at?: string
           email?: string | null
+          fax?: string | null
           id?: string
+          landline_phone?: string | null
           name?: string
+          note?: string | null
           organization_id?: string | null
           phone?: string | null
           updated_at?: string

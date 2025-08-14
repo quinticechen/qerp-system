@@ -48,8 +48,22 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
 
           {customer.phone && (
             <div className="space-y-2">
-              <Label>電話</Label>
+              <Label>手機</Label>
               <div className="p-2 bg-gray-50 rounded">{customer.phone}</div>
+            </div>
+          )}
+
+          {customer.landline_phone && (
+            <div className="space-y-2">
+              <Label>市話</Label>
+              <div className="p-2 bg-gray-50 rounded">{customer.landline_phone}</div>
+            </div>
+          )}
+
+          {customer.fax && (
+            <div className="space-y-2">
+              <Label>傳真</Label>
+              <div className="p-2 bg-gray-50 rounded">{customer.fax}</div>
             </div>
           )}
 
@@ -64,6 +78,13 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
             <div className="space-y-2">
               <Label>地址</Label>
               <div className="p-2 bg-gray-50 rounded">{customer.address}</div>
+            </div>
+          )}
+
+          {customer.note && (
+            <div className="space-y-2">
+              <Label>備註</Label>
+              <div className="p-2 bg-gray-50 rounded">{customer.note}</div>
             </div>
           )}
 
