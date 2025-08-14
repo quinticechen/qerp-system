@@ -20,7 +20,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CreateProductDialog } from '@/components/product/CreateProductDialog';
-import { CreateCustomerDialog } from '@/components/customer/CreateCustomerDialog';
+import { CreateCustomerDialog } from '@/components/common/CreateCustomerDialog';
 import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog';
 import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
 import { useNavigate } from 'react-router-dom';
