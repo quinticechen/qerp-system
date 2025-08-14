@@ -266,7 +266,8 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           factory_id: purchaseOrder.factory_id,
           arrival_date: arrivalDate,
           note,
-          user_id: (await supabase.auth.getUser()).data.user?.id || ''
+          user_id: (await supabase.auth.getUser()).data.user?.id || '',
+          organization_id: organizationId
         })
         .select()
         .single();
