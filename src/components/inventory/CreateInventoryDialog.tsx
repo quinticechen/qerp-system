@@ -471,19 +471,13 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                           />
                           <div className="flex-1">
                             <div className="flex items-center space-x-3">
-                              {item.products_new.color_code && (
-                                <div 
-                                  className="w-6 h-6 rounded border border-gray-400 flex-shrink-0"
-                                  style={{ backgroundColor: item.products_new.color_code }}
-                                />
-                              )}
                               <div>
                                 <h4 className="font-medium text-gray-900">
                                   {item.products_new.name}
                                 </h4>
                                 <p className="text-sm text-gray-600">
                                   {item.products_new.color && `顏色: ${item.products_new.color}`}
-                                  {item.products_new.color_code && ` (${item.products_new.color_code})`}
+                                  {item.products_new.color_code && ` | 色碼: ${item.products_new.color_code}`}
                                 </p>
                               </div>
                             </div>
