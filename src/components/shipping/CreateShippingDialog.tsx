@@ -213,6 +213,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           total_shipped_rolls: totalShippedRolls,
           note: shippingData.note || null,
           user_id: user.id,
+          organization_id: organizationId,
           shipping_number: uniqueShippingNumber
         } as any)
         .select()
@@ -249,7 +250,32 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
         }
       }
 
-      return shipping;
+      // 重新查詢完整的出貨單數據包含所有關聯
+      const { data: completeShipping, error: queryError } = await supabase
+        .from('shippings')
+        .select(`
+          *,
+          customers (name),
+          orders (order_number, note),
+          shipping_items (
+            id,
+            shipped_quantity,
+            inventory_rolls (
+              roll_number,
+              products_new (name, color, color_code)
+            )
+          )
+        `)
+        .eq('id', shipping.id)
+        .single();
+
+      if (queryError) {
+        console.error('Error fetching complete shipping data:', queryError);
+        // 如果查詢失敗，返回基本數據
+        return shipping;
+      }
+
+      return completeShipping;
     },
     onSuccess: (shipping) => {
       toast({
