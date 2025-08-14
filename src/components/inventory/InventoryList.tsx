@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,12 @@ import { ViewInventoryDialog } from './ViewInventoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
-export const InventoryList = () => {
+interface InventoryListProps {
+  selectedInventoryId?: string | null;
+  onInventorySelected?: (inventoryId: string | null) => void;
+}
+
+export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryId, onInventorySelected }) => {
   const [selectedInventory, setSelectedInventory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
@@ -84,7 +89,18 @@ export const InventoryList = () => {
   const handleView = (inventory: any) => {
     setSelectedInventory(inventory);
     setViewDialogOpen(true);
+    onInventorySelected?.(inventory.id);
   };
+
+  // Auto-open inventory when selectedInventoryId changes
+  useEffect(() => {
+    if (selectedInventoryId && inventories) {
+      const inventory = inventories.find(inv => inv.id === selectedInventoryId);
+      if (inventory) {
+        handleView(inventory);
+      }
+    }
+  }, [selectedInventoryId, inventories]);
 
   const columns: TableColumn[] = [
     {

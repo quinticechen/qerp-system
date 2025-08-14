@@ -12,6 +12,8 @@ import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
 
 const InventoryManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("summary");
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
 
   return (
     <div className="space-y-6">
@@ -26,7 +28,7 @@ const InventoryManagement = () => {
         </Button>
       </div>
       
-      <Tabs defaultValue="summary" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="summary" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">庫存統計</TabsTrigger>
           <TabsTrigger value="pending-inventory" className="text-gray-900 data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-600">待入庫</TabsTrigger>
@@ -47,13 +49,17 @@ const InventoryManagement = () => {
         </TabsContent>
         
         <TabsContent value="records">
-          <InventoryList />
+          <InventoryList selectedInventoryId={selectedInventoryId} onInventorySelected={setSelectedInventoryId} />
         </TabsContent>
       </Tabs>
       
       <CreateInventoryDialog 
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
+        onInventoryCreated={(inventoryId) => {
+          setActiveTab("records");
+          setSelectedInventoryId(inventoryId);
+        }}
       />
     </div>
   );

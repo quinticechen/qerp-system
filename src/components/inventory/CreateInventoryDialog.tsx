@@ -21,6 +21,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 interface CreateInventoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onInventoryCreated?: (inventoryId: string) => void;
 }
 
 interface PurchaseOrderItem {
@@ -52,6 +53,7 @@ interface SelectedProduct {
 export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   open,
   onOpenChange,
+  onInventoryCreated,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -302,7 +304,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
       return inventory;
     },
-    onSuccess: () => {
+    onSuccess: (inventory) => {
       toast({
         title: "入庫成功",
         description: "庫存記錄已成功建立",
@@ -312,6 +314,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ['purchase-orders-for-inventory'] });
       onOpenChange(false);
       resetForm();
+      onInventoryCreated?.(inventory.id);
     },
     onError: (error: any) => {
       toast({
