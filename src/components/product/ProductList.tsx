@@ -75,17 +75,14 @@ const ProductList = () => {
       title: '顏色',
       sortable: true,
       filterable: false,
-      render: (value, row) => (
-        <div className="flex items-center gap-2">
-          {row.color_code && (
-            <div 
-              className="w-4 h-4 rounded border border-gray-300" 
-              style={{ backgroundColor: row.color_code }}
-            />
-          )}
-          <span className="text-gray-700">{value}</span>
-        </div>
-      )
+      render: (value) => <span className="text-gray-700">{value}</span>
+    },
+    {
+      key: 'color_code',
+      title: '色碼',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value || '未設定'}</span>
     },
     {
       key: 'category',
