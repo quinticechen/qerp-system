@@ -172,7 +172,8 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
         expected_arrival_date: purchaseData.expected_arrival_date || null,
         note: purchaseData.note || null,
         status: 'confirmed',
-        user_id: user.id
+        user_id: user.id,
+        organization_id: organizationId
       };
 
       const { data: purchase, error: purchaseError } = await supabase
