@@ -31,6 +31,7 @@ interface OrderProductSectionProps {
   onCreateProduct: () => void;
   note: string;
   onNoteChange: (note: string) => void;
+  productErrors?: { [index: number]: { product_id?: string; quantity?: string; unit_price?: string } };
 }
 
 export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
@@ -42,6 +43,7 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
   onCreateProduct,
   note,
   onNoteChange,
+  productErrors,
 }) => {
   // Get unique product names
   const uniqueProductNames = [...new Set(allProducts?.map(p => p.name))];
@@ -82,6 +84,8 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
       {/* Products List */}
       {products.map((product, index) => {
         const colorVariants = getColorVariants(product.base_product_name);
+        const productFieldErrors = productErrors?.[index];
+        
         // 改善顏色選項顯示：每個色碼都是獨立選項，同時顯示顏色和色碼
         const colorOptions = colorVariants.map(variant => {
           const displayText = variant.color && variant.color_code 
@@ -109,6 +113,9 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
                     emptyText="未找到產品"
                     className="w-full"
                   />
+                  {productFieldErrors?.product_id && (
+                    <p className="text-sm text-red-600">{productFieldErrors.product_id}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -123,6 +130,9 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
                     disabled={!product.base_product_name}
                     className="w-full"
                   />
+                  {productFieldErrors?.product_id && (
+                    <p className="text-sm text-red-600">{productFieldErrors.product_id}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -135,6 +145,9 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
                     min="0"
                     step="0.01"
                   />
+                  {productFieldErrors?.quantity && (
+                    <p className="text-sm text-red-600">{productFieldErrors.quantity}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -147,6 +160,9 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
                     min="0"
                     step="0.01"
                   />
+                  {productFieldErrors?.unit_price && (
+                    <p className="text-sm text-red-600">{productFieldErrors.unit_price}</p>
+                  )}
                 </div>
               </div>
 

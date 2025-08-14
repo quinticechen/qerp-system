@@ -54,6 +54,12 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const [isCreateCustomerOpen, setIsCreateCustomerOpen] = useState(false);
   const [isCreateFactoryOpen, setIsCreateFactoryOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
+  
+  // Validation errors
+  const [validationErrors, setValidationErrors] = useState<{
+    selectedCustomer?: string;
+    products?: { [index: number]: { product_id?: string; quantity?: string; unit_price?: string } };
+  }>({});
 
   // Generate next order number preview when dialog opens
   useEffect(() => {
@@ -235,6 +241,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       unit_price: 0,
       specifications: {}
     }]);
+    setValidationErrors({});
   };
 
   // Handlers for creating new entities
@@ -281,26 +288,60 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     setProducts(updatedProducts);
   };
 
-  const handleSubmit = () => {
+  const validateForm = () => {
+    const errors: typeof validationErrors = {};
+    
+    // Validate customer selection
     if (!selectedCustomer) {
-      toast({
-        title: "錯誤",
-        description: "請選擇客戶",
-        variant: "destructive",
-      });
+      errors.selectedCustomer = "請選擇客戶";
+    }
+    
+    // Validate products
+    const productErrors: { [index: number]: { product_id?: string; quantity?: string; unit_price?: string } } = {};
+    let hasValidProduct = false;
+    
+    products.forEach((product, index) => {
+      const productError: { product_id?: string; quantity?: string; unit_price?: string } = {};
+      
+      if (!product.product_id) {
+        productError.product_id = "請選擇產品和顏色";
+      }
+      if (!product.quantity || product.quantity <= 0) {
+        productError.quantity = "請輸入有效的數量";
+      }
+      if (!product.unit_price || product.unit_price <= 0) {
+        productError.unit_price = "請輸入有效的單價";
+      }
+      
+      if (Object.keys(productError).length > 0) {
+        productErrors[index] = productError;
+      } else {
+        hasValidProduct = true;
+      }
+    });
+    
+    if (!hasValidProduct) {
+      // If no valid products, ensure at least the first product shows all errors
+      if (!productErrors[0]) {
+        productErrors[0] = {};
+      }
+    }
+    
+    if (Object.keys(productErrors).length > 0) {
+      errors.products = productErrors;
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validateForm()) {
       return;
     }
 
     const validProducts = products.filter(p => p.product_id && p.quantity > 0 && p.unit_price > 0);
-    if (validProducts.length === 0) {
-      toast({
-        title: "錯誤",
-        description: "請至少添加一個有效的產品",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    
     createOrderMutation.mutate({
       customer_id: selectedCustomer,
       factory_ids: selectedFactoryIds,
@@ -323,12 +364,18 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
           <OrderBasicInfo
             generatedOrderNumber={generatedOrderNumber}
             selectedCustomer={selectedCustomer}
-            onCustomerChange={setSelectedCustomer}
+            onCustomerChange={(value) => {
+              setSelectedCustomer(value);
+              if (validationErrors.selectedCustomer) {
+                setValidationErrors(prev => ({ ...prev, selectedCustomer: undefined }));
+              }
+            }}
             selectedFactoryIds={selectedFactoryIds}
             onFactoriesChange={setSelectedFactoryIds}
             customers={customers || []}
             onCreateCustomer={() => setIsCreateCustomerOpen(true)}
             onCreateFactory={() => setIsCreateFactoryOpen(true)}
+            customerError={validationErrors.selectedCustomer}
           />
 
           <OrderProductSection
@@ -336,10 +383,26 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
             allProducts={allProducts || []}
             onAddProduct={addProduct}
             onRemoveProduct={removeProduct}
-            onUpdateProduct={updateProduct}
+            onUpdateProduct={(index, field, value) => {
+              updateProduct(index, field, value);
+              // Clear validation errors for this field
+              if (validationErrors.products?.[index]?.[field as keyof OrderProduct]) {
+                setValidationErrors(prev => ({
+                  ...prev,
+                  products: {
+                    ...prev.products,
+                    [index]: {
+                      ...prev.products?.[index],
+                      [field]: undefined
+                    }
+                  }
+                }));
+              }
+            }}
             onCreateProduct={() => setIsCreateProductOpen(true)}
             note={note}
             onNoteChange={setNote}
+            productErrors={validationErrors.products}
           />
         </div>
 

@@ -19,6 +19,7 @@ interface OrderBasicInfoProps {
   customers: Customer[];
   onCreateCustomer: () => void;
   onCreateFactory: () => void;
+  customerError?: string;
 }
 
 export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
@@ -30,6 +31,7 @@ export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
   customers,
   onCreateCustomer,
   onCreateFactory,
+  customerError,
 }) => {
   // Prepare customer options for combobox
   const customerOptions = customers?.map(customer => ({
@@ -69,6 +71,9 @@ export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
           emptyText="未找到客戶"
           className="w-full"
         />
+        {customerError && (
+          <p className="text-sm text-red-600">{customerError}</p>
+        )}
       </div>
 
       {/* Factory Selection */}
