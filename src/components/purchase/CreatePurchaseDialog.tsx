@@ -228,18 +228,27 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
       return purchase;
     },
-    onSuccess: (purchase) => {
+    onSuccess: async (purchase) => {
       toast({
         title: "成功",
         description: "採購單已成功建立並設為已下單狀態，關聯訂單狀態已更新為「已向工廠下單」",
       });
-      // 刷新所有相關查詢
-      queryClient.invalidateQueries({ queryKey: ['purchases'] });
-      queryClient.invalidateQueries({ queryKey: ['purchases', organizationId] });
-      queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['pending-inventory', organizationId] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', organizationId] });
+      
+      // 更積極的查詢刷新 - 使用 refetchQueries 確保立即重新載入
+      try {
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['purchases', organizationId] }),
+          queryClient.refetchQueries({ queryKey: ['pending-inventory', organizationId] }),
+          queryClient.refetchQueries({ queryKey: ['orders', organizationId] }),
+        ]);
+        console.log('All queries refetched successfully after purchase creation');
+      } catch (error) {
+        console.error('Error refetching queries after purchase creation:', error);
+        // 如果 refetch 失敗，使用 invalidate 作為備用
+        queryClient.invalidateQueries({ queryKey: ['purchases'] });
+        queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
       
       onOpenChange(false);
       resetForm();
