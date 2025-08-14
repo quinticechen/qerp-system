@@ -51,10 +51,10 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
                 搜尋並添加訂單
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0">
+            <PopoverContent className="w-80 p-0 bg-white shadow-lg border border-gray-200 z-50">
               <Command>
                 <CommandInput placeholder="搜尋訂單編號..." className="h-9" />
-                <CommandList>
+                <CommandList className="max-h-60">
                   <CommandEmpty>未找到訂單。</CommandEmpty>
                   <CommandGroup>
                     {orders?.map((order) => (

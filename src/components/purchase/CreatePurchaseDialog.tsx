@@ -17,11 +17,13 @@ import { OrderProduct, InventoryInfo, PurchaseItem } from './types';
 interface CreatePurchaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (purchase: any) => void;
 }
 
 export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   open,
   onOpenChange,
+  onSuccess,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -226,7 +228,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
       return purchase;
     },
-    onSuccess: () => {
+    onSuccess: (purchase) => {
       toast({
         title: "成功",
         description: "採購單已成功建立並設為已下單狀態，關聯訂單狀態已更新為「已向工廠下單」",
@@ -235,6 +237,11 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       onOpenChange(false);
       resetForm();
+      
+      // 調用成功回調來打開新創建的採購單預覽
+      if (onSuccess) {
+        onSuccess(purchase);
+      }
     },
     onError: (error) => {
       console.error('Error creating purchase order:', error);
