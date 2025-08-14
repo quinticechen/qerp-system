@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface CreateInventoryDialogProps {
   open: boolean;
@@ -54,6 +55,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { organizationId, hasOrganization } = useCurrentOrganization();
   
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState('');
   const [arrivalDate, setArrivalDate] = useState(new Date().toISOString().split('T')[0]);
@@ -64,8 +66,14 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   const [forceCreateInventory, setForceCreateInventory] = useState(false);
 
   const { data: purchaseOrders, isLoading: isPurchaseOrdersLoading } = useQuery({
-    queryKey: ['purchase-orders-for-inventory'],
+    queryKey: ['purchase-orders-for-inventory', organizationId],
     queryFn: async () => {
+      if (!organizationId) {
+        console.log('No organization ID available for purchase orders');
+        return [];
+      }
+
+      console.log('Fetching purchase orders for organization:', organizationId);
       const { data: allPurchaseOrders, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -73,6 +81,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           po_number,
           factory_id,
           status,
+          organization_id,
           factories (name),
           purchase_order_items (
             id,
@@ -83,9 +92,13 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
             products_new (name, color, color_code)
           )
         `)
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching purchase orders:', error);
+        throw error;
+      }
       
       if (!allPurchaseOrders) return [];
 
@@ -95,19 +108,32 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           return remaining > 0;
         });
       });
-    }
+    },
+    enabled: hasOrganization
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ['warehouses'],
+    queryKey: ['warehouses', organizationId],
     queryFn: async () => {
+      if (!organizationId) {
+        console.log('No organization ID available for warehouses');
+        return [];
+      }
+
+      console.log('Fetching warehouses for organization:', organizationId);
       const { data, error } = await supabase
         .from('warehouses')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('name');
-      if (error) throw error;
-      return data;
-    }
+        
+      if (error) {
+        console.error('Error fetching warehouses:', error);
+        throw error;
+      }
+      return data || [];
+    },
+    enabled: hasOrganization
   });
 
   const selectedPurchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
