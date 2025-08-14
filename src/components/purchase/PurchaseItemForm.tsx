@@ -175,18 +175,10 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
               >
                 <span className="truncate">
                   {selectedProduct ? (
-                    <div className="flex items-center space-x-2">
-                      {selectedProduct.color_code && (
-                        <div 
-                          className="w-4 h-4 rounded border border-gray-400 flex-shrink-0"
-                          style={{ backgroundColor: selectedProduct.color_code }}
-                        />
-                      )}
-                      <span>
-                        {selectedProduct.color || '無顏色'} 
-                        {selectedProduct.color_code ? ` (${selectedProduct.color_code})` : ''}
-                      </span>
-                    </div>
+                    <span>
+                      {selectedProduct.color || '無顏色'} 
+                      {selectedProduct.color_code ? ` (${selectedProduct.color_code})` : ''}
+                    </span>
                   ) : (
                     "選擇顏色..."
                   )}
@@ -206,18 +198,10 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
                         value={`${variant.color || '無顏色'} ${variant.color_code || ''}`}
                         onSelect={() => handleColorSelect(variant.id)}
                       >
-                        <div className="flex items-center space-x-2 flex-1">
-                          {variant.color_code && (
-                            <div 
-                              className="w-4 h-4 rounded border border-gray-400 flex-shrink-0"
-                              style={{ backgroundColor: variant.color_code }}
-                            />
-                          )}
-                          <span>
-                            {variant.color || '無顏色'} 
-                            {variant.color_code ? ` (${variant.color_code})` : ''}
-                          </span>
-                        </div>
+                        <span className="flex-1">
+                          {variant.color || '無顏色'} 
+                          {variant.color_code ? ` (${variant.color_code})` : ''}
+                        </span>
                         <Check
                           className={cn(
                             "ml-auto h-4 w-4",
