@@ -1,0 +1,24 @@
+name: Keep Supabase Active
+
+on:
+  schedule:
+    - cron: '0 0 */4 * *'  # 每 4 天執行一次
+  workflow_dispatch:        # 允許手動觸發
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://gyiyedvutcbwzpbcsmjc.supabase.co/rest/v1/customers?limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5aXllZHZ1dGNid3pwYmNzbWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTQxNTksImV4cCI6MjA5MTczMDE1OX0.GjjHa-Dbg7KJQxfuteg7jUaKelWVhoqSPNg30DFyG34" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5aXllZHZ1dGNid3pwYmNzbWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTQxNTksImV4cCI6MjA5MTczMDE1OX0.GjjHa-Dbg7KJQxfuteg7jUaKelWVhoqSPNg30DFyG34")
+          echo "Response: $response"
+          if [ "$response" = "200" ] || [ "$response" = "406" ]; then
+            echo "Supabase is active"
+          else
+            echo "Unexpected response: $response"
+            exit 1
+          fi
