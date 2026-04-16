@@ -22,9 +22,18 @@ import NotFound from '@/pages/NotFound';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { OrganizationGuard } from '@/components/organization/OrganizationGuard';
+import { QueryFloatButton } from '@/components/query/QueryFloatButton';
+import { useAuth } from '@/hooks/useAuth';
 import './App.css';
 
 const queryClient = new QueryClient();
+
+// Renders the floating Query button only when the user is authenticated
+function QueryLayer() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return null;
+  return <QueryFloatButton />;
+}
 
 function App() {
   return (
@@ -174,6 +183,7 @@ function App() {
               <Route path="*" element={<Navigate to="/404" replace />} />
             </Routes>
             <Toaster />
+            <QueryLayer />
           </OrganizationProvider>
         </Router>
       </QueryClientProvider>
