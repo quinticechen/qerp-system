@@ -13,6 +13,26 @@ import { handleQuery } from "./agent/query-handler.js";
 
 const PORT = parseInt(process.env.PORT || "3100", 10);
 
+// Origins allowed to call this server from a browser
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "http://localhost:5174",
+  "http://localhost:3000",
+  "https://qerp.qwizai.com",
+]);
+
+function setCorsHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
+  const origin = req.headers.origin ?? "";
+  const allowed = ALLOWED_ORIGINS.has(origin) ? origin : "";
+  if (allowed) {
+    res.setHeader("Access-Control-Allow-Origin", allowed);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 function extractJwt(authHeader: string | undefined): string | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
   return authHeader.slice(7);
@@ -26,6 +46,15 @@ async function readBody(req: http.IncomingMessage): Promise<any> {
 }
 
 const httpServer = http.createServer(async (req, res) => {
+  setCorsHeaders(req, res);
+
+  // ── CORS preflight ────────────────────────────────────────────────────────
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // ── Health check ──────────────────────────────────────────────────────────
   if (req.method === "GET" && req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
