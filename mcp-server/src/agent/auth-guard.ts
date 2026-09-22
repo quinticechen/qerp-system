@@ -26,10 +26,13 @@ export async function authGuard(supabase: SupabaseClient): Promise<AuthResult> {
     .single();
 
   // 查詢組織角色（多角色支援）
+  // user_organization_roles 本身沒有 role_name 欄位，角色名稱要透過 role_id
+  // 關聯 organization_roles(name) 取得
   const { data: orgRoles } = await supabase
     .from("user_organization_roles")
-    .select("role_name")
-    .eq("user_id", user.id);
+    .select("organization_roles(name)")
+    .eq("user_id", user.id)
+    .eq("is_active", true);
 
   // 合併所有角色
   const roles = new Set<string>();
@@ -39,7 +42,7 @@ export async function authGuard(supabase: SupabaseClient): Promise<AuthResult> {
   }
 
   if (orgRoles?.length) {
-    orgRoles.forEach((r: any) => r.role_name && roles.add(r.role_name));
+    orgRoles.forEach((r: any) => r.organization_roles?.name && roles.add(r.organization_roles.name));
   }
 
   // 若查不到角色，預設給 accounting（最低權限）

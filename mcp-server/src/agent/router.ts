@@ -11,9 +11,15 @@ const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負責分析
 - supply_chain：負責庫存管理、採購單、出貨記錄、工廠資訊
 
 判斷規則：
-- 客戶、訂單、產品相關 → commercial
-- 庫存、採購單、出貨、工廠相關 → supply_chain
-- 涉及多個領域 → 同時包含兩個
+- 客戶、訂單、產品相關 → 僅 commercial
+- 庫存、採購單、出貨、工廠相關 → 僅 supply_chain
+- 同時涉及兩個領域 → 同時包含兩個
+- 若對話歷史正在進行「新增/建立」操作（例如：新增訂單、建立客戶），當前訊息一定是該流程的延續，沿用相同的 agent，不要新增其他 agent
+
+特別注意：
+- 「新增訂單」「建立訂單」「下訂單」屬於 commercial，不是 supply_chain
+- 若對話歷史中包含「請提供客戶名稱」或「請問您要為哪位客戶建立訂單」，則當前訊息是客戶選擇回應，只路由到 commercial
+- 單一字元或短名稱（如 "c"、"Chen"）在訂單建立流程中代表客戶名稱輸入，只路由到 commercial
 
 tasks 的描述要具體，包含使用者原始請求的關鍵資訊（如名稱、條件等）。`;
 
@@ -47,10 +53,17 @@ export async function routeQuery(
   // Router：結構化輸出，直接得到 JSON 物件，不需要解析字串
   let decision: RouterDecision;
   try {
+    // Include recent history (last 6 turns) so the router can detect ongoing flows
+    const recentHistory = history.slice(-6).map(
+      (m) => ({ role: m.role as "user" | "assistant", content: m.content })
+    );
     decision = await aiGenerateObject<RouterDecision>({
       schema: routerSchema,
       system: ROUTER_SYSTEM_PROMPT,
-      messages: [{ role: "user" as const, content: message }],
+      messages: [
+        ...recentHistory,
+        { role: "user" as const, content: message },
+      ],
     } as any);
   } catch {
     // 分類失敗時 fallback：用第一個可用群組

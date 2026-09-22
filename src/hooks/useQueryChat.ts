@@ -1,7 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 const QUERY_API_URL = import.meta.env.VITE_QUERY_API_URL ?? 'http://localhost:3100';
+const HISTORY_KEY = 'query-chat-history';
+const MAX_STORED_MESSAGES = 100;
 
 export interface ChatMessage {
   id: string;
@@ -10,10 +12,32 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+function loadHistory(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed: Array<Omit<ChatMessage, 'timestamp'> & { timestamp: string }> = JSON.parse(raw);
+    return parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(messages: ChatMessage[]) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-MAX_STORED_MESSAGES)));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
 export function useQueryChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory());
+
+  useEffect(() => {
+    saveHistory(messages);
+  }, [messages]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -27,7 +51,6 @@ export function useQueryChat() {
 
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
-    setError(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -63,9 +86,15 @@ export function useQueryChat() {
 
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err: any) {
-      setError(err.message ?? '發生未知錯誤');
-      // Remove the optimistically added user message on failure
-      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
+      // Keep the user message in history so conversation context is preserved.
+      // Add an inline error assistant bubble instead of removing the message.
+      const errorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `⚠️ 發生錯誤：${err.message ?? '未知錯誤'}`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -73,8 +102,8 @@ export function useQueryChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setError(null);
+    try { localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
   }, []);
 
-  return { messages, isLoading, error, sendMessage, clearMessages };
+  return { messages, isLoading, sendMessage, clearMessages };
 }

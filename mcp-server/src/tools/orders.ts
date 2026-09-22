@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getUserOrgId } from "../utils/get-org-id.js";
 
 const orderStatusEnum = z.enum([
   "pending",
@@ -97,7 +98,11 @@ export function registerOrderTools(server: McpServer, supabase: SupabaseClient) 
       note: z.string().optional().describe("訂單備註"),
     },
     async ({ customer_id, note }) => {
-      // 產生訂單編號
+      const organization_id = await getUserOrgId(supabase);
+      if (!organization_id) {
+        return { content: [{ type: "text", text: "無法取得組織資訊，請確認帳號已加入組織" }] };
+      }
+
       const orderNumber = `ORD-${Date.now()}`;
 
       const { data, error } = await supabase
@@ -105,6 +110,7 @@ export function registerOrderTools(server: McpServer, supabase: SupabaseClient) 
         .insert({
           order_number: orderNumber,
           customer_id,
+          organization_id,
           status: "pending",
           payment_status: "unpaid",
           shipping_status: "not_started",

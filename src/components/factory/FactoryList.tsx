@@ -2,8 +2,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditFactoryDialog } from './EditFactoryDialog';
 import { ViewFactoryDialog } from './ViewFactoryDialog';
@@ -45,11 +43,6 @@ export const FactoryList = () => {
   const handleView = (factory: any) => {
     setSelectedFactory(factory);
     setViewDialogOpen(true);
-  };
-
-  const handleEdit = (factory: any) => {
-    setSelectedFactory(factory);
-    setEditDialogOpen(true);
   };
 
   const columns: TableColumn[] = [
@@ -117,32 +110,6 @@ export const FactoryList = () => {
         </span>
       )
     },
-    {
-      key: 'actions',
-      title: '操作',
-      sortable: false,
-      filterable: false,
-      render: (value, row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleView(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   if (!hasOrganization) {
@@ -178,6 +145,7 @@ export const FactoryList = () => {
             loading={isLoading}
             searchPlaceholder="搜尋工廠名稱、聯絡人、電話..."
             emptyMessage="沒有找到工廠"
+            onRowClick={handleView}
           />
         </CardContent>
       </Card>
@@ -189,6 +157,10 @@ export const FactoryList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             factory={selectedFactory}
+            onEdit={() => {
+              setViewDialogOpen(false);
+              setEditDialogOpen(true);
+            }}
           />
           <EditFactoryDialog
             open={editDialogOpen}

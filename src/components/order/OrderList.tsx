@@ -2,9 +2,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditOrderDialog } from './EditOrderDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
@@ -152,24 +150,6 @@ export const OrderList = () => {
         </span>
       )
     },
-    {
-      key: 'actions',
-      title: '操作',
-      sortable: false,
-      filterable: false,
-      render: (value, row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   if (!hasOrganization) {
@@ -205,6 +185,7 @@ export const OrderList = () => {
             loading={isLoading}
             searchPlaceholder="搜尋訂單號、客戶名稱..."
             emptyMessage="沒有找到訂單"
+            onRowClick={handleEdit}
           />
         </CardContent>
       </Card>

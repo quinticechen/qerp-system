@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
+import { createInviteClient } from '@/integrations/supabase/inviteClient';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -60,8 +61,10 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
     try {
       console.log('Creating user with data:', data);
       
-      // 使用 signUp 而不是 admin.inviteUserByEmail
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      // 使用 signUp 而不是 admin.inviteUserByEmail（前端沒有 service role key）。
+      // 透過獨立的 inviteClient 呼叫，避免 signUp 回傳的 session 覆蓋掉目前登入
+      // 管理員自己的 session。
+      const { data: signUpData, error: signUpError } = await createInviteClient().auth.signUp({
         email: data.email,
         password: Math.random().toString(36).slice(-8), // 臨時密碼
         options: {
@@ -71,7 +74,9 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             organization_id: organizationId,
             role_id: data.role_id
           },
-          emailRedirectTo: `${window.location.origin}/auth`
+          // 對應 App.tsx 中受保護的 /dashboard 路由；使用者確認信箱後
+          // 會直接帶著已建立好的組織成員資格進入該組織工作區
+          emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
 
@@ -81,18 +86,18 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       }
 
       if (signUpData.user) {
-        // 創建 profile
+        // profile 已由資料庫的 handle_new_user trigger 自動建立，
+        // 這裡改用 update 補上 trigger 沒有寫入的欄位（例如 phone）
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: signUpData.user.id,
-            email: data.email,
+          .update({
             full_name: data.full_name,
             phone: data.phone
-          });
+          })
+          .eq('id', signUpData.user.id);
 
         if (profileError) {
-          console.error('Profile creation error:', profileError);
+          console.error('Profile update error:', profileError);
         }
 
         // 將用戶加入組織

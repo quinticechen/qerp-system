@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { getUserOrgId } from "../utils/get-org-id.js";
 
 export function registerCustomerTools(server: McpServer, supabase: SupabaseClient) {
   server.tool(
@@ -84,11 +85,17 @@ export function registerCustomerTools(server: McpServer, supabase: SupabaseClien
         };
       }
 
+      const organization_id = await getUserOrgId(supabase);
+      if (!organization_id) {
+        return { content: [{ type: "text", text: "無法取得組織資訊，請確認帳號已加入組織" }] };
+      }
+
       const { data, error } = await supabase
         .from("customers")
         .insert({
           name,
           contact_person,
+          organization_id,
           phone: phone || null,
           landline_phone: landline_phone || null,
           email: email || null,

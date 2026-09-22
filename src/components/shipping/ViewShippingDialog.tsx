@@ -3,17 +3,20 @@ import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface ViewShippingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   shipping: any;
+  onEdit?: () => void;
 }
 
 export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
   open,
   onOpenChange,
   shipping,
+  onEdit,
 }) => {
   if (!shipping) return null;
 
@@ -119,6 +122,13 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            關閉
+          </Button>
+          {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>
     </Dialog>

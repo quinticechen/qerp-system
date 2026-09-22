@@ -3,14 +3,16 @@ import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface ViewPurchaseDialogProps {
   purchase: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onEdit?: () => void;
 }
 
-export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchaseDialogProps) => {
+export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: ViewPurchaseDialogProps) => {
   if (!purchase) return null;
 
   const getStatusBadge = (status: string) => {
@@ -168,6 +170,13 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange }: ViewPurchas
               </CardContent>
             </Card>
           )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            關閉
+          </Button>
+          {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>
     </Dialog>

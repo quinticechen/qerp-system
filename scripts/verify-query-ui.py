@@ -21,6 +21,7 @@ Screenshots are saved to scripts/screenshots/.
 
 import argparse
 import json
+import os
 import ssl
 import sys
 import urllib.request
@@ -32,9 +33,20 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 SCREENSHOT_DIR = Path(__file__).parent / "screenshots"
 SCREENSHOT_DIR.mkdir(exist_ok=True)
 
+def _load_dotenv() -> None:
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+_load_dotenv()
+
 DEFAULT_URL      = "http://localhost:8080"
-DEFAULT_EMAIL    = "lovejoker369@gmail.com"
-DEFAULT_PASSWORD = "Quintice_0603"
+DEFAULT_EMAIL    = os.environ.get("VERIFY_EMAIL", "")
+DEFAULT_PASSWORD = os.environ.get("VERIFY_PASSWORD", "")
 TIMEOUT_MS       = 15_000
 API_TIMEOUT_MS   = 60_000   # AI reply can be slow
 

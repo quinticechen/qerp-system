@@ -14,12 +14,14 @@ interface ViewCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: any;
+  onEdit?: () => void;
 }
 
 export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
   open,
   onOpenChange,
   customer,
+  onEdit,
 }) => {
   if (!customer) return null;
 
@@ -96,10 +98,11 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end pt-4">
-          <Button onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
+          {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>
     </Dialog>

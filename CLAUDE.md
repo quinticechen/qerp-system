@@ -55,15 +55,14 @@ playwright install chromium
 ### Command
 
 ```bash
-# From weave-flow-erp-system/ — uses default test account (quinticechen@gmail.com)
+# From weave-flow-erp-system/ — credentials loaded from .env automatically
 python3 scripts/verify-query-ui.py
-
-# Or with explicit credentials
-python3 scripts/verify-query-ui.py --email quinticechen@gmail.com --password Quing_0603
 
 # Headless (no browser window, faster)
 python3 scripts/verify-query-ui.py --headless
 ```
+
+> Credentials are stored in `weave-flow-erp-system/.env` (`VERIFY_EMAIL` / `VERIFY_PASSWORD`). Never hardcode them here.
 
 ### What the Script Verifies
 

@@ -1259,6 +1259,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_organization_member_status: {
+        Args: { _organization_id: string }
+        Returns: {
+          user_id: string
+          is_pending: boolean
+        }[]
+      }
       get_user_organizations: {
         Args: { _user_id: string }
         Returns: {

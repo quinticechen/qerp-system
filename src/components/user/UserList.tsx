@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Edit, UserX, UserCheck } from 'lucide-react';
+import { UserX, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ViewUserDialog } from './ViewUserDialog';
 import { EditUserDialog } from './EditUserDialog';
@@ -77,17 +77,27 @@ export const UserList = () => {
         throw rolesError;
       }
 
+      // Get pending-invite status (email not yet confirmed) for these users
+      const { data: memberStatus, error: memberStatusError } = await supabase
+        .rpc('get_organization_member_status', { _organization_id: organizationId });
+
+      if (memberStatusError) {
+        console.error('Error fetching member status:', memberStatusError);
+      }
+
       // Combine the data
       const processedData = profiles?.map(profile => {
         const userOrg = userOrgs.find(uo => uo.user_id === profile.id);
         const roles = userRoles?.filter(ur => ur.user_id === profile.id) || [];
-        
+        const status = memberStatus?.find(ms => ms.user_id === profile.id);
+
         return {
           id: profile.id,
           email: profile.email,
           full_name: profile.full_name,
           phone: profile.phone,
           is_active: profile.is_active,
+          is_pending: status?.is_pending ?? false,
           created_at: profile.created_at,
           joined_at: userOrg?.joined_at,
           roles: roles.map(role => ({
@@ -134,11 +144,6 @@ export const UserList = () => {
   const handleView = (user: any) => {
     setSelectedUser(user);
     setViewDialogOpen(true);
-  };
-
-  const handleEdit = (user: any) => {
-    setSelectedUser(user);
-    setEditDialogOpen(true);
   };
 
   const getRoleBadge = (role: string) => {
@@ -214,10 +219,16 @@ export const UserList = () => {
         { value: 'true', label: '啟用' },
         { value: 'false', label: '停用' }
       ],
-      render: (value) => (
-        <Badge variant="outline" className={value ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-          {value ? '啟用' : '停用'}
-        </Badge>
+      render: (value, row) => (
+        row.is_pending ? (
+          <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+            邀請待接受
+          </Badge>
+        ) : (
+          <Badge variant="outline" className={value ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+            {value ? '啟用' : '停用'}
+          </Badge>
+        )
       )
     },
     {
@@ -241,25 +252,12 @@ export const UserList = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleView(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleToggleUserStatus(row.id, row.is_active)}
-            className={row.is_active 
-              ? "border-red-300 text-red-700 hover:bg-red-50" 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleUserStatus(row.id, row.is_active);
+            }}
+            className={row.is_active
+              ? "border-red-300 text-red-700 hover:bg-red-50"
               : "border-green-300 text-green-700 hover:bg-green-50"
             }
           >
@@ -297,6 +295,7 @@ export const UserList = () => {
             loading={isLoading}
             searchPlaceholder="搜尋使用者姓名、電子信箱、電話..."
             emptyMessage="沒有找到使用者"
+            onRowClick={handleView}
           />
         </CardContent>
       </Card>
@@ -308,6 +307,10 @@ export const UserList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             user={selectedUser}
+            onEdit={() => {
+              setViewDialogOpen(false);
+              setEditDialogOpen(true);
+            }}
           />
           <EditUserDialog
             open={editDialogOpen}

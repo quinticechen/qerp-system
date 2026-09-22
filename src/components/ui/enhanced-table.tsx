@@ -28,6 +28,7 @@ export interface EnhancedTableProps {
   onFilter?: (column: string, value: string) => void;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  onRowClick?: (row: any) => void;
 }
 
 export const EnhancedTable: React.FC<EnhancedTableProps> = ({
@@ -41,7 +42,8 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
   onSort,
   onFilter,
   searchPlaceholder = '搜尋...',
-  emptyMessage = '暫無資料'
+  emptyMessage = '暫無資料',
+  onRowClick
 }) => {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [sortColumn, setSortColumn] = useState<string>('');
@@ -194,7 +196,11 @@ export const EnhancedTable: React.FC<EnhancedTableProps> = ({
           </TableHeader>
           <TableBody>
             {processedData.map((row, index) => (
-              <TableRow key={index}>
+              <TableRow
+                key={index}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : undefined}
+              >
                 {columns.map((column) => (
                   <TableCell key={column.key}>
                     {column.render ? column.render(row[column.key], row) : row[column.key]}

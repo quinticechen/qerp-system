@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Edit, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { EditShippingDialog } from './EditShippingDialog';
 import { ViewShippingDialog } from './ViewShippingDialog';
@@ -59,11 +57,6 @@ export const ShippingList = () => {
     setViewDialogOpen(true);
   };
 
-  const handleEdit = (shipping: any) => {
-    setSelectedShipping(shipping);
-    setEditDialogOpen(true);
-  };
-
   const columns: TableColumn[] = [
     {
       key: 'shipping_number',
@@ -118,32 +111,6 @@ export const ShippingList = () => {
       filterable: false,
       render: (value) => <span className="text-gray-700">{value || '-'}</span>
     },
-    {
-      key: 'actions',
-      title: '操作',
-      sortable: false,
-      filterable: false,
-      render: (value, row) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleView(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(row)}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-        </div>
-      )
-    }
   ];
 
   if (!hasOrganization) {
@@ -179,6 +146,7 @@ export const ShippingList = () => {
             loading={isLoading}
             searchPlaceholder="搜尋出貨單號、訂單號、客戶名稱..."
             emptyMessage="沒有找到出貨記錄"
+            onRowClick={handleView}
           />
         </CardContent>
       </Card>
@@ -190,6 +158,10 @@ export const ShippingList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             shipping={selectedShipping}
+            onEdit={() => {
+              setViewDialogOpen(false);
+              setEditDialogOpen(true);
+            }}
           />
           <EditShippingDialog
             open={editDialogOpen}

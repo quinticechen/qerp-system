@@ -9,16 +9,19 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 設置認證狀態監聽器
+    // Listen for future auth changes (login, logout, token refresh).
+    // Do NOT call setLoading(false) here — the initial load is settled by
+    // getSession() below. Without this guard, onAuthStateChange can fire with
+    // a null session before the real session is confirmed, which briefly sets
+    // user=null → useOrganization clears orgs → redirect to /create-organization.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
       }
     );
 
-    // 檢查現有會話
+    // Single authoritative initial check — only this call settles the loading state.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);

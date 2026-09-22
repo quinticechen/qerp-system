@@ -3,14 +3,16 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 
 interface ViewUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: any;
+  onEdit?: () => void;
 }
 
-export const ViewUserDialog = ({ open, onOpenChange, user }: ViewUserDialogProps) => {
+export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDialogProps) => {
   const getRoleBadge = (role: string) => {
     const roleMap = {
       admin: 'bg-red-100 text-red-800 border-red-200',
@@ -61,9 +63,15 @@ export const ViewUserDialog = ({ open, onOpenChange, user }: ViewUserDialogProps
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">狀態</label>
-                <Badge variant="outline" className={user?.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                  {user?.is_active ? '啟用' : '停用'}
-                </Badge>
+                {user?.is_pending ? (
+                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                    邀請待接受
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className={user?.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+                    {user?.is_active ? '啟用' : '停用'}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -115,6 +123,13 @@ export const ViewUserDialog = ({ open, onOpenChange, user }: ViewUserDialogProps
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            關閉
+          </Button>
+          {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>
     </Dialog>

@@ -9,6 +9,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ToolName, filterByGroup, AgentGroup } from "./permissions.js";
+import { getUserOrgId } from "../utils/get-org-id.js";
 
 export function createTools(supabase: SupabaseClient, allowedTools: ToolName[]) {
   const allTools = {
@@ -53,8 +54,10 @@ export function createTools(supabase: SupabaseClient, allowedTools: ToolName[]) 
       }),
       execute: async ({ name, contact_person, phone, landline_phone, email, address, note }) => {
         if (!phone && !landline_phone) return "建立失敗：手機或市話至少填一個";
+        const organization_id = await getUserOrgId(supabase);
+        if (!organization_id) return "建立失敗：無法取得組織資訊，請確認帳號已加入組織";
         const { data, error } = await supabase.from("customers").insert({
-          name, contact_person, phone: phone ?? null, landline_phone: landline_phone ?? null,
+          name, contact_person, organization_id, phone: phone ?? null, landline_phone: landline_phone ?? null,
           email: email ?? null, address: address ?? null, note: note ?? null,
         }).select().single();
         if (error) return `建立失敗：${error.message}`;
@@ -101,9 +104,11 @@ export function createTools(supabase: SupabaseClient, allowedTools: ToolName[]) 
         note: z.string().optional().describe("備註"),
       }),
       execute: async ({ customer_id, note }) => {
+        const organization_id = await getUserOrgId(supabase);
+        if (!organization_id) return "建立失敗：無法取得組織資訊，請確認帳號已加入組織";
         const orderNumber = `ORD-${Date.now()}`;
         const { data, error } = await supabase.from("orders").insert({
-          order_number: orderNumber, customer_id, status: "pending",
+          order_number: orderNumber, customer_id, organization_id, status: "pending",
           payment_status: "unpaid", shipping_status: "not_started", note: note ?? null,
         }).select("*, customers(name)").single();
         if (error) return `建立失敗：${error.message}`;

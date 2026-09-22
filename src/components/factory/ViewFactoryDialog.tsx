@@ -14,12 +14,14 @@ interface ViewFactoryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   factory: any;
+  onEdit?: () => void;
 }
 
 export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
   open,
   onOpenChange,
   factory,
+  onEdit,
 }) => {
   if (!factory) return null;
 
@@ -96,10 +98,11 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
           </div>
         </div>
 
-        <div className="flex justify-end pt-4">
-          <Button onClick={() => onOpenChange(false)}>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
+          {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>
     </Dialog>
