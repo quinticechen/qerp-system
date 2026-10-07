@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { defineTool, ok, fail, embeddedName } from "./types.js";
+import { defineTool, ok, fail, embeddedName, allInOrganization } from "./types.js";
+import { fields } from "./labels.js";
 
 export const purchaseOrderTools = [
   defineTool({
@@ -13,8 +14,8 @@ export const purchaseOrderTools = [
       factory_id: z.string().uuid().optional(),
       limit: z.number().optional(),
     }),
-    execute: async ({ supabase }, { status, factory_id, limit }) => {
-      let q = supabase.from("purchase_orders").select("id, po_number, status, order_date, expected_arrival_date, factories(name)").order("created_at", { ascending: false }).limit(limit ?? 20);
+    execute: async ({ supabase, organizationId }, { status, factory_id, limit }) => {
+      let q = supabase.from("purchase_orders").select("id, po_number, status, order_date, expected_arrival_date, factories(name)").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(limit ?? 20);
       if (status) q = q.eq("status", status);
       if (factory_id) q = q.eq("factory_id", factory_id);
       const { data, error } = await q;
@@ -32,8 +33,8 @@ export const purchaseOrderTools = [
     input: z.object({
       purchase_order_id: z.string().uuid().describe("採購單 UUID"),
     }),
-    execute: async ({ supabase }, { purchase_order_id }) => {
-      const { data, error } = await supabase.from("purchase_orders").select("*, factories(name, contact_person, phone), purchase_order_items(*, products_new(name, color))").eq("id", purchase_order_id).single();
+    execute: async ({ supabase, organizationId }, { purchase_order_id }) => {
+      const { data, error } = await supabase.from("purchase_orders").select("*, factories(name, contact_person, phone), purchase_order_items(*, products_new(name, color))").eq("id", purchase_order_id).eq("organization_id", organizationId).single();
       if (error) return fail(`找不到採購單：${error.message}`);
       return ok(data);
     },
@@ -57,9 +58,45 @@ export const purchaseOrderTools = [
       })).min(1).describe("採購品項列表，至少一筆"),
       order_ids: z.array(z.string().uuid()).optional().describe("要關聯的銷售訂單 UUID 列表"),
     }),
+    summarize: async ({ supabase, organizationId }, { factory_id, expected_arrival_date, note, items, order_ids }) => {
+      const productIds = [...new Set(items.map((i) => i.product_id))];
+      const [{ data: factory }, { data: products }, { data: orders }] = await Promise.all([
+        supabase.from("factories").select("name").eq("id", factory_id).eq("organization_id", organizationId).maybeSingle(),
+        supabase.from("products_new").select("id, name, color").in("id", productIds).eq("organization_id", organizationId),
+        order_ids?.length
+          ? supabase.from("orders").select("id, order_number").in("id", order_ids).eq("organization_id", organizationId)
+          : Promise.resolve({ data: [] as { id: string; order_number: string }[] }),
+      ]);
+      if (!factory) return { ok: false, error: "建立失敗：找不到此工廠" };
+      const productById = new Map(((products ?? []) as { id: string; name: string; color: string | null }[]).map((p) => [p.id, p]));
+      if (productById.size !== productIds.length) return { ok: false, error: "建立失敗：找不到部分產品" };
+      const orderNumbers = ((orders ?? []) as { order_number: string }[]).map((o) => o.order_number);
+      if (orderNumbers.length !== new Set(order_ids ?? []).size) return { ok: false, error: "建立失敗：找不到部分關聯訂單" };
+      const lines = items.map((i) => {
+        const p = productById.get(i.product_id)!;
+        return `${[p.name, p.color].filter(Boolean).join(" ")} × ${i.ordered_quantity}，單價 ${i.unit_price}${i.specifications ? `（${i.specifications}）` : ""}`;
+      });
+      return {
+        ok: true,
+        summary: {
+          title: "建立採購單",
+          fields: fields([
+            ["工廠", (factory as { name: string }).name],
+            ["品項", lines.join("\n")],
+            ["預計到貨", expected_arrival_date],
+            ["關聯訂單", orderNumbers.join("、")],
+            ["備註", note],
+          ]),
+        },
+      };
+    },
     // Not transactional: a later step can fail after the header row is written. Moves to an
     // RPC in the Phase 1 order flow (docs/QUERY_AGENT_PHASE0.md D1).
-    execute: async ({ supabase, userId, organizationId }, { factory_id, expected_arrival_date, note, items, order_ids }) => {
+    execute: async (ctx, { factory_id, expected_arrival_date, note, items, order_ids }) => {
+      const { supabase, userId, organizationId } = ctx;
+      if (!(await allInOrganization(ctx, "factories", [factory_id]))) return fail("建立失敗：找不到此工廠");
+      if (!(await allInOrganization(ctx, "products_new", items.map((i) => i.product_id)))) return fail("建立失敗：找不到部分產品");
+      if (!(await allInOrganization(ctx, "orders", order_ids ?? []))) return fail("建立失敗：找不到部分關聯訂單");
       const { data: purchase, error: purchaseError } = await supabase.from("purchase_orders").insert({
         factory_id,
         expected_arrival_date: expected_arrival_date ?? null,
@@ -86,7 +123,7 @@ export const purchaseOrderTools = [
           order_ids.map((order_id) => ({ purchase_order_id: po.id, order_id }))
         );
         if (relError) return fail(`採購單已建立（編號 ${po.po_number}），但關聯訂單失敗：${relError.message}`);
-        await supabase.from("orders").update({ status: "factory_ordered" }).in("id", order_ids);
+        await supabase.from("orders").update({ status: "factory_ordered" }).in("id", order_ids).eq("organization_id", organizationId);
       }
 
       return ok({

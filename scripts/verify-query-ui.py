@@ -284,6 +284,9 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         # The backend rejects /query without the organization selected in the UI (P0-3)
         sent_org = bool(query_requests) and bool(query_requests[-1].get("organization_id"))
         check("Request includes organization_id", sent_org)
+        # P0-4: the server reads history from the session; the client sends the saved message's id
+        last = query_requests[-1] if query_requests else {}
+        check("Request sends session_id + message_id, no history", bool(last.get("session_id")) and bool(last.get("message_id")) and "history" not in last)
 
         # Thinking animation is best-effort: mocked API responds instantly so
         # the dots may never be visible. Record as info, not a hard failure.

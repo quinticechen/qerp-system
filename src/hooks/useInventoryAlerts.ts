@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useStockThresholds } from '@/hooks/useStockThresholds';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export type InventoryAlert = {
   product_id: string;
@@ -16,13 +17,20 @@ export const useInventoryAlerts = () => {
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const { thresholds } = useStockThresholds();
+  const { organizationId } = useCurrentOrganization();
 
   const checkInventoryAlerts = async () => {
+    if (!organizationId) {
+      setAlerts([]);
+      setLoading(false);
+      return;
+    }
     try {
-      // 獲取庫存摘要數據
+      // 獲取目前組織的庫存摘要數據
       const { data: inventoryData, error } = await supabase
         .from('inventory_summary')
-        .select('*');
+        .select('*')
+        .eq('organization_id', organizationId);
 
       if (error) throw error;
 
@@ -69,7 +77,7 @@ export const useInventoryAlerts = () => {
     } else {
       setLoading(false);
     }
-  }, [thresholds]);
+  }, [thresholds, organizationId]);
 
   return {
     alerts,

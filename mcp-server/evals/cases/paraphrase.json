@@ -1,0 +1,148 @@
+[
+  {
+    "id": "pp-customers",
+    "name": "改寫：客戶名單",
+    "message": "把客戶名單給我看一下",
+    "expect": {
+      "tools_include": [
+        "list_customers"
+      ],
+      "reply_matches": [
+        "永泰布行"
+      ]
+    }
+  },
+  {
+    "id": "pp-latest-po",
+    "name": "改寫：最近一張採購單",
+    "message": "最近一張採購單是哪一張？",
+    "expect": {
+      "tools_include": [
+        "list_purchase_orders"
+      ],
+      "reply_matches": [
+        "PO-20261004-002"
+      ],
+      "reply_not_matches": [
+        "請問.*(篩選|條件)"
+      ]
+    }
+  },
+  {
+    "id": "pp-low-stock",
+    "name": "改寫：快缺貨的布",
+    "message": "有哪些布快要缺貨了？",
+    "expect": {
+      "tools_include": [
+        "get_low_stock_alerts"
+      ],
+      "reply_matches": [
+        "灰0922"
+      ]
+    }
+  },
+  {
+    "id": "pp-inventory",
+    "name": "改寫：庫存剩多少（顏色在前）",
+    "message": "藍0922 的雲朵眠庫存還剩多少",
+    "expect": {
+      "tools_include": [
+        "get_inventory_summary"
+      ],
+      "reply_matches": [
+        "320"
+      ]
+    }
+  },
+  {
+    "id": "pp-unpaid",
+    "name": "改寫：還沒付錢的訂單",
+    "message": "哪些訂單客戶還沒付錢？",
+    "expect": {
+      "tools_include": [
+        "list_orders"
+      ],
+      "reply_matches": [
+        "ORD-20261001-001"
+      ]
+    }
+  },
+  {
+    "id": "pp-create-order",
+    "name": "改寫：開一張新訂單",
+    "message": "替永泰布行開一張新訂單",
+    "expect": {
+      "tools_include": [
+        "create_order"
+      ],
+      "tool_args": [
+        {
+          "tool": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004"
+          }
+        }
+      ],
+      "drafts": {
+        "create_order": 1
+      }
+    }
+  },
+  {
+    "id": "pp-create-po",
+    "name": "改寫：跟工廠訂布",
+    "message": "跟永興織造訂 50 公尺的棉麻平織米白，單價 80",
+    "expect": {
+      "tools_include": [
+        "create_purchase_order"
+      ],
+      "drafts": {
+        "create_purchase_order": 1
+      }
+    }
+  },
+  {
+    "id": "pp-order-with-product",
+    "name": "跨領域：客戶要訂某產品（只能建立訂單本身）",
+    "message": "Chen 要訂雲朵眠 藍0922，幫我開單",
+    "expect": {
+      "tools_include": [
+        "list_customers"
+      ],
+      "drafts": {
+        "create_order": 1
+      }
+    }
+  },
+  {
+    "id": "pp-multi-turn-answer",
+    "name": "多輪：上一輪問客戶，本輪只回名稱（F1 型）",
+    "history": [
+      {
+        "role": "user",
+        "content": "幫我建一張訂單"
+      },
+      {
+        "role": "assistant",
+        "content": "好的，請問是哪一位客戶？"
+      }
+    ],
+    "message": "Chen1",
+    "expect": {
+      "tools_include": [
+        "create_order"
+      ],
+      "tool_args": [
+        {
+          "tool": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000002"
+          }
+        }
+      ],
+      "drafts": {
+        "create_order": 1
+      }
+    }
+  }
+]

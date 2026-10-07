@@ -3,30 +3,152 @@
     "id": "r-duplicate-history",
     "name": "history 中有重複訊息（2026-10-07 事故）仍可正常回應",
     "history": [
-      { "role": "user", "content": "查詢所有客戶" },
-      { "role": "assistant", "content": "-  Chen\n-  Chen1\n- Client name test0922\n- 永泰布行\n" },
-      { "role": "user", "content": "新增訂單" },
-      { "role": "user", "content": "新增訂單" },
-      { "role": "assistant", "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。" },
-      { "role": "assistant", "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。" }
+      {
+        "role": "user",
+        "content": "查詢所有客戶"
+      },
+      {
+        "role": "assistant",
+        "content": "-  Chen\n-  Chen1\n- Client name test0922\n- 永泰布行\n"
+      },
+      {
+        "role": "user",
+        "content": "新增訂單"
+      },
+      {
+        "role": "user",
+        "content": "新增訂單"
+      },
+      {
+        "role": "assistant",
+        "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。"
+      },
+      {
+        "role": "assistant",
+        "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。"
+      }
     ],
     "message": "Client name test0922",
     "expect": {
-      "tools_include": ["list_customers"]
+      "tools_include": [
+        "list_customers"
+      ]
     }
   },
   {
     "id": "r-multi-turn-order",
     "name": "多輪建單：上一輪已詢問客戶名稱，本輪只回答名稱",
     "history": [
-      { "role": "user", "content": "我要新增訂單" },
-      { "role": "assistant", "content": "好的，請問您要為哪位客戶建立訂單？" }
+      {
+        "role": "user",
+        "content": "我要新增訂單"
+      },
+      {
+        "role": "assistant",
+        "content": "好的，請問您要為哪位客戶建立訂單？"
+      }
     ],
     "message": "永泰布行",
     "expect": {
-      "agents_include": ["commercial"],
-      "tools_include": ["list_customers", "create_order"],
-      "writes": { "orders": 1 }
+      "agents_include": [
+        "commercial"
+      ],
+      "tools_include": [
+        "list_customers",
+        "create_order"
+      ],
+      "drafts": {
+        "create_order": 1
+      }
+    }
+  },
+  {
+    "id": "r-entity-memory",
+    "name": "實體記憶：上一輪已找到客戶，本輪用代名詞建單（P0-4）",
+    "history": [
+      {
+        "role": "user",
+        "content": "幫我找永泰布行"
+      },
+      {
+        "role": "assistant",
+        "content": "找到客戶「永泰布行」，聯絡人黃永泰，電話 02-2222-3333。",
+        "metadata": {
+          "entities": [
+            {
+              "type": "customer",
+              "id": "c0000000-0000-4000-8000-000000000004",
+              "label": "永泰布行"
+            }
+          ]
+        }
+      }
+    ],
+    "message": "幫他建立一張訂單",
+    "expect": {
+      "tools_include": [
+        "create_order"
+      ],
+      "tool_args": [
+        {
+          "tool": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004"
+          }
+        }
+      ],
+      "tools_exclude": [
+        "list_customers"
+      ],
+      "drafts": {
+        "create_order": 1
+      }
+    },
+    "note": "對照組（移除 entities）每次都會先呼叫 list_customers 重新查詢；有實體記憶時應直接建單"
+  },
+  {
+    "id": "r-after-confirmation",
+    "name": "確認卡片完成後的下一個新增要求，必須真的建立草稿（2026-10-07 實測事故）",
+    "note": "實測：歷史中的卡片與完成訊息讓模型模仿上一輪文字、聲稱已建立草稿卻沒有呼叫工具",
+    "history": [
+      {
+        "role": "user",
+        "content": "新增一位客戶：P0-5 測試客戶，聯絡人王小明，手機 0912-000-000"
+      },
+      {
+        "role": "assistant",
+        "content": "好的，已建立客戶「P0-5 測試客戶」的草稿，聯絡人為王小明，手機號碼為 0912-000-000。請在下方的確認卡片中點選「確認」來儲存客戶資料。",
+        "metadata": {
+          "action_ids": [
+            "ac000000-0000-4000-8000-000000000001"
+          ]
+        }
+      },
+      {
+        "role": "assistant",
+        "kind": "action",
+        "content": "建立客戶",
+        "metadata": {
+          "action_id": "ac000000-0000-4000-8000-000000000001"
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "✅ 建立客戶已完成",
+        "metadata": {
+          "action_id": "ac000000-0000-4000-8000-000000000001",
+          "action_outcome": true
+        }
+      }
+    ],
+    "message": "新增一位客戶：P0-5 取消測試，聯絡人李小華，手機 0912-111-111",
+    "expect": {
+      "tools_include": [
+        "create_customer"
+      ],
+      "drafts": {
+        "create_customer": 1
+      }
     }
   }
 ]

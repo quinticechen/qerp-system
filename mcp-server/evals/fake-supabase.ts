@@ -13,6 +13,8 @@ export interface RecordedWrite {
   op: "insert" | "update" | "delete";
   table: string;
   values: unknown;
+  /** Ids of the rows an update or delete matched (empty when the filters matched nothing). */
+  ids?: unknown[];
 }
 
 // Inserted rows get these relations embedded so `.select("*, customers(name)")` style reads
@@ -50,6 +52,36 @@ function parseOr(expr: string): Filter {
   return (row) => terms.some((test) => test(row));
 }
 
+// Top-level entries of a PostgREST select list: "id, name, customers(name)" → ["id", "name", "customers(name)"].
+function splitSelect(columns: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of columns) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+/** Keeps only the selected columns (and embedded relations), like PostgREST. `*` keeps everything. */
+function project(row: Row, columns: string[] | null): Row {
+  if (!columns || columns.includes("*")) return row;
+  const out: Row = {};
+  for (const entry of columns) {
+    const name = entry.replace(/\(.*$/s, "").trim();
+    if (name in row) out[name] = row[name];
+  }
+  return out;
+}
+
 class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string } | null }> {
   private filters: Filter[] = [];
   private sortBy: { column: string; ascending: boolean } | null = null;
@@ -59,9 +91,14 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string
 
   constructor(private table: string, private tables: Tables, private writes: RecordedWrite[]) {}
 
-  select(_columns?: string) { return this; }
+  private columns: string[] | null = null;
+  select(columns?: string) { if (columns) this.columns = splitSelect(columns); return this; }
   eq(column: string, value: unknown) { this.filters.push((r) => r[column] === value); return this; }
   neq(column: string, value: unknown) { this.filters.push((r) => r[column] !== value); return this; }
+  lt(column: string, value: string | number) { this.filters.push((r) => (r[column] as string | number) < value); return this; }
+  lte(column: string, value: string | number) { this.filters.push((r) => (r[column] as string | number) <= value); return this; }
+  gt(column: string, value: string | number) { this.filters.push((r) => (r[column] as string | number) > value); return this; }
+  gte(column: string, value: string | number) { this.filters.push((r) => (r[column] as string | number) >= value); return this; }
   in(column: string, values: unknown[]) { this.filters.push((r) => values.includes(r[column])); return this; }
   ilike(column: string, pattern: string) { const re = likeToRegExp(pattern); this.filters.push((r) => re.test(stringify(r[column]))); return this; }
   or(expr: string) { this.filters.push(parseOr(expr)); return this; }
@@ -113,10 +150,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string
     } else {
       result = rows.filter((r) => this.filters.every((f) => f(r)));
       if (this.mutation?.op === "update") {
-        this.writes.push({ op: "update", table: this.table, values: this.mutation.values });
+        this.writes.push({ op: "update", table: this.table, values: this.mutation.values, ids: result.map((r) => r.id) });
         result.forEach((r) => Object.assign(r, this.mutation!.values as Row));
       } else if (this.mutation?.op === "delete") {
-        this.writes.push({ op: "delete", table: this.table, values: result.map((r) => r.id) });
+        this.writes.push({ op: "delete", table: this.table, values: null, ids: result.map((r) => r.id) });
         this.tables[this.table] = rows.filter((r) => !result.includes(r));
       }
       if (this.sortBy) {
@@ -129,6 +166,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string
       if (this.max !== null) result = result.slice(0, this.max);
     }
 
+    result = result.map((r) => project(r, this.columns));
     if (this.mode === "many") return { data: result, error: null };
     if (result.length === 0) {
       return this.mode === "maybeSingle"

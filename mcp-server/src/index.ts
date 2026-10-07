@@ -3,6 +3,7 @@ import { createUserClient } from "./supabase.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { handleQuery } from "./agent/query-handler.js";
+import { confirmAction, cancelAction } from "./agent/actions.js";
 import { authGuard, AccessError } from "./agent/auth-guard.js";
 import { getTools } from "./tools/index.js";
 import { registerMcpTools } from "./tools/adapters.js";
@@ -65,8 +66,10 @@ const httpServer = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── Auth：所有 /mcp 和 /query 都需要 JWT ──────────────────────────────────
-  if (req.url === "/mcp" || req.url === "/query") {
+  const actionRoute = req.url?.match(/^\/query\/actions\/([0-9a-f-]{36})\/(confirm|cancel)$/i);
+
+  // ── Auth：所有 /mcp、/query 與確認操作都需要 JWT ───────────────────────────
+  if (req.url === "/mcp" || req.url === "/query" || actionRoute) {
     const jwt = extractJwt(req.headers.authorization);
     if (!jwt) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -75,6 +78,19 @@ const httpServer = http.createServer(async (req, res) => {
     }
 
     const supabase = createUserClient(jwt);
+
+    // ── POST /query/actions/:id/confirm|cancel — 確認或取消 AI 建立的草稿 ─────
+    if (actionRoute && req.method === "POST") {
+      try {
+        const [, actionId, verb] = actionRoute;
+        const result = verb === "confirm" ? await confirmAction(supabase, actionId) : await cancelAction(supabase, actionId);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (err: unknown) {
+        sendError(res, err);
+      }
+      return;
+    }
 
     // ── POST /query — AI Agent Query 入口 ────────────────────────────────────
     if (req.url === "/query" && req.method === "POST") {
@@ -88,6 +104,8 @@ const httpServer = http.createServer(async (req, res) => {
         const result = await handleQuery(supabase, {
           message: body.message,
           organizationId: body.organization_id,
+          sessionId: body.session_id,
+          messageId: body.message_id,
           history: body.history ?? [],
         });
         res.writeHead(200, { "Content-Type": "application/json" });

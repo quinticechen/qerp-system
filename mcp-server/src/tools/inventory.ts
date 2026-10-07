@@ -19,8 +19,8 @@ export const inventoryTools = [
       search: z.string().optional(),
       limit: z.number().optional(),
     }),
-    execute: async ({ supabase }, { product_id, search, limit }) => {
-      let q = supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, total_rolls, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock, stock_thresholds").limit(limit ?? 30);
+    execute: async ({ supabase, organizationId }, { product_id, search, limit }) => {
+      let q = supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, total_rolls, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock, stock_thresholds").eq("organization_id", organizationId).limit(limit ?? 30);
       if (product_id) q = q.eq("product_id", product_id);
       const { data, error } = await applySearch(q, ["product_name", "color"], search);
       if (error) return fail(`查詢失敗：${error.message}`);
@@ -35,8 +35,8 @@ export const inventoryTools = [
     permission: "canViewInventory",
     description: "取得庫存低於門檻的產品警示清單",
     input: z.object({}),
-    execute: async ({ supabase }) => {
-      const { data, error } = await supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, stock_thresholds").eq("product_status", "Available").not("stock_thresholds", "is", null);
+    execute: async ({ supabase, organizationId }) => {
+      const { data, error } = await supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, stock_thresholds").eq("organization_id", organizationId).eq("product_status", "Available").not("stock_thresholds", "is", null);
       if (error) return fail(`查詢失敗：${error.message}`);
       const low = ((data ?? []) as StockRow[]).filter((i) => i.stock_thresholds && (i.total_stock ?? 0) < i.stock_thresholds);
       return ok(low.length ? low : "目前所有產品庫存充足");

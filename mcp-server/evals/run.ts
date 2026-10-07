@@ -12,10 +12,12 @@
 import { readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { routeQuery } from "../src/agent/router.js";
+import { answerQuery, type AgentMode } from "../src/agent/answer.js";
+import { MODEL_PRIORITY, modelsFor, type GatewayModel } from "../src/agent/ai-gateway.js";
 import { authGuard } from "../src/agent/auth-guard.js";
 import type { QueryObserver, ObservedToolCall, RouteDecision } from "../src/agent/observer.js";
-import type { ConversationMessage } from "../src/agent/sub-agents.js";
+import { entitiesFromHistory, toModelHistory, type StoredMessage } from "../src/agent/memory.js";
+import type { Draft } from "../src/tools/types.js";
 import { createFakeSupabase, type FakeAccess, type RecordedWrite, type Tables } from "./fake-supabase.js";
 
 const EVALS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -30,7 +32,9 @@ interface EvalExpect {
   tools_exclude?: string[];
   tool_args?: { tool: string; args: Record<string, unknown> }[];
   agents_include?: string[];
-  writes?: Record<string, number>;
+  /** Drafts (pending writes) per tool, exact. The agent loop itself never writes business data. */
+  drafts?: Record<string, number>;
+  no_drafts?: boolean;
   no_writes?: boolean;
   reply_matches?: string[];
   reply_not_matches?: string[];
@@ -43,7 +47,8 @@ interface EvalCase {
   known_gap?: string;
   fixtures?: string;
   role?: string;
-  history?: ConversationMessage[];
+  /** May carry metadata.entities, as replies saved by the server do. */
+  history?: StoredMessage[];
   message: string;
   expect: EvalExpect;
 }
@@ -65,6 +70,7 @@ interface RunResult {
   routeFromFallback: boolean;
   toolCalls: ObservedToolCall[];
   writes: RecordedWrite[];
+  drafts: Draft[];
   modelErrors: string[];
   tokens: number;
   latencyMs: number;
@@ -84,6 +90,9 @@ function parseArgs() {
     label: get("--label") ?? "run",
     concurrency: Number(get("--concurrency") ?? 4),
     minPass: Number(get("--min-pass") ?? 0.66), // 2 of 3 runs
+    arch: (get("--arch") === "single" ? "single" : "router") as AgentMode,
+    /** Model to try first; the rest of MODEL_PRIORITY follows as fallbacks. */
+    primary: get("--primary"),
     verbose: args.includes("--verbose"),
   };
 }
@@ -114,15 +123,6 @@ function loadFixtures(name: string): Tables {
 
 // ── Checks ────────────────────────────────────────────────────────────────────
 
-function countInserts(writes: RecordedWrite[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const w of writes) {
-    if (w.op !== "insert") continue;
-    counts[w.table] = (counts[w.table] ?? 0) + (Array.isArray(w.values) ? w.values.length : 1);
-  }
-  return counts;
-}
-
 function argsMatch(actual: unknown, expected: Record<string, unknown>): boolean {
   if (!actual || typeof actual !== "object") return false;
   return Object.entries(expected).every(
@@ -130,7 +130,7 @@ function argsMatch(actual: unknown, expected: Record<string, unknown>): boolean 
   );
 }
 
-function evaluate(c: EvalCase, r: Omit<RunResult, "pass" | "checks">): CheckResult[] {
+function evaluate(c: EvalCase, r: Omit<RunResult, "pass" | "checks">, arch: AgentMode): CheckResult[] {
   const checks: CheckResult[] = [];
   const e = c.expect;
   const called = new Set(r.toolCalls.map((t) => t.toolName));
@@ -150,17 +150,19 @@ function evaluate(c: EvalCase, r: Omit<RunResult, "pass" | "checks">): CheckResu
     const seen = r.toolCalls.filter((t) => t.toolName === tool).map((t) => JSON.stringify(t.args));
     checks.push({ check: `${tool} args ⊇ ${JSON.stringify(args)}`, pass: ok, detail: seen.join(" | ") || "(not called)" });
   }
-  for (const agent of e.agents_include ?? []) {
+  // Which sub-agent the router picked has no meaning for the single agent.
+  for (const agent of arch === "router" ? e.agents_include ?? [] : []) {
     checks.push({ check: `routes to ${agent}`, pass: !!r.route?.agents.includes(agent as never), detail: r.route?.agents.join(", ") });
   }
 
-  const inserts = countInserts(r.writes);
-  if (e.no_writes) {
-    checks.push({ check: "no writes", pass: r.writes.length === 0, detail: r.writes.map((w) => `${w.op} ${w.table}`).join(", ") });
-  }
-  for (const [table, expected] of Object.entries(e.writes ?? {})) {
-    const actual = inserts[table] ?? 0;
-    checks.push({ check: `inserts ${expected} into ${table}`, pass: actual === expected, detail: `actual: ${actual}` });
+  // P0-5 invariant: writes only happen after the user confirms a card, never inside the agent loop.
+  checks.push({ check: "agent loop writes nothing", pass: r.writes.length === 0, detail: r.writes.map((w) => `${w.op} ${w.table}`).join(", ") });
+  const draftCounts: Record<string, number> = {};
+  for (const d of r.drafts) draftCounts[d.tool] = (draftCounts[d.tool] ?? 0) + 1;
+  if (e.no_drafts) checks.push({ check: "no drafts", pass: r.drafts.length === 0, detail: Object.keys(draftCounts).join(", ") });
+  for (const [tool, expected] of Object.entries(e.drafts ?? {})) {
+    const actual = draftCounts[tool] ?? 0;
+    checks.push({ check: `drafts ${expected} × ${tool}`, pass: actual === expected, detail: `actual: ${actual}` });
   }
 
   for (const pattern of e.reply_matches ?? []) {
@@ -176,11 +178,12 @@ function evaluate(c: EvalCase, r: Omit<RunResult, "pass" | "checks">): CheckResu
 
 const ROLES: Record<string, FakeAccess> = JSON.parse(readFileSync(join(EVALS_DIR, "fixtures", "roles.json"), "utf8"));
 
-async function runOnce(c: EvalCase, run: number): Promise<RunResult> {
+async function runOnce(c: EvalCase, run: number, arch: AgentMode, models?: GatewayModel[]): Promise<RunResult> {
   const role = ROLES[c.role ?? "owner"];
   if (!role) throw new Error(`Unknown role "${c.role}" in case ${c.id} (see evals/fixtures/roles.json)`);
   const { client, writes } = createFakeSupabase(loadFixtures(c.fixtures ?? "basic"), EVAL_USER_ID, role);
   const toolCalls: ObservedToolCall[] = [];
+  const drafts: Draft[] = [];
   const modelErrors: string[] = [];
   let route: RouteDecision | undefined;
   let routeFromFallback = false;
@@ -188,7 +191,7 @@ async function runOnce(c: EvalCase, run: number): Promise<RunResult> {
 
   const observer: QueryObserver = {
     onRoute: (decision, fromFallback) => { route = decision; routeFromFallback = fromFallback; },
-    onModelAttempt: (modelId, error) => { if (error) modelErrors.push(`${modelId}: ${(error as Error).message}`); },
+    onModelAttempt: ({ phase, modelId, error }) => { if (error) modelErrors.push(`${phase} ${modelId}: ${(error as Error).message}`); },
     onStep: (_agent, step) => {
       toolCalls.push(...step.toolCalls);
       tokens += step.promptTokens + step.completionTokens;
@@ -202,13 +205,20 @@ async function runOnce(c: EvalCase, run: number): Promise<RunResult> {
     // Same permission path as production: the real authGuard against the fake database.
     const access = await authGuard(client, EVAL_ORG_ID);
     const ctx = { supabase: client, userId: access.userId, organizationId: access.organizationId };
-    reply = await routeQuery(c.message, ctx, access.allowedTools, c.history ?? [], observer);
+    const history = c.history ?? [];
+    reply = await answerQuery(c.message, ctx, access.allowedTools, toModelHistory(history), {
+      observer,
+      deadline: Date.now() + 90_000,
+      entities: entitiesFromHistory(history),
+      drafts,
+      models,
+    }, arch);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
 
-  const partial = { caseId: c.id, run, reply, error, route, routeFromFallback, toolCalls, writes, modelErrors, tokens, latencyMs: Date.now() - started };
-  const checks = evaluate(c, partial);
+  const partial = { caseId: c.id, run, reply, error, route, routeFromFallback, toolCalls, writes, drafts, modelErrors, tokens, latencyMs: Date.now() - started };
+  const checks = evaluate(c, partial, arch);
   return { ...partial, checks, pass: checks.every((ch) => ch.pass) };
 }
 
@@ -234,7 +244,7 @@ function pct(n: number, d: number): string {
 
 const TOOL_CHECK_RE = /^(calls |does not call |\S+ args ⊇ )/;
 
-function buildReport(label: string, cases: EvalCase[], results: RunResult[], runs: number, minPass: number) {
+function buildReport(label: string, cases: EvalCase[], results: RunResult[], runs: number, minPass: number, arch: AgentMode, primary: string) {
   const byCase = new Map(cases.map((c) => [c.id, results.filter((r) => r.caseId === c.id)]));
   const gated = results.filter((r) => !cases.find((c) => c.id === r.caseId)?.known_gap);
 
@@ -261,6 +271,7 @@ function buildReport(label: string, cases: EvalCase[], results: RunResult[], run
     "",
     `- 時間：${new Date().toISOString()}`,
     `- 案例：${cases.length}（每案 ${runs} 次）；通過門檻 ${Math.round(minPass * 100)}%`,
+    `- 架構：${arch}；主模型：${primary}`,
     "",
     "## 指標（不含 known_gap 案例）",
     "",
@@ -320,19 +331,20 @@ async function main() {
     console.error = () => {};
   }
 
-  console.log(`Running ${cases.length} cases × ${opts.runs} runs (concurrency ${opts.concurrency})…`);
-  const tasks = cases.flatMap((c) => Array.from({ length: opts.runs }, (_, i) => () => runOnce(c, i + 1)));
+  const models = opts.primary ? modelsFor([opts.primary, ...MODEL_PRIORITY.filter((id) => id !== opts.primary)]) : undefined;
+  console.log(`Running ${cases.length} cases × ${opts.runs} runs (arch ${opts.arch}, primary ${opts.primary ?? MODEL_PRIORITY[0]}, concurrency ${opts.concurrency})…`);
+  const tasks = cases.flatMap((c) => Array.from({ length: opts.runs }, (_, i) => () => runOnce(c, i + 1, opts.arch, models)));
   const results = await runPool(tasks, opts.concurrency, (r) => process.stdout.write(r.pass ? "." : "F"));
   process.stdout.write("\n");
   Object.assign(console, restore);
 
-  const { markdown, metrics, failing } = buildReport(opts.label, cases, results, opts.runs, opts.minPass);
+  const { markdown, metrics, failing } = buildReport(opts.label, cases, results, opts.runs, opts.minPass, opts.arch, opts.primary ?? MODEL_PRIORITY[0]);
   const reportsDir = join(EVALS_DIR, "reports");
   mkdirSync(reportsDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13);
   const base = join(reportsDir, `${stamp}-${opts.label}`);
   writeFileSync(`${base}.md`, markdown);
-  writeFileSync(`${base}.json`, JSON.stringify({ label: opts.label, metrics, results }, null, 2));
+  writeFileSync(`${base}.json`, JSON.stringify({ label: opts.label, arch: opts.arch, primary: opts.primary ?? MODEL_PRIORITY[0], metrics, results }, null, 2));
 
   console.log(`\n任務完成率 ${metrics.taskCompletion}｜Tool 選擇 ${metrics.toolSelection}｜錯誤率 ${metrics.errorRate}｜降級率 ${metrics.fallbackRate}｜平均 ${metrics.avgLatencyMs} ms`);
   console.log(`報告：${base}.md`);

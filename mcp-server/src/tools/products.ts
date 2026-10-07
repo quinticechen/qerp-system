@@ -14,8 +14,8 @@ export const productTools = [
       status: z.enum(["Available", "Unavailable"]).optional(),
       limit: z.number().optional(),
     }),
-    execute: async ({ supabase }, { search, status, limit }) => {
-      let q = supabase.from("products_new").select("id, name, category, color, color_code, status").order("name").limit(limit ?? 30);
+    execute: async ({ supabase, organizationId }, { search, status, limit }) => {
+      let q = supabase.from("products_new").select("id, name, category, color, color_code, status").eq("organization_id", organizationId).order("name").limit(limit ?? 30);
       if (status) q = q.eq("status", status);
       const { data, error } = await applySearch(q, ["name", "color"], search);
       if (error) return fail(`查詢失敗：${error.message}`);
@@ -32,8 +32,8 @@ export const productTools = [
     input: z.object({
       product_id: z.string().uuid().describe("產品 UUID"),
     }),
-    execute: async ({ supabase }, { product_id }) => {
-      const { data, error } = await supabase.from("products_new").select("*").eq("id", product_id).single();
+    execute: async ({ supabase, organizationId }, { product_id }) => {
+      const { data, error } = await supabase.from("products_new").select("*").eq("id", product_id).eq("organization_id", organizationId).single();
       if (error) return fail(`找不到產品：${error.message}`);
       return ok(data);
     },

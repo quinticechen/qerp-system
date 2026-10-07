@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, KeyboardEvent, type ReactNode } from 'react';
 import { X, Send, Trash2, Loader2, ChevronDown, Pin, Plus, Trash } from 'lucide-react';
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
+import { ActionCard } from './ActionCard';
 import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -130,13 +131,21 @@ export function QueryChat({ onClose }: QueryChatProps) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50/80">
         {/* Welcome bubble */}
-        <AssistantBubble content={WELCOME_MESSAGE} />
+        <AssistantBubble>
+          <MarkdownMessage content={WELCOME_MESSAGE} />
+        </AssistantBubble>
 
         {messages.map((msg) =>
           msg.role === 'user' ? (
             <UserBubble key={msg.id} content={msg.content} />
+          ) : msg.kind === 'action' && msg.actionId ? (
+            <AssistantBubble key={msg.id}>
+              <ActionCard actionId={msg.actionId} />
+            </AssistantBubble>
           ) : (
-            <AssistantBubble key={msg.id} content={msg.content} />
+            <AssistantBubble key={msg.id}>
+              <MarkdownMessage content={msg.content} />
+            </AssistantBubble>
           )
         )}
 
@@ -320,14 +329,14 @@ function UserBubble({ content }: { content: string }) {
   );
 }
 
-function AssistantBubble({ content }: { content: string }) {
+function AssistantBubble({ children }: { children: ReactNode }) {
   return (
     <div className="flex gap-2.5 items-start">
       <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 mt-0.5">
         <MantaRayIcon size={16} className="text-white" />
       </div>
       <div className="max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm bg-white shadow-sm border border-gray-100 text-gray-800">
-        <MarkdownMessage content={content} />
+        {children}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import type { PermissionKey } from "../tools/types.js";
 import { getAllTools } from "../tools/index.js";
 
 export class AccessError extends Error {
-  constructor(message: string, readonly status: 400 | 401 | 403) {
+  constructor(message: string, readonly status: 400 | 401 | 403 | 404 | 409) {
     super(message);
   }
 }

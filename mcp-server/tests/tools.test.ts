@@ -42,7 +42,7 @@ function textOf(result: Awaited<ReturnType<Client["callTool"]>>): string {
 
 test("AI SDK and MCP adapters expose the same tools", async () => {
   const { ctx } = fakeContext();
-  const aiNames = Object.keys(toAiSdkTools(getAllTools(), ctx)).filter((n) => !n.startsWith("default_api.")).sort();
+  const aiNames = Object.keys(toAiSdkTools(getAllTools(), ctx, { onDraft: () => {} })).filter((n) => !n.startsWith("default_api.")).sort();
   const { tools } = await (await connectMcp(ctx)).listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), aiNames);
   assert.equal(aiNames.length, 17);

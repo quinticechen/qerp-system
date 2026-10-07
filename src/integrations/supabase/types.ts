@@ -784,6 +784,8 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          kind: string
+          metadata: Json
           role: string
           session_id: string
         }
@@ -791,6 +793,8 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          kind?: string
+          metadata?: Json
           role: string
           session_id: string
         }
@@ -798,12 +802,77 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          kind?: string
+          metadata?: Json
           role?: string
           session_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "query_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "query_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      query_pending_actions: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          error: string | null
+          expires_at: string
+          id: string
+          organization_id: string
+          payload: Json
+          result: Json | null
+          session_id: string | null
+          status: string
+          summary: Json
+          tool: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          error?: string | null
+          expires_at?: string
+          id?: string
+          organization_id: string
+          payload: Json
+          result?: Json | null
+          session_id?: string | null
+          status?: string
+          summary: Json
+          tool: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          error?: string | null
+          expires_at?: string
+          id?: string
+          organization_id?: string
+          payload?: Json
+          result?: Json | null
+          session_id?: string | null
+          status?: string
+          summary?: Json
+          tool?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "query_pending_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "query_pending_actions_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "query_sessions"
@@ -845,6 +914,75 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      query_traces: {
+        Row: {
+          attempts: Json
+          created_at: string
+          error: string | null
+          fallback_from: string | null
+          id: string
+          input_tokens: number
+          latency_ms: number
+          model: string | null
+          organization_id: string
+          output_tokens: number
+          route: Json | null
+          session_id: string | null
+          status: string
+          steps: Json
+          user_id: string
+        }
+        Insert: {
+          attempts?: Json
+          created_at?: string
+          error?: string | null
+          fallback_from?: string | null
+          id?: string
+          input_tokens?: number
+          latency_ms: number
+          model?: string | null
+          organization_id: string
+          output_tokens?: number
+          route?: Json | null
+          session_id?: string | null
+          status: string
+          steps?: Json
+          user_id: string
+        }
+        Update: {
+          attempts?: Json
+          created_at?: string
+          error?: string | null
+          fallback_from?: string | null
+          id?: string
+          input_tokens?: number
+          latency_ms?: number
+          model?: string | null
+          organization_id?: string
+          output_tokens?: number
+          route?: Json | null
+          session_id?: string | null
+          status?: string
+          steps?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "query_traces_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "query_traces_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "query_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1258,12 +1396,21 @@ export type Database = {
           color: string | null
           d_grade_stock: number | null
           defective_stock: number | null
+          organization_id: string | null
           product_id: string | null
           product_name: string | null
           total_rolls: number | null
           total_stock: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_new_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_summary_enhanced: {
         Row: {
@@ -1284,6 +1431,7 @@ export type Database = {
           defective_details: string[] | null
           defective_rolls: number | null
           defective_stock: number | null
+          organization_id: string | null
           pending_in_quantity: number | null
           pending_out_quantity: number | null
           product_id: string | null
@@ -1293,7 +1441,15 @@ export type Database = {
           total_rolls: number | null
           total_stock: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_new_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -1304,6 +1460,10 @@ export type Database = {
       add_existing_user_to_organization: {
         Args: { _email: string; _organization_id: string; _role_id: string }
         Returns: string
+      }
+      can_inspect_organization: {
+        Args: { _organization_id: string; _user_id: string }
+        Returns: boolean
       }
       complete_user_invitation: {
         Args: {

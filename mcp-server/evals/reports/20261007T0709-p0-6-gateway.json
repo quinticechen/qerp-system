@@ -1,0 +1,2957 @@
+{
+  "label": "p0-6-gateway",
+  "metrics": {
+    "taskCompletion": "82%",
+    "toolSelection": "82%",
+    "errorRate": "0%",
+    "fallbackRate": "0%",
+    "avgLatencyMs": 3288,
+    "avgSubAgentTokens": 1911
+  },
+  "results": [
+    {
+      "caseId": "p-accounting-cannot-create-order",
+      "run": 1,
+      "reply": "抱歉，我目前沒有權限為客戶「test0922」建立新訂單。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 862,
+      "latencyMs": 2773,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /權限|無法|不能/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-accounting-cannot-create-order",
+      "run": 2,
+      "reply": "抱歉，我目前沒有權限為客戶「test0922」建立新訂單。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 862,
+      "latencyMs": 2882,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /權限|無法|不能/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-accounting-cannot-create-order",
+      "run": 3,
+      "reply": "抱歉，我無法為您建立新訂單，因為我沒有建立訂單的權限。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1391,
+      "latencyMs": 3269,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /權限|無法|不能/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-warehouse-no-customers",
+      "run": 1,
+      "reply": "抱歉，本帳號無法使用查詢客戶的功能。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 587,
+      "latencyMs": 2644,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply does not match /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-warehouse-no-customers",
+      "run": 2,
+      "reply": "抱歉，本帳號無法使用查詢客戶的功能。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 587,
+      "latencyMs": 1583,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply does not match /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-warehouse-no-customers",
+      "run": 3,
+      "reply": "抱歉，本帳號無法使用查詢客戶的功能。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 587,
+      "latencyMs": 2968,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply does not match /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-sales-cannot-create-po",
+      "run": 1,
+      "reply": "抱歉，本帳號沒有建立採購單的權限。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1049,
+      "latencyMs": 3825,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_purchase_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-sales-cannot-create-po",
+      "run": 2,
+      "reply": "抱歉，本帳號沒有建立採購單的權限。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1049,
+      "latencyMs": 3794,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_purchase_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "p-sales-cannot-create-po",
+      "run": 3,
+      "reply": "抱歉，本帳號沒有建立採購單的權限。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1049,
+      "latencyMs": 3100,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "does not call create_purchase_order",
+          "pass": true
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-list-customers",
+      "run": 1,
+      "reply": "以下是所有客戶列表：\n- Chen\n- Chen1\n- Client name test0922\n- 永泰布行\n\n您可以透過客戶名稱進行查詢，或是查詢訂單。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1825,
+      "latencyMs": 2778,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-list-customers",
+      "run": 2,
+      "reply": "以下是所有客戶列表：\n- Chen\n- Chen1\n- Client name test0922\n- 永泰布行\n\n您可以透過客戶名稱進行查詢，或是查詢訂單。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1825,
+      "latencyMs": 3361,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-list-customers",
+      "run": 3,
+      "reply": "以下是所有客戶列表：\n- Chen\n- Chen1\n- Client name test0922\n- 永泰布行\n\n您可以透過客戶名稱進行查詢，或是查詢訂單。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1825,
+      "latencyMs": 2902,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Client name test0922/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永泰布行/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-customer-contact",
+      "run": 1,
+      "reply": "好的，永泰布行的聯絡人是黃永泰，電話是 02-2222-3333。請問您需要查詢訂單或產品資訊嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢永泰布行的聯絡人和電話"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1763,
+      "latencyMs": 4601,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /黃永泰/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /02-2222-3333/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-customer-contact",
+      "run": 2,
+      "reply": "好的，永泰布行的聯絡人是黃永泰，電話是 02-2222-3333。請問您需要查詢訂單或產品資訊嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢永泰布行的聯絡人和電話"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1763,
+      "latencyMs": 4197,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /黃永泰/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /02-2222-3333/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-customer-contact",
+      "run": 3,
+      "reply": "好的，永泰布行的聯絡人是黃永泰，電話是 02-2222-3333。請問您需要查詢訂單或產品資訊嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢永泰布行的聯絡人和電話"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1763,
+      "latencyMs": 2997,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /黃永泰/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /02-2222-3333/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-latest-po",
+      "run": 1,
+      "reply": "這是最新的採購單詳情：\n採購單號：PO-20261004-002\n工廠：Factory 092202\n訂單日期：2026-10-04\n預計到貨日期：2026-10-18\n狀態：in_production\n\n採購單號：PO-20260920-001\n工廠：永興織造\n訂單日期：2026-09-20\n預計到貨日期：2026-10-01\n狀態：completed\n\n您可以查詢特定採購單的詳細資訊，或查詢其他狀態的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢最新的採購單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_purchase_orders",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2244,
+      "latencyMs": 3032,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_purchase_orders",
+          "pass": true,
+          "detail": "called: list_purchase_orders"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /PO-20261004-002/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /請問.*(篩選|條件)/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-latest-po",
+      "run": 2,
+      "reply": "這是最新的採購單詳情：\n採購單號：PO-20261004-002\n工廠：Factory 092202\n訂單日期：2026-10-04\n預計到貨日期：2026-10-18\n狀態：in_production\n\n採購單號：PO-20260920-001\n工廠：永興織造\n訂單日期：2026-09-20\n預計到貨日期：2026-10-01\n狀態：completed\n\n您可以查詢特定採購單的詳細資訊，或查詢其他狀態的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢最新的採購單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_purchase_orders",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2244,
+      "latencyMs": 3684,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_purchase_orders",
+          "pass": true,
+          "detail": "called: list_purchase_orders"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /PO-20261004-002/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /請問.*(篩選|條件)/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-latest-po",
+      "run": 3,
+      "reply": "這是最新的採購單詳情：\n採購單號：PO-20261004-002\n工廠：Factory 092202\n訂單日期：2026-10-04\n預計到貨日期：2026-10-18\n狀態：in_production\n\n採購單號：PO-20260920-001\n工廠：永興織造\n訂單日期：2026-09-20\n預計到貨日期：2026-10-01\n狀態：completed\n\n您可以查詢特定採購單的詳細資訊，或查詢其他狀態的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢最新的採購單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_purchase_orders",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2244,
+      "latencyMs": 2903,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_purchase_orders",
+          "pass": true,
+          "detail": "called: list_purchase_orders"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /PO-20261004-002/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /請問.*(篩選|條件)/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-low-stock",
+      "run": 1,
+      "reply": "雲朵眠 test0922 (灰0922) 的庫存低於門檻。目前庫存為 45 卷，低於設定的 150 卷門檻。\n\n您需要為此產品建立採購單以補足庫存。請告訴我您想在哪個工廠下單，以及您希望訂購的數量和單價。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "庫存低於門檻的產品"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_low_stock_alerts",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2020,
+      "latencyMs": 2740,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_low_stock_alerts",
+          "pass": true,
+          "detail": "called: get_low_stock_alerts"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /灰0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /棉麻平織/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-low-stock",
+      "run": 2,
+      "reply": "雲朵眠 test0922 (灰0922) 的庫存低於門檻。目前庫存為 45 卷，低於設定的 150 卷門檻。\n\n您需要為此產品建立採購單以補足庫存。請告訴我您想在哪個工廠下單，以及您希望訂購的數量和單價。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "庫存低於門檻的產品"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_low_stock_alerts",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2020,
+      "latencyMs": 2604,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_low_stock_alerts",
+          "pass": true,
+          "detail": "called: get_low_stock_alerts"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /灰0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /棉麻平織/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-low-stock",
+      "run": 3,
+      "reply": "雲朵眠 test0922 (灰0922) 的庫存低於門檻。目前庫存為 45 卷，低於設定的 150 卷門檻。\n\n您需要為此產品建立採購單以補足庫存。請告訴我您想在哪個工廠下單，以及您希望訂購的數量和單價。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "庫存低於門檻的產品"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_low_stock_alerts",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2020,
+      "latencyMs": 2722,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_low_stock_alerts",
+          "pass": true,
+          "detail": "called: get_low_stock_alerts"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /灰0922/",
+          "pass": true
+        },
+        {
+          "check": "reply does not match /棉麻平織/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-inventory-search",
+      "run": 1,
+      "reply": "目前「雲朵眠 test0922 藍0922」的庫存總共有 320 卷，其中 A 級庫存 280 卷、B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢 雲朵眠 藍0922 的庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 藍0922"
+          }
+        },
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "product_id": "a0000000-0000-4000-8000-000000000001"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3320,
+      "latencyMs": 4041,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: list_products, get_inventory_summary"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-inventory-search",
+      "run": 2,
+      "reply": "目前「雲朵眠 test0922 藍0922」的庫存總共有 320 卷，其中 A 級庫存 280 卷、B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢 雲朵眠 藍0922 的庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 藍0922"
+          }
+        },
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "product_id": "a0000000-0000-4000-8000-000000000001"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3320,
+      "latencyMs": 5285,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: list_products, get_inventory_summary"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-inventory-search",
+      "run": 3,
+      "reply": "目前「雲朵眠 test0922 藍0922」的庫存總共有 320 卷，其中 A 級庫存 280 卷、B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢 雲朵眠 藍0922 的庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 藍0922"
+          }
+        },
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "product_id": "a0000000-0000-4000-8000-000000000001"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3320,
+      "latencyMs": 3697,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: list_products, get_inventory_summary"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-unpaid-orders",
+      "run": 1,
+      "reply": "好的，這是一筆未付款的訂單：\n\n*   訂單號碼：ORD-20261001-001\n*   客戶名稱：Chen\n*   訂單狀態：confirmed\n*   付款狀態：unpaid\n*   出貨狀態：not_started\n\n您可以透過訂單號碼查詢訂單詳情，或更新訂單狀態。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "列出還沒付款的訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_orders",
+          "args": {
+            "payment_status": "unpaid"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1688,
+      "latencyMs": 2703,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_orders",
+          "pass": true,
+          "detail": "called: list_orders"
+        },
+        {
+          "check": "list_orders args ⊇ {\"payment_status\":\"unpaid\"}",
+          "pass": true,
+          "detail": "{\"payment_status\":\"unpaid\"}"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /ORD-20261001-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-unpaid-orders",
+      "run": 2,
+      "reply": "好的，這是一筆未付款的訂單：\n\n*   訂單號碼：ORD-20261001-001\n*   客戶名稱：Chen\n*   訂單狀態：confirmed\n*   付款狀態：unpaid\n*   出貨狀態：not_started\n\n您可以透過訂單號碼查詢訂單詳情，或更新訂單狀態。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "列出還沒付款的訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_orders",
+          "args": {
+            "payment_status": "unpaid"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1688,
+      "latencyMs": 3108,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_orders",
+          "pass": true,
+          "detail": "called: list_orders"
+        },
+        {
+          "check": "list_orders args ⊇ {\"payment_status\":\"unpaid\"}",
+          "pass": true,
+          "detail": "{\"payment_status\":\"unpaid\"}"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /ORD-20261001-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-unpaid-orders",
+      "run": 3,
+      "reply": "好的，這是一筆未付款的訂單：\n\n*   訂單號碼：ORD-20261001-001\n*   客戶名稱：Chen\n*   訂單狀態：confirmed\n*   付款狀態：unpaid\n*   出貨狀態：not_started\n\n您可以透過訂單號碼查詢訂單詳情，或更新訂單狀態。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "列出還沒付款的訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_orders",
+          "args": {
+            "payment_status": "unpaid"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1688,
+      "latencyMs": 2879,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_orders",
+          "pass": true,
+          "detail": "called: list_orders"
+        },
+        {
+          "check": "list_orders args ⊇ {\"payment_status\":\"unpaid\"}",
+          "pass": true,
+          "detail": "{\"payment_status\":\"unpaid\"}"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /ORD-20261001-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-factories",
+      "run": 1,
+      "reply": "以下是我們的合作工廠資訊：\n\n*   **Factory 092202**\n    *   廠長：張廠長\n    *   電話：04-1111-2222\n*   **永興織造**\n    *   經理：吳經理\n    *   電話：04-3333-4444\n    *   Email：yx@example.com\n\n請問您想了解哪一間工廠的詳細資訊，或是需要查詢其他資料呢？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢合作工廠資訊"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 4342,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Factory 092202/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永興織造/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-factories",
+      "run": 2,
+      "reply": "以下是我們的合作工廠資訊：\n\n*   **Factory 092202**\n    *   廠長：張廠長\n    *   電話：04-1111-2222\n*   **永興織造**\n    *   經理：吳經理\n    *   電話：04-3333-4444\n    *   Email：yx@example.com\n\n請問您想了解哪一間工廠的詳細資訊，或是需要查詢其他資料呢？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢合作工廠資訊"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 2913,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Factory 092202/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永興織造/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-factories",
+      "run": 3,
+      "reply": "以下是我們的合作工廠資訊：\n\n*   **Factory 092202**\n    *   廠長：張廠長\n    *   電話：04-1111-2222\n*   **永興織造**\n    *   經理：吳經理\n    *   電話：04-3333-4444\n    *   Email：yx@example.com\n\n請問您想了解哪一間工廠的詳細資訊，或是需要查詢其他資料呢？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢合作工廠資訊"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 3008,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /Factory 092202/",
+          "pass": true
+        },
+        {
+          "check": "reply matches /永興織造/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-recent-shipping",
+      "run": 1,
+      "reply": "這是最近的出貨紀錄：\n\n*   出貨單號：SH-20261002-001，出貨日期：2026-10-02，客戶：永泰布行，訂單號：ORD-20261003-002，出貨數量：600 卷\n*   出貨單號：SH-20260925-002，出貨日期：2026-09-25，客戶：Chen，出貨數量：150 卷\n\n您想查詢特定訂單的出貨紀錄嗎？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢出貨紀錄"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_shippings",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2233,
+      "latencyMs": 2871,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_shippings",
+          "pass": true,
+          "detail": "called: list_shippings"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /SH-20261002-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-recent-shipping",
+      "run": 2,
+      "reply": "這是最近的出貨紀錄：\n\n*   出貨單號：SH-20261002-001，出貨日期：2026-10-02，客戶：永泰布行，訂單號：ORD-20261003-002，出貨數量：600 卷\n*   出貨單號：SH-20260925-002，出貨日期：2026-09-25，客戶：Chen，出貨數量：150 卷\n\n您想查詢特定訂單的出貨紀錄嗎？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢出貨紀錄"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_shippings",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2233,
+      "latencyMs": 3196,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_shippings",
+          "pass": true,
+          "detail": "called: list_shippings"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /SH-20261002-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-recent-shipping",
+      "run": 3,
+      "reply": "這是最近的出貨紀錄：\n\n*   出貨單號：SH-20261002-001，出貨日期：2026-10-02，客戶：永泰布行，訂單號：ORD-20261003-002，出貨數量：600 卷\n*   出貨單號：SH-20260925-002，出貨日期：2026-09-25，客戶：Chen，出貨數量：150 卷\n\n您想查詢特定訂單的出貨紀錄嗎？",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢出貨紀錄"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_shippings",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2233,
+      "latencyMs": 2946,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_shippings",
+          "pass": true,
+          "detail": "called: list_shippings"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /SH-20261002-001/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 1,
+      "reply": "以下是我們合作的工廠列表：\n\n*   Factory 092202 (廠長：張廠長)\n*   永興織造 (經理：吳經理)",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2075,
+      "latencyMs": 4101,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 2,
+      "reply": "以下是我們合作的工廠列表：\n\n*   Factory 092202 (廠長：張廠長)\n*   永興織造 (經理：吳經理)",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2075,
+      "latencyMs": 4289,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 3,
+      "reply": "以下是我們合作的工廠列表：\n\n*   Factory 092202 (廠長：張廠長)\n*   永興織造 (經理：吳經理)",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 2075,
+      "latencyMs": 2578,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "r-duplicate-history",
+      "run": 1,
+      "reply": "好的，請提供客戶名稱，以便為您查詢客戶資料。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單, 客戶名稱:"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 790,
+      "latencyMs": 1616,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": false,
+          "detail": "called: (none)"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-duplicate-history",
+      "run": 2,
+      "reply": "好的，請提供客戶名稱，以便為您查詢客戶資料。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單, 客戶名稱:"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 790,
+      "latencyMs": 1530,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": false,
+          "detail": "called: (none)"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-duplicate-history",
+      "run": 3,
+      "reply": "好的，請提供客戶名稱，以便為您查詢客戶資料。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單, 客戶名稱:"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 790,
+      "latencyMs": 3069,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": false,
+          "detail": "called: (none)"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-multi-turn-order",
+      "run": 1,
+      "reply": "好的，找到客戶「永泰布行」，請問需要為這位客戶新增什麼訂單內容嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單 (客戶名稱: 永泰布行)"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1723,
+      "latencyMs": 3607,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "routes to commercial",
+          "pass": true,
+          "detail": "commercial"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-multi-turn-order",
+      "run": 2,
+      "reply": "好的，找到客戶「永泰布行」，請問需要為這位客戶新增什麼訂單內容嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單 (客戶名稱: 永泰布行)"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1723,
+      "latencyMs": 3228,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "routes to commercial",
+          "pass": true,
+          "detail": "commercial"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-multi-turn-order",
+      "run": 3,
+      "reply": "好的，找到客戶「永泰布行」，請問需要為這位客戶新增什麼訂單內容嗎？",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "新增訂單 (客戶名稱: 永泰布行)"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1723,
+      "latencyMs": 2858,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "routes to commercial",
+          "pass": true,
+          "detail": "commercial"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-create-order",
+      "run": 1,
+      "reply": "好的，這筆訂單是為「Client name test0922」建立的。請提供訂單備註。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1691,
+      "latencyMs": 2851,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000003\"}",
+          "pass": false,
+          "detail": "(not called)"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-create-order",
+      "run": 2,
+      "reply": "好的，這筆訂單是為「Client name test0922」建立的。請提供訂單備註。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1691,
+      "latencyMs": 2853,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000003\"}",
+          "pass": false,
+          "detail": "(not called)"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-create-order",
+      "run": 3,
+      "reply": "好的，這筆訂單是為「Client name test0922」建立的。請提供訂單備註。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為 Client name test0922 建立一張新訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1691,
+      "latencyMs": 2724,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "calls create_order",
+          "pass": false,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000003\"}",
+          "pass": false,
+          "detail": "(not called)"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-order-unknown-customer",
+      "run": 1,
+      "reply": "找不到客戶王大明布行，是否要新增此客戶？若否，請提供欲查詢的客戶名稱。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為王大明布行建立一張訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "王大明布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1615,
+      "latencyMs": 3253,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /找不到|查無|沒有.*客戶|新增/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-order-unknown-customer",
+      "run": 2,
+      "reply": "找不到客戶王大明布行，是否要新增此客戶？若否，請提供欲查詢的客戶名稱。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為王大明布行建立一張訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "王大明布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1615,
+      "latencyMs": 2925,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /找不到|查無|沒有.*客戶|新增/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-order-unknown-customer",
+      "run": 3,
+      "reply": "找不到客戶王大明布行，是否要新增此客戶？若否，請提供欲查詢的客戶名稱。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "為王大明布行建立一張訂單"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "王大明布行"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 1615,
+      "latencyMs": 2788,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "check": "no writes",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /找不到|查無|沒有.*客戶|新增/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-create-po",
+      "run": 1,
+      "reply": "已成功向 Factory 092202 下達採購單 PO-EVAL-4，內容為：雲朵眠 test0922 藍0922，100 公尺，單價 50 元。\n\n接下來您可以追蹤此採購單的狀態，或繼續建立新的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "create_purchase_order",
+          "args": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "ordered_quantity": 100,
+                "unit_price": 50,
+                "specifications": "公尺"
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [
+        {
+          "op": "insert",
+          "table": "purchase_orders",
+          "values": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "expected_arrival_date": null,
+            "note": null,
+            "status": "confirmed",
+            "user_id": "0a000000-0000-4000-8000-000000000001",
+            "organization_id": "0e000000-0000-4000-8000-000000000001"
+          }
+        },
+        {
+          "op": "insert",
+          "table": "purchase_order_items",
+          "values": [
+            {
+              "purchase_order_id": "b05f6f93-e9e0-404c-9047-e7edf8081d58",
+              "product_id": "a0000000-0000-4000-8000-000000000001",
+              "ordered_quantity": 100,
+              "ordered_rolls": 0,
+              "unit_price": 50,
+              "specifications": {
+                "description": "公尺"
+              }
+            }
+          ]
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 4701,
+      "latencyMs": 4898,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls list_products",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls create_purchase_order",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "inserts 1 into purchase_orders",
+          "pass": true,
+          "detail": "actual: 1"
+        },
+        {
+          "check": "inserts 1 into purchase_order_items",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-create-po",
+      "run": 2,
+      "reply": "已成功向 Factory 092202 下達採購單 PO-EVAL-4，內容為：雲朵眠 test0922 藍0922，100 公尺，單價 50 元。\n\n接下來您可以追蹤此採購單的狀態，或繼續建立新的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "create_purchase_order",
+          "args": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "ordered_quantity": 100,
+                "unit_price": 50,
+                "specifications": "公尺"
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [
+        {
+          "op": "insert",
+          "table": "purchase_orders",
+          "values": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "expected_arrival_date": null,
+            "note": null,
+            "status": "confirmed",
+            "user_id": "0a000000-0000-4000-8000-000000000001",
+            "organization_id": "0e000000-0000-4000-8000-000000000001"
+          }
+        },
+        {
+          "op": "insert",
+          "table": "purchase_order_items",
+          "values": [
+            {
+              "purchase_order_id": "7bfba94e-c79b-4ebd-9aa1-9fa3fd783b15",
+              "product_id": "a0000000-0000-4000-8000-000000000001",
+              "ordered_quantity": 100,
+              "ordered_rolls": 0,
+              "unit_price": 50,
+              "specifications": {
+                "description": "公尺"
+              }
+            }
+          ]
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 4701,
+      "latencyMs": 6271,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls list_products",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls create_purchase_order",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "inserts 1 into purchase_orders",
+          "pass": true,
+          "detail": "actual: 1"
+        },
+        {
+          "check": "inserts 1 into purchase_order_items",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-create-po",
+      "run": 3,
+      "reply": "已成功向 Factory 092202 下達採購單 PO-EVAL-4，內容為：雲朵眠 test0922 藍0922，100 公尺，單價 50 元。\n\n接下來您可以追蹤此採購單的狀態，或繼續建立新的採購單。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "create_purchase_order",
+          "args": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "ordered_quantity": 100,
+                "unit_price": 50,
+                "specifications": "公尺"
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [
+        {
+          "op": "insert",
+          "table": "purchase_orders",
+          "values": {
+            "factory_id": "f0000000-0000-4000-8000-000000000001",
+            "expected_arrival_date": null,
+            "note": null,
+            "status": "confirmed",
+            "user_id": "0a000000-0000-4000-8000-000000000001",
+            "organization_id": "0e000000-0000-4000-8000-000000000001"
+          }
+        },
+        {
+          "op": "insert",
+          "table": "purchase_order_items",
+          "values": [
+            {
+              "purchase_order_id": "02ae393d-0475-4c35-b90c-f971fc579d46",
+              "product_id": "a0000000-0000-4000-8000-000000000001",
+              "ordered_quantity": 100,
+              "ordered_rolls": 0,
+              "unit_price": 50,
+              "specifications": {
+                "description": "公尺"
+              }
+            }
+          ]
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 4701,
+      "latencyMs": 5878,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls list_products",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "calls create_purchase_order",
+          "pass": true,
+          "detail": "called: list_factories, list_products, create_purchase_order"
+        },
+        {
+          "check": "inserts 1 into purchase_orders",
+          "pass": true,
+          "detail": "actual: 1"
+        },
+        {
+          "check": "inserts 1 into purchase_order_items",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "w-cross-domain-order",
+      "run": 1,
+      "reply": "**📋 商務管理**\n找不到此客戶，是否要新增？\n\n---\n\n**📦 供應鏈**\n好的，這是 Factory 092202 的訂單。請問需要訂購什麼產品呢？請提供產品名稱、數量和單價。",
+      "route": {
+        "agents": [
+          "commercial",
+          "supply_chain"
+        ],
+        "tasks": {
+          "commercial": "新增一張訂單，客戶名稱為 test0922，購買的產品為「雲朵眠 test0922」和「藍0922」",
+          "supply_chain": "新增一張訂單，出貨工廠為「Factory 092202」"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3805,
+      "latencyMs": 3979,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_products",
+          "pass": false,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-cross-domain-order",
+      "run": 2,
+      "reply": "**📋 商務管理**\n找不到此客戶，是否要新增？\n\n---\n\n**📦 供應鏈**\n好的，這是 Factory 092202 的訂單。請問需要訂購什麼產品呢？請提供產品名稱、數量和單價。",
+      "route": {
+        "agents": [
+          "commercial",
+          "supply_chain"
+        ],
+        "tasks": {
+          "commercial": "新增一張訂單，客戶名稱為 test0922，購買的產品為「雲朵眠 test0922」和「藍0922」",
+          "supply_chain": "新增一張訂單，出貨工廠為「Factory 092202」"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3805,
+      "latencyMs": 3429,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_products",
+          "pass": false,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "w-cross-domain-order",
+      "run": 3,
+      "reply": "**📋 商務管理**\n找不到此客戶，是否要新增？\n\n---\n\n**📦 供應鏈**\n好的，這是 Factory 092202 的訂單。請問需要訂購什麼產品呢？請提供產品名稱、數量和單價。",
+      "route": {
+        "agents": [
+          "commercial",
+          "supply_chain"
+        ],
+        "tasks": {
+          "commercial": "新增一張訂單，客戶名稱為 test0922，購買的產品為「雲朵眠 test0922」和「藍0922」",
+          "supply_chain": "新增一張訂單，出貨工廠為「Factory 092202」"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "Factory 092202"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "test0922"
+          }
+        }
+      ],
+      "writes": [],
+      "modelErrors": [],
+      "tokens": 3805,
+      "latencyMs": 4297,
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "calls list_products",
+          "pass": false,
+          "detail": "called: list_factories, list_customers"
+        },
+        {
+          "check": "inserts 1 into orders",
+          "pass": false,
+          "detail": "actual: 0"
+        }
+      ],
+      "pass": false
+    }
+  ]
+}

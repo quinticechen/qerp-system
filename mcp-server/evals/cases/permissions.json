@@ -5,9 +5,14 @@
     "role": "accounting",
     "message": "幫 Client name test0922 建立一張新訂單",
     "expect": {
-      "tools_exclude": ["create_order"],
+      "tools_exclude": [
+        "create_order"
+      ],
       "no_writes": true,
-      "reply_matches": ["權限|無法|不能"]
+      "reply_matches": [
+        "權限|無法|不能"
+      ],
+      "no_drafts": true
     }
   },
   {
@@ -16,9 +21,15 @@
     "role": "warehouse",
     "message": "查詢所有客戶",
     "expect": {
-      "tools_exclude": ["list_customers"],
+      "tools_exclude": [
+        "list_customers"
+      ],
       "no_writes": true,
-      "reply_not_matches": ["Client name test0922", "永泰布行"]
+      "reply_not_matches": [
+        "Client name test0922",
+        "永泰布行"
+      ],
+      "no_drafts": true
     }
   },
   {
@@ -27,8 +38,11 @@
     "role": "sales",
     "message": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元",
     "expect": {
-      "tools_exclude": ["create_purchase_order"],
-      "no_writes": true
+      "tools_exclude": [
+        "create_purchase_order"
+      ],
+      "no_writes": true,
+      "no_drafts": true
     }
   }
 ]

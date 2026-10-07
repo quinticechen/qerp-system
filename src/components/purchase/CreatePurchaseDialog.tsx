@@ -109,15 +109,17 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
 
   // Fetch inventory summary for stock information
   const { data: inventoryInfo } = useQuery({
-    queryKey: ['inventory-info'],
+    queryKey: ['inventory-info', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_summary')
-        .select('product_id, total_stock, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock');
+        .select('product_id, total_stock, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock')
+        .eq('organization_id', organizationId!);
       
       if (error) throw error;
       return data as InventoryInfo[];
-    }
+    },
+    enabled: !!organizationId
   });
 
   // Fetch products for manual addition (organization-specific)

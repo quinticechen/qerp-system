@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useCurrentOrganization } from './useCurrentOrganization';
+import { postQueryApi } from '@/lib/queryApi';
 
-const QUERY_API_URL = import.meta.env.VITE_QUERY_API_URL ?? 'http://localhost:3100';
 // Purely a per-browser convenience (which session to reopen) — the actual
 // conversation data lives in Supabase (query_sessions / query_messages), not here.
 const ACTIVE_SESSION_KEY = 'query-chat-active-session-id';
@@ -15,6 +15,10 @@ const TITLE_PLACEHOLDER = '新對話';
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
+  /** 'action' messages are confirmation cards for a write the assistant drafted. */
+  kind: 'text' | 'action';
+  /** query_pending_actions.id, for 'action' messages. */
+  actionId: string | null;
   content: string;
   timestamp: Date;
 }
@@ -72,18 +76,23 @@ export function useQueryChat() {
     saveActiveSessionId(id);
   }, []);
 
+  // Conversations belong to an organization: switching organizations shows that
+  // organization's conversations, so one organization's data never becomes another's context.
+  const sessionsKey = useMemo(() => ['query-sessions', user?.id, organizationId], [user?.id, organizationId]);
+
   const { data: rawSessions = [], isSuccess: sessionsLoaded } = useQuery({
-    queryKey: ['query-sessions', user?.id],
+    queryKey: sessionsKey,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('query_sessions')
         .select('id, title, pinned, created_at, updated_at')
+        .eq('organization_id', organizationId as string)
         .order('pinned', { ascending: false })
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!user && !!organizationId,
   });
 
   const sessions: QuerySession[] = useMemo(
@@ -113,7 +122,7 @@ export function useQueryChat() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('query_messages')
-        .select('id, role, content, created_at')
+        .select('id, role, kind, metadata, content, created_at')
         .eq('session_id', activeSessionId as string)
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -127,6 +136,8 @@ export function useQueryChat() {
       rawMessages.map((m) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
+        kind: m.kind === 'action' ? 'action' : 'text',
+        actionId: (m.metadata as { action_id?: string } | null)?.action_id ?? null,
         content: m.content,
         timestamp: new Date(m.created_at),
       })),
@@ -134,8 +145,8 @@ export function useQueryChat() {
   );
 
   const invalidateSessions = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['query-sessions', user?.id] });
-  }, [queryClient, user?.id]);
+    queryClient.invalidateQueries({ queryKey: sessionsKey });
+  }, [queryClient, sessionsKey]);
 
   const invalidateMessages = useCallback(
     (sessionId: string) => {
@@ -145,10 +156,10 @@ export function useQueryChat() {
   );
 
   const createSession = useCallback(async () => {
-    if (!user) return null;
+    if (!user || !organizationId) return null;
     const { data, error } = await supabase
       .from('query_sessions')
-      .insert({ user_id: user.id, organization_id: organizationId ?? null })
+      .insert({ user_id: user.id, organization_id: organizationId })
       .select('id, title, pinned, created_at, updated_at')
       .single();
     if (error) {
@@ -157,14 +168,14 @@ export function useQueryChat() {
     }
     // Add the new session to the cache before activating it — otherwise the auto-pick
     // effect sees an id missing from the stale list and switches back to sessions[0].
-    queryClient.setQueryData<QuerySessionRow[]>(['query-sessions', user.id], (old = []) => {
+    queryClient.setQueryData<QuerySessionRow[]>(sessionsKey, (old = []) => {
       const pinnedCount = old.filter((s) => s.pinned).length;
       return [...old.slice(0, pinnedCount), data, ...old.slice(pinnedCount)];
     });
     invalidateSessions();
     setActiveSessionId(data.id);
     return data.id as string;
-  }, [user, organizationId, queryClient, invalidateSessions, setActiveSessionId]);
+  }, [user, organizationId, sessionsKey, queryClient, invalidateSessions, setActiveSessionId]);
 
   const switchSession = useCallback(
     (id: string) => {
@@ -181,7 +192,7 @@ export function useQueryChat() {
         return;
       }
       // Drop it from the cache first so the auto-pick effect can't re-select the deleted session.
-      queryClient.setQueryData<QuerySessionRow[]>(['query-sessions', user?.id], (old = []) =>
+      queryClient.setQueryData<QuerySessionRow[]>(sessionsKey, (old = []) =>
         old.filter((s) => s.id !== id)
       );
       invalidateSessions();
@@ -190,7 +201,7 @@ export function useQueryChat() {
         setActiveSessionId(null);
       }
     },
-    [activeSessionId, user?.id, queryClient, invalidateSessions, setActiveSessionId]
+    [activeSessionId, sessionsKey, queryClient, invalidateSessions, setActiveSessionId]
   );
 
   const togglePin = useCallback(
@@ -210,83 +221,83 @@ export function useQueryChat() {
     [sessions, invalidateSessions]
   );
 
+  // Locks synchronously on the first call: `isLoading` only updates after a render, so a fast
+  // second Enter/click would otherwise send the same message twice.
+  const sendingRef = useRef(false);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isLoading || !user) return;
+      if (!trimmed || sendingRef.current || !user) return;
       if (!organizationId) {
         toast.error('請先選擇組織');
         return;
       }
+      sendingRef.current = true;
+      setIsLoading(true);
 
-      // Never write into a session that isn't in this user's list — RLS would reject it.
-      let sessionId =
-        activeSessionId && sessions.some((s) => s.id === activeSessionId) ? activeSessionId : null;
-      if (!sessionId) {
-        sessionId = await createSession();
+      let sessionId: string | null = null;
+      try {
+        // Never write into a session that isn't in this user's list — RLS would reject it.
+        sessionId =
+          activeSessionId && sessions.some((s) => s.id === activeSessionId) ? activeSessionId : null;
         if (!sessionId) {
-          toast.error('無法建立對話，請稍後再試');
+          sessionId = await createSession();
+          if (!sessionId) {
+            toast.error('無法建立對話，請稍後再試');
+            return;
+          }
+        }
+
+        // Only overwrite the placeholder title — a no-op once the session already has one.
+        await supabase
+          .from('query_sessions')
+          .update({ title: deriveTitle(trimmed) })
+          .eq('id', sessionId)
+          .eq('title', TITLE_PLACEHOLDER);
+
+        const { data: userMessage, error: userMsgError } = await supabase
+          .from('query_messages')
+          .insert({ session_id: sessionId, role: 'user', content: trimmed })
+          .select('id')
+          .single();
+        if (userMsgError) {
+          console.error('Error saving user message:', userMsgError);
+          toast.error('訊息傳送失敗，請稍後再試');
           return;
         }
-      }
-
-      // Only overwrite the placeholder title — a no-op once the session already has one.
-      await supabase
-        .from('query_sessions')
-        .update({ title: deriveTitle(trimmed) })
-        .eq('id', sessionId)
-        .eq('title', TITLE_PLACEHOLDER);
-
-      const history = messages.map((m) => ({ role: m.role, content: m.content }));
-
-      const { error: userMsgError } = await supabase
-        .from('query_messages')
-        .insert({ session_id: sessionId, role: 'user', content: trimmed });
-      if (userMsgError) {
-        console.error('Error saving user message:', userMsgError);
-        toast.error('訊息傳送失敗，請稍後再試');
-        return;
-      }
-      invalidateMessages(sessionId);
-      invalidateSessions();
-
-      setIsLoading(true);
-      try {
-        const { data: { session: authSession } } = await supabase.auth.getSession();
-        if (!authSession?.access_token) {
-          throw new Error('未登入，請重新整理頁面');
-        }
-
-        const res = await fetch(`${QUERY_API_URL}/query`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${authSession.access_token}`,
-          },
-          body: JSON.stringify({ message: trimmed, history, organization_id: organizationId }),
-        });
-
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`伺服器錯誤 (${res.status})：${body}`);
-        }
-
-        const data = await res.json();
-        await supabase
-          .from('query_messages')
-          .insert({ session_id: sessionId, role: 'assistant', content: data.reply ?? '已完成。' });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : '未知錯誤';
-        await supabase
-          .from('query_messages')
-          .insert({ session_id: sessionId, role: 'assistant', content: `⚠️ 發生錯誤：${message}` });
-      } finally {
-        setIsLoading(false);
         invalidateMessages(sessionId);
+        invalidateSessions();
+
+        try {
+          // The server reads the conversation from the session itself and saves its reply
+          // (and a confirmation card for each write it drafted).
+          const data = await postQueryApi<{ reply?: string; messageId?: string | null }>('/query', {
+            message: trimmed,
+            organization_id: organizationId,
+            session_id: sessionId,
+            message_id: userMessage.id,
+          });
+          if (!data.messageId) {
+            // The server could not save the reply — keep it so the conversation stays complete.
+            await supabase
+              .from('query_messages')
+              .insert({ session_id: sessionId, role: 'assistant', content: data.reply ?? '已完成。' });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : '未知錯誤';
+          await supabase
+            .from('query_messages')
+            .insert({ session_id: sessionId, role: 'assistant', content: `⚠️ 發生錯誤：${message}` });
+        }
+      } finally {
+        sendingRef.current = false;
+        setIsLoading(false);
+        if (sessionId) invalidateMessages(sessionId);
         invalidateSessions();
       }
     },
-    [activeSessionId, sessions, isLoading, user, organizationId, messages, createSession, invalidateMessages, invalidateSessions]
+    [activeSessionId, sessions, user, organizationId, createSession, invalidateMessages, invalidateSessions]
   );
 
   const clearMessages = useCallback(async () => {

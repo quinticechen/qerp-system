@@ -6,6 +6,9 @@
  */
 
 import type { AgentGroup } from "./permissions.js";
+import type { GatewayModel } from "./ai-gateway.js";
+import type { Entity } from "./memory.js";
+import type { Draft } from "../tools/types.js";
 
 export interface ObservedToolCall {
   toolName: string;
@@ -29,13 +32,36 @@ export interface RouteDecision {
   tasks: Partial<Record<AgentGroup, string>>;
 }
 
-export interface QueryObserver {
-  onRoute?(decision: RouteDecision, fromFallback: boolean): void;
-  onModelAttempt?(modelId: string, error?: unknown): void;
-  onStep?(agent: AgentGroup, step: ObservedStep): void;
+export interface ObservedAttempt {
+  /** "router" or "agent:<group>". */
+  phase: string;
+  modelId: string;
+  durationMs: number;
+  /** Set when the attempt failed. */
+  error?: unknown;
 }
 
-// Gemini via OpenRouter sometimes prefixes tool names (see tool-registry.ts aliases).
+export interface QueryObserver {
+  onRoute?(decision: RouteDecision, fromFallback: boolean): void;
+  onModelAttempt?(attempt: ObservedAttempt): void;
+  /** `agent` is the sub-agent group, or "all" for the single agent. */
+  onStep?(agent: string, step: ObservedStep): void;
+}
+
+/** Per-request options threaded from the entry point through router, sub-agents and gateway. */
+export interface QueryRun {
+  observer?: QueryObserver;
+  /** Epoch ms. No model attempt starts after it, and a running one is aborted at it. */
+  deadline?: number;
+  /** Overrides the provider list — tests pass mock models. */
+  models?: GatewayModel[];
+  /** Records found earlier in the conversation (memory.ts); listed in sub-agent prompts. */
+  entities?: Entity[];
+  /** Collects the writes the model asked for, from successful attempts only. */
+  drafts?: Draft[];
+}
+
+// Gemini via OpenRouter sometimes prefixes tool names; the gateway repairs such calls.
 export function normalizeToolName(name: string): string {
   return name.startsWith("default_api.") ? name.slice("default_api.".length) : name;
 }

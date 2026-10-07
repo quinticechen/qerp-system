@@ -2,7 +2,8 @@ import { z } from "zod";
 import { ToolName, TOOL_GROUPS } from "./permissions.js";
 import { runSubAgent, ConversationMessage } from "./sub-agents.js";
 import { aiGenerateObject } from "./ai-gateway.js";
-import type { QueryObserver } from "./observer.js";
+import type { QueryRun } from "./observer.js";
+import { redactIds } from "./output-guard.js";
 import type { ToolContext } from "../tools/types.js";
 
 const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負責分析使用者意圖並決定調用哪個子 Agent。
@@ -42,8 +43,9 @@ export async function routeQuery(
   ctx: ToolContext,
   allowedTools: ToolName[],
   history: ConversationMessage[] = [],
-  observer?: QueryObserver
+  run: QueryRun = {}
 ): Promise<string> {
+  const { observer } = run;
   const availableGroups = (["commercial", "supply_chain"] as const).filter(
     (group) => TOOL_GROUPS[group].some((tool) => allowedTools.includes(tool))
   );
@@ -66,7 +68,7 @@ export async function routeQuery(
         ...recentHistory,
         { role: "user" as const, content: message },
       ],
-    } as any, observer);
+    } as any, { ...run, phase: "router" });
     observer?.onRoute?.(decision, false);
   } catch {
     // 分類失敗時 fallback：用第一個可用群組
@@ -95,7 +97,7 @@ export async function routeQuery(
         allowedTools,
         ctx,
         history,
-        observer
+        run
       )
     )
   );
@@ -110,13 +112,13 @@ export async function routeQuery(
     return "⚠️ 這部分處理時發生錯誤，請稍後再試或換個方式描述。";
   });
 
-  if (results.length === 1) return results[0];
+  if (results.length === 1) return redactIds(results[0]);
 
   // 多 Agent 合併結果
-  return results
+  return redactIds(results
     .map((result, i) => {
       const label = authorizedAgents[i] === "commercial" ? "📋 商務管理" : "📦 供應鏈";
       return `**${label}**\n${result}`;
     })
-    .join("\n\n---\n\n");
+    .join("\n\n---\n\n"));
 }

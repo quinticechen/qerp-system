@@ -39,6 +39,19 @@ export type ToolResult =
   | { ok: false; error: string };
 
 export const ok = (data: unknown): ToolResult => ({ ok: true, data });
+
+/** What a confirmation card shows — names, never IDs (docs/QUERY_AGENT_PHASE0.md §4.3). */
+export interface ActionSummary {
+  title: string;
+  fields: { label: string; value: string }[];
+}
+
+/** A write the model asked for; stored as a pending action and executed only after confirmation. */
+export interface Draft {
+  tool: ToolName;
+  payload: unknown;
+  summary: ActionSummary;
+}
 export const fail = (error: string): ToolResult => ({ ok: false, error });
 
 interface ToolMeta {
@@ -54,23 +67,43 @@ interface ToolMeta {
 export interface ToolDefinition<I extends z.AnyZodObject> extends ToolMeta {
   input: I;
   execute(ctx: ToolContext, input: z.infer<I>): Promise<ToolResult>;
+  /**
+   * Required for `write` tools: validates the input (including that referenced records are in
+   * this organization) and describes the change for the confirmation card. Must not write.
+   */
+  summarize?(ctx: ToolContext, input: z.infer<I>): Promise<{ ok: true; summary: ActionSummary } | { ok: false; error: string }>;
 }
 
-/** Type-erased form stored in the registry; `run` validates raw input before executing. */
+/** Type-erased form stored in the registry; `run` and `draft` validate raw input first. */
 export interface RegisteredTool extends ToolMeta {
   input: z.AnyZodObject;
   run(ctx: ToolContext, rawInput: unknown): Promise<ToolResult>;
+  /** Write tools only: the validated payload and card summary, without writing anything. */
+  draft?(ctx: ToolContext, rawInput: unknown): Promise<{ ok: true; draft: Draft } | { ok: false; error: string }>;
+}
+
+function parseInput<I extends z.AnyZodObject>(input: I, raw: unknown): { ok: true; data: z.infer<I> } | { ok: false; error: string } {
+  const parsed = input.safeParse(raw);
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, error: `參數錯誤：${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("；")}` };
 }
 
 export function defineTool<I extends z.AnyZodObject>(def: ToolDefinition<I>): RegisteredTool {
-  const { execute, ...meta } = def;
+  const { execute, summarize, ...meta } = def;
+  if (def.kind === "write" && !summarize) throw new Error(`Write tool ${def.name} needs summarize() for the confirmation card`);
   return {
     ...meta,
     run: async (ctx, rawInput) => {
-      const parsed = def.input.safeParse(rawInput);
-      if (!parsed.success) return fail(`參數錯誤：${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("；")}`);
-      return execute(ctx, parsed.data);
+      const parsed = parseInput(def.input, rawInput);
+      return parsed.ok ? execute(ctx, parsed.data) : fail(parsed.error);
     },
+    draft: summarize && (async (ctx, rawInput) => {
+      const parsed = parseInput(def.input, rawInput);
+      if (!parsed.ok) return parsed;
+      const described = await summarize(ctx, parsed.data);
+      return described.ok ? { ok: true, draft: { tool: def.name, payload: parsed.data, summary: described.summary } } : described;
+    }),
   };
 }
 
@@ -80,4 +113,15 @@ export function defineTool<I extends z.AnyZodObject>(def: ToolDefinition<I>): Re
  */
 export function embeddedName(relation: { name: string } | { name: string }[] | null | undefined): string | undefined {
   return Array.isArray(relation) ? relation[0]?.name : relation?.name;
+}
+
+/**
+ * True when every id exists in `table` within the context's organization. Writes call this for
+ * referenced records: RLS allows any organization the user belongs to, not just the selected one.
+ */
+export async function allInOrganization(ctx: ToolContext, table: string, ids: readonly string[]): Promise<boolean> {
+  const unique = [...new Set(ids)];
+  if (!unique.length) return true;
+  const { data, error } = await ctx.supabase.from(table).select("id").in("id", unique).eq("organization_id", ctx.organizationId);
+  return !error && (data ?? []).length === unique.length;
 }

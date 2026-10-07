@@ -13,8 +13,8 @@ export const factoryTools = [
       search: z.string().optional(),
       limit: z.number().optional(),
     }),
-    execute: async ({ supabase }, { search, limit }) => {
-      const q = supabase.from("factories").select("id, name, contact_person, phone, email").order("name").limit(limit ?? 20);
+    execute: async ({ supabase, organizationId }, { search, limit }) => {
+      const q = supabase.from("factories").select("id, name, contact_person, phone, email").eq("organization_id", organizationId).order("name").limit(limit ?? 20);
       const { data, error } = await applySearch(q, ["name", "contact_person"], search);
       if (error) return fail(`查詢失敗：${error.message}`);
       return ok(data ?? []);

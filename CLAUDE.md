@@ -2,6 +2,14 @@
 
 紡織業 ERP 系統。All UI text and documentation in this project must be in Chinese. Program logic (variable names, function names, comments in code) stays in English.
 
+## Parallel Sessions
+
+Two Claude Code sessions develop this project at the same time — one on the Query AI agent, one on roles and permissions — sharing this working directory, the `main` branch and the one Supabase database. **Before changing any file or the database, read `docs/SESSION_COORDINATION.md`**: it says which session owns which files and database objects, the contracts between them, and the handoff status. Always:
+
+- Commit only your own files by explicit path — never `git add -A`, `git add .` or `git commit -a`.
+- In `src/integrations/supabase/types.ts`, add only the types for your own migration; never regenerate the whole file.
+- Never `CREATE OR REPLACE` a database object the other session owns; leave a request in the coordination doc instead.
+
 ## Stack
 
 - **Frontend:** React + TypeScript + Vite (port 8080)
@@ -88,6 +96,8 @@ bun run eval -- --label <short-change-name>
 
 The eval replays `evals/cases/*.json` against real models with an in-memory fake database, and writes a report to `evals/reports/`. Not every case passes yet, so the bar is **no regression**: every case that passed in the most recent full run (no `--filter`) under `evals/reports/` must still pass. Tool descriptions and prompts are fragile with the primary model — rerun the eval after any wording change, however small. Compare the two reports' per-case tables and list any case that went from ✅ to ❌. When a change fixes a known failure, add or tighten a case so it stays fixed. Design and case format: `docs/QUERY_AGENT_PHASE0.md` §4.7.
 
+To debug a specific Query reply, look it up in `query_traces` by the `traceId` that `/query` returns: it records the route, every model attempt (with errors and fallbacks), the tool calls, tokens and latency.
+
 ### What Counts as "No Automated Test Available"
 
 If your change is to:
@@ -102,6 +112,9 @@ If your change is to:
 - **CORS:** The mcp-server allowlist is in `mcp-server/src/index.ts` → `ALLOWED_ORIGINS`. Only add origins that the team controls.
 - **JWT:** The `/query` and `/mcp` endpoints require a valid Supabase Bearer token. Never disable this check.
 - **Organization & tool permissions:** `/query` (`organization_id` in the body) and `/mcp` (`X-Organization-Id` header) only serve organizations the user actively belongs to. Which tools the model gets is decided by `mcp-server/src/agent/auth-guard.ts` via the database function `user_has_organization_permission()` — the same one RLS uses. Grant AI access by setting a tool's `permission` key; never by hard-coding roles in the server.
+- **Tools stay inside the selected organization:** RLS lets a user read every organization they belong to, so every tool query filters `organization_id = ctx.organizationId` (by-id lookups too), and writes check referenced records with `allInOrganization()`. `tests/org-isolation.test.ts` must cover each new tool.
+- **Database objects stay inside the organization too:** views are created `WITH (security_invoker = true)` and expose `organization_id` so the UI can filter by the current organization (a view without it runs as its owner and bypasses RLS). A `SECURITY DEFINER` function that takes a user or organization id must answer only about the caller or the caller's organizations — call `can_inspect_organization()` (see `supabase/migrations/20261007130000_org_boundary_hardening.sql`). Run the Supabase security advisor after any such migration.
+- **The AI never writes directly:** in the agent loop, `write` tools only create drafts (`query_pending_actions`); the write runs when the user confirms the card (`POST /query/actions/:id/confirm`, `mcp-server/src/agent/actions.ts`), which re-checks membership and permission and claims the action atomically. A new write tool needs `summarize()` (card text with names, never IDs); the registry refuses one without it. The eval fails any case where the agent loop writes.
 
 ## Known Configuration
 
