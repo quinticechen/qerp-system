@@ -2,23 +2,38 @@ name: Keep Supabase Active
 
 on:
   schedule:
-    - cron: '0 0 */4 * *'  # 每 4 天執行一次
-  workflow_dispatch:        # 允許手動觸發
+    - cron: '0 4 * * *'        # 每天 UTC 04:00 (台灣時間 12:00) 執行一次
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase Health & REST API
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://gyiyedvutcbwzpbcsmjc.supabase.co/rest/v1/customers?limit=1" \
-            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5aXllZHZ1dGNid3pwYmNzbWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTQxNTksImV4cCI6MjA5MTczMDE1OX0.GjjHa-Dbg7KJQxfuteg7jUaKelWVhoqSPNg30DFyG34" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5aXllZHZ1dGNid3pwYmNzbWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTQxNTksImV4cCI6MjA5MTczMDE1OX0.GjjHa-Dbg7KJQxfuteg7jUaKelWVhoqSPNg30DFyG34")
-          echo "Response: $response"
-          if [ "$response" = "200" ] || [ "$response" = "406" ]; then
-            echo "Supabase is active"
+          SUPABASE_URL="https://gyiyedvutcbwzpbcsmjc.supabase.co"
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5aXllZHZ1dGNid3pwYmNzbWpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxNTQxNTksImV4cCI6MjA5MTczMDE1OX0.GjjHa-Dbg7KJQxfuteg7jUaKelWVhoqSPNg30DFyG34"
+
+          echo "Pinging Supabase Auth Health..."
+          # 1. 先 ping 系統健康端點 (內建 retry 3 次)
+          curl -s --retry 3 --retry-delay 5 --max-time 30 \
+            "$SUPABASE_URL/auth/v1/health" \
+            -H "apikey: $ANON_KEY"
+
+          echo -e "\nPinging REST API..."
+          # 2. ping REST API 並檢查狀態碼
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 5 --max-time 30 \
+            "$SUPABASE_URL/rest/v1/customers?limit=1" \
+            -H "apikey: $ANON_KEY" \
+            -H "Authorization: Bearer $ANON_KEY")
+
+          echo "REST API HTTP Status: $HTTP_STATUS"
+
+          # 只要伺服器有回應 (2xx, 3xx, 4xx) 代表 Supabase 存活且已收到請求
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ]; then
+            echo "✅ Supabase is confirmed active!"
           else
-            echo "Unexpected response: $response"
+            echo "❌ Supabase ping failed with status $HTTP_STATUS"
             exit 1
           fi
