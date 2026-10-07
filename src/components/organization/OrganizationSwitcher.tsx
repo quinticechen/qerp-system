@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronDown, Building2, Settings, Plus } from 'lucide-react';
+import { ChevronDown, Building2, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,11 +96,7 @@ export const OrganizationSwitcher: React.FC = () => {
             <Plus className="h-4 w-4" />
             <span className="text-sm">新增組織</span>
           </DropdownMenuItem>
-          
-          <DropdownMenuItem className="flex items-center space-x-2 px-2 py-2">
-            <Settings className="h-4 w-4" />
-            <span className="text-sm">組織設定</span>
-          </DropdownMenuItem>
+
         </DropdownMenuContent>
       </DropdownMenu>
 

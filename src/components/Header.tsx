@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, User, LogOut } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
 } from './ui/dropdown-menu';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Badge } from './ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -41,17 +40,6 @@ const Header = () => {
           {/* 組織切換器 */}
           <OrganizationSwitcher />
           
-          {/* 通知 */}
-          <Button variant="ghost" size="sm" className="relative">
-            <Bell className="h-5 w-5" />
-            <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
-            >
-              3
-            </Badge>
-          </Button>
-
           {/* 使用者選單 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
