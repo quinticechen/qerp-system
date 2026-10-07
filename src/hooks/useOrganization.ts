@@ -83,7 +83,10 @@ export const useOrganization = () => {
       }
 
       console.log('Fetched organizations:', data);
-      const userOrgs = data as UserOrganization[];
+      // A membership whose organization has been soft-deleted (organizations.is_active = false)
+      // comes back with organization: null, since RLS blocks the embedded row — filter those out
+      // rather than letting the rest of this function dereference a null organization.
+      const userOrgs = (data as UserOrganization[]).filter((uo) => !!uo.organization);
       setOrganizations(userOrgs);
 
       // 設定當前組織（從 localStorage 獲取或使用第一個）
@@ -153,6 +156,12 @@ export const useOrganization = () => {
       }
 
       console.log('Organization created successfully:', orgData);
+
+      // 立即把新建立的組織設成目前組織。不先做這一步的話，若瀏覽器裡已經存有
+      // 指向其他組織的 currentOrganizationId（任何不是第一次使用的使用者都會
+      // 有這個情況），下面的 fetchUserOrganizations() 會沿用舊的偏好設定，
+      // 使用者建立新組織後畫面還是停在原本的組織，而不是新組織的儀表板。
+      localStorage.setItem('currentOrganizationId', orgData.id);
 
       // 等待一下讓觸發器完成
       await new Promise(resolve => setTimeout(resolve, 1000));

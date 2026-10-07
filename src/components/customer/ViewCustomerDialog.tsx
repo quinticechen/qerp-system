@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewCustomerDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={customer.id} className="absolute right-10 top-2" />
           <DialogTitle>客戶詳情</DialogTitle>
           <DialogDescription>
             查看客戶資訊

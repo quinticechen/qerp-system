@@ -61,6 +61,29 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   description: '描述',
   is_active: '啟用',
   settings: '設定',
+  // Products, customers, factories, shelves
+  category: '類別',
+  color: '顏色',
+  color_code: '色號',
+  stock_thresholds: '安全庫存',
+  unit_of_measure: '單位',
+  contact_person: '聯絡人',
+  phone: '電話',
+  landline_phone: '市話',
+  fax: '傳真',
+  email: '電子郵件',
+  address: '地址',
+  location: '位置',
+  // People, roles and permissions
+  full_name: '姓名',
+  display_name: '顯示名稱',
+  permissions: '權限',
+  role_id: '角色',
+  invited_role_id: '邀請角色',
+  user_id: '用戶',
+  owner_id: '擁有者',
+  invited_by: '邀請者',
+  granted_by: '授權者',
 };
 
 export const formatAuditValue = (value: unknown): string => {
@@ -69,3 +92,12 @@ export const formatAuditValue = (value: unknown): string => {
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 };
+
+// Bookkeeping columns left out when showing the contents of an added or removed row
+export const AUDIT_SNAPSHOT_HIDDEN_FIELDS = new Set([
+  'status',
+  'shipped_quantity',
+  'received_quantity',
+  'current_quantity',
+  'is_allocated',
+]);

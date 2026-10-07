@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Product, ProductFormData } from '@/hooks/useProducts';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface EditProductDialogProps {
   open: boolean;
@@ -78,6 +79,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={product.id} creation={{ tableName: 'products_new', createdBy: product.user_id, createdAt: product.created_at }} className="absolute right-10 top-2" />
           <DialogTitle>編輯產品</DialogTitle>
           <DialogDescription>
             編輯產品資訊

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useShelfProducts, type Shelf } from '@/hooks/useShelves';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ShelfProductsDialogProps {
   shelf: Shelf | null;
@@ -27,6 +28,7 @@ export const ShelfProductsDialog: React.FC<ShelfProductsDialogProps> = ({ shelf,
     <Dialog open={!!shelf} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={shelf?.id} className="absolute right-10 top-2" />
           <DialogTitle className="text-gray-900">貨架：{shelf?.name}</DialogTitle>
           <DialogDescription className="text-gray-700">
             此貨架目前存放的產品與數量（僅計算尚有庫存的布卷）

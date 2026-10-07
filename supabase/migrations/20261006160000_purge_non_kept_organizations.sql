@@ -7,9 +7,10 @@
 -- 刪除 qq / qq2 org / GF 三個組織的所有資料，以及沒有 organization_id
 -- 的孤兒資料列（orders/products_new/query_sessions/inventories）。
 --
--- 保留 QA Sandbox Org (6ba881fd-a57d-43c0-8f9b-5aaff9c60b53)，因為它的
--- owner 是 lovejoker369+testing@gmail.com，正是 scripts/verify-query-ui.py
--- 這個必跑測試腳本登入用的帳號。
+-- 保留 QA Sandbox Org (6ba881fd-a57d-43c0-8f9b-5aaff9c60b53)，它的
+-- owner 是 lovejoker369+testing@gmail.com（撰寫時以為是驗證腳本的帳號）。
+-- 更正：scripts/verify-query-ui.py 實際使用的是 .env 的 VERIFY_EMAIL =
+-- lovejoker369+test@gmail.com（lo1 / lo2 的成員），不依賴 QA Sandbox Org。
 --
 -- 已確認：刪除 qq/qq2 org/GF 後不會有任何使用者帳號變成零組織歸屬
 -- （qq/qq2 org 的 owner quinticechen@gmail.com 仍是 lo1 的成員），

@@ -9,7 +9,7 @@ import { Pencil } from 'lucide-react';
 import { InventoryBatchForm } from './InventoryBatchForm';
 import { EditableRoll, EditRollDialog } from './EditRollDialog';
 import { InventoryRollsEditor } from './InventoryRollsEditor';
-import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 import {
   EditableInventoryRoll,
   InventoryRollRow,
@@ -126,6 +126,11 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange }: ViewInven
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton
+            recordId={inventory.id}
+            creation={{ tableName: 'inventories', createdBy: inventory.user_id ?? null, createdAt: inventory.created_at }}
+            className="absolute right-10 top-2"
+          />
           <DialogTitle className="text-gray-900">入庫記錄詳情</DialogTitle>
           <DialogDescription className="text-gray-600">
             查看入庫批次的詳細資訊和布卷明細
@@ -318,8 +323,6 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange }: ViewInven
               </div>
             )}
           </div>
-
-          <RecordAuditHistory recordId={inventory.id} />
 
           <div className="flex justify-end pt-4">
             <Button

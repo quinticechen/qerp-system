@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewPurchaseDialogProps {
   purchase: any;
@@ -46,6 +46,11 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton
+            recordId={purchase.id}
+            creation={{ tableName: 'purchase_orders', createdBy: purchase.user_id ?? null, createdAt: purchase.created_at }}
+            className="absolute right-10 top-2"
+          />
           <DialogTitle className="text-gray-900">採購單詳情 - {purchase.po_number}</DialogTitle>
           <DialogDescription className="text-gray-600">
             查看採購單的詳細資訊
@@ -172,8 +177,6 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
             </Card>
           )}
         </div>
-
-        <RecordAuditHistory recordId={purchase.id} />
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

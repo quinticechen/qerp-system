@@ -15,7 +15,7 @@ import { EditableOrderItem, toEditableOrderItem, toOrderItemsPayload, useOrderIt
 import { useProductOptions } from '@/hooks/useProductOptions';
 import { saveOrderItems } from '@/lib/documentItemsService';
 import { OrderItemsEditor } from './OrderItemsEditor';
-import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 type OrderStatus = Database['public']['Enums']['order_status'];
 type PaymentStatus = Database['public']['Enums']['payment_status'];
@@ -223,6 +223,11 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton
+            recordId={order.id}
+            creation={{ tableName: 'orders', createdBy: order.user_id ?? null, createdAt: order.created_at }}
+            className="absolute right-10 top-2"
+          />
           <DialogTitle className="text-gray-900">編輯訂單</DialogTitle>
           <DialogDescription className="text-gray-700">
             訂單編號: {order.order_number}
@@ -368,8 +373,6 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             />
           </div>
         </div>
-
-        <RecordAuditHistory recordId={order.id} />
 
         {saveError && (
           <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">

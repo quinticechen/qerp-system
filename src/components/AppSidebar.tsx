@@ -43,7 +43,7 @@ export function AppSidebar() {
     { id: 'customer', label: '客戶管理', icon: Users, path: '/customer' },
     { id: 'user', label: '用戶管理', icon: User, path: '/user' },
     { id: 'permission', label: '權限管理', icon: Shield, path: '/permission' },
-    { id: 'system', label: '系統設定', icon: Settings, path: '/system' }
+    { id: 'system', label: '組織設定', icon: Settings, path: '/system' }
   ];
 
   return (

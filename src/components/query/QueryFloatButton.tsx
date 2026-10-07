@@ -6,7 +6,7 @@ export function QueryFloatButton() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
       {/* Chat Panel */}
       <div
         className={[
@@ -25,7 +25,7 @@ export function QueryFloatButton() {
       <button
         onClick={() => setIsOpen((v) => !v)}
         className={[
-          'flex items-center gap-2.5 pl-3 pr-4 py-3 rounded-full shadow-lg',
+          'pointer-events-auto flex items-center gap-2.5 pl-3 pr-4 py-3 rounded-full shadow-lg',
           'bg-gradient-to-r from-indigo-600 to-violet-600 text-white',
           'hover:shadow-xl hover:scale-105 active:scale-95',
           'transition-all duration-200',

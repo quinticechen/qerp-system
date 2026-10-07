@@ -580,7 +580,6 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
-          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
         Insert: {
@@ -590,7 +589,6 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Update: {
@@ -600,7 +598,6 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
         Relationships: []
@@ -1479,11 +1476,11 @@ export type Database = {
         Args: { _organization_id: string }
         Returns: undefined
       }
-      ensure_user_profile: { Args: never; Returns: undefined }
-      get_current_user_role: {
-        Args: never
-        Returns: Database["public"]["Enums"]["user_role"]
+      delete_organization: {
+        Args: { _confirm_name: string; _organization_id: string }
+        Returns: undefined
       }
+      ensure_user_profile: { Args: never; Returns: undefined }
       get_my_pending_invitations: {
         Args: never
         Returns: {
@@ -1508,13 +1505,6 @@ export type Database = {
         Returns: {
           organization_id: string
         }[]
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["user_role"]
-          _user_id: string
-        }
-        Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_organization_owner: {

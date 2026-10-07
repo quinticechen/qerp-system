@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewShippingDialogProps {
   open: boolean;
@@ -25,6 +25,11 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton
+            recordId={shipping.id}
+            creation={{ tableName: 'shippings', createdBy: shipping.user_id ?? null, createdAt: shipping.created_at }}
+            className="absolute right-10 top-2"
+          />
           <DialogTitle className="text-gray-900">出貨單詳情</DialogTitle>
           <DialogDescription className="text-gray-700">
             出貨單號: {shipping.shipping_number}
@@ -124,8 +129,6 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
             </CardContent>
           </Card>
         </div>
-
-        <RecordAuditHistory recordId={shipping.id} />
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

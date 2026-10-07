@@ -10,6 +10,8 @@ import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
+import { PERMISSION_GROUPS } from '@/lib/permissionLabels';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface EditRoleDialogProps {
   open: boolean;
@@ -23,53 +25,6 @@ interface EditRoleForm {
   description?: string;
 }
 
-const PERMISSION_GROUPS = {
-  '產品管理': [
-    { key: 'canViewProducts', label: '查看產品' },
-    { key: 'canCreateProducts', label: '新增產品' },
-    { key: 'canEditProducts', label: '編輯產品' },
-    { key: 'canDeleteProducts', label: '刪除產品' },
-  ],
-  '庫存管理': [
-    { key: 'canViewInventory', label: '查看庫存' },
-    { key: 'canCreateInventory', label: '新增庫存' },
-    { key: 'canEditInventory', label: '編輯庫存' },
-  ],
-  '訂單管理': [
-    { key: 'canViewOrders', label: '查看訂單' },
-    { key: 'canCreateOrders', label: '新增訂單' },
-    { key: 'canEditOrders', label: '編輯訂單' },
-  ],
-  '採購管理': [
-    { key: 'canViewPurchases', label: '查看採購' },
-    { key: 'canCreatePurchases', label: '新增採購' },
-    { key: 'canEditPurchases', label: '編輯採購' },
-  ],
-  '出貨管理': [
-    { key: 'canViewShipping', label: '查看出貨' },
-    { key: 'canCreateShipping', label: '新增出貨' },
-    { key: 'canEditShipping', label: '編輯出貨' },
-  ],
-  '客戶管理': [
-    { key: 'canViewCustomers', label: '查看客戶' },
-    { key: 'canCreateCustomers', label: '新增客戶' },
-    { key: 'canEditCustomers', label: '編輯客戶' },
-  ],
-  '工廠管理': [
-    { key: 'canViewFactories', label: '查看工廠' },
-    { key: 'canCreateFactories', label: '新增工廠' },
-    { key: 'canEditFactories', label: '編輯工廠' },
-  ],
-  '系統管理': [
-    { key: 'canViewUsers', label: '查看使用者' },
-    { key: 'canCreateUsers', label: '新增使用者' },
-    { key: 'canEditUsers', label: '編輯使用者' },
-    { key: 'canViewPermissions', label: '查看權限' },
-    { key: 'canEditPermissions', label: '編輯權限' },
-    { key: 'canViewSystemSettings', label: '查看系統設定' },
-    { key: 'canEditSystemSettings', label: '編輯系統設定' },
-  ],
-};
 
 export const EditRoleDialog = ({ open, onOpenChange, role, onSuccess }: EditRoleDialogProps) => {
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<EditRoleForm>();
@@ -133,6 +88,7 @@ export const EditRoleDialog = ({ open, onOpenChange, role, onSuccess }: EditRole
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={role.id} creation={{ tableName: 'organization_roles', createdBy: role.created_by ?? null, createdAt: role.created_at }} className="absolute right-10 top-2" />
           <DialogTitle>編輯角色 - {role.display_name}</DialogTitle>
           <DialogDescription>
             修改角色的基本資訊和權限設定。

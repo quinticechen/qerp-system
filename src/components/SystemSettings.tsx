@@ -1,22 +1,27 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Settings, Bell, Shield, Database, Users, Mail } from 'lucide-react';
+import { Settings, Bell, Shield, Database, Users, Mail, AlertTriangle } from 'lucide-react';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useOrganizationPermissions } from '@/hooks/useOrganizationPermissions';
+import { DeleteOrganizationDialog } from '@/components/organization/DeleteOrganizationDialog';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 const SystemSettings = () => {
   const { organization, hasOrganization } = useCurrentOrganization();
+  const { isOwner } = useOrganizationPermissions();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (!hasOrganization) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
+          <h2 className="text-2xl font-bold text-slate-800">組織設定</h2>
         </div>
         <Card>
           <CardContent className="p-6">
@@ -31,8 +36,9 @@ const SystemSettings = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">系統設定</h2>
+          <h2 className="text-2xl font-bold text-slate-800">組織設定</h2>
         </div>
+        <RecordAuditHistoryButton recordId={organization?.id} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -257,6 +263,34 @@ const SystemSettings = () => {
         </Card>
       </div>
 
+      {/* 危險區域：僅組織擁有者可見 */}
+      {isOwner && (
+        <Card className="border-red-200">
+          <CardHeader>
+            <CardTitle className="flex items-center text-red-600">
+              <AlertTriangle className="mr-2" size={20} />
+              危險區域
+            </CardTitle>
+            <CardDescription>
+              以下操作無法復原，請謹慎執行
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-4">
+              <div className="space-y-0.5">
+                <Label className="text-base text-red-700">刪除組織</Label>
+                <p className="text-sm text-red-600/80">
+                  將「{organization?.name}」從介面中移除，您與團隊將無法再存取或找回
+                </p>
+              </div>
+              <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                刪除組織
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 保存設定按鈕 */}
       <div className="flex justify-end space-x-4">
         <Button variant="outline">
@@ -266,6 +300,8 @@ const SystemSettings = () => {
           保存設定
         </Button>
       </div>
+
+      <DeleteOrganizationDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} />
     </div>
   );
 };

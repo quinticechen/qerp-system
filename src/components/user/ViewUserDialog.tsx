@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewUserDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDia
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={user?.id} className="absolute right-10 top-2" />
           <DialogTitle>使用者詳情</DialogTitle>
         </DialogHeader>
 

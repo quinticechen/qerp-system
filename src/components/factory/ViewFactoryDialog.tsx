@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewFactoryDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
+          <RecordAuditHistoryButton recordId={factory.id} className="absolute right-10 top-2" />
           <DialogTitle>工廠詳情</DialogTitle>
           <DialogDescription>
             查看工廠資訊
