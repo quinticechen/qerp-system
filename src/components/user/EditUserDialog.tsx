@@ -73,30 +73,20 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
 
       if (profileError) throw profileError;
 
-      // 更新角色 - 先刪除現有角色，再添加新角色
-      const { error: deleteRoleError } = await supabase
-        .from('user_organization_roles')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId);
-
-      if (deleteRoleError) throw deleteRoleError;
-
-      // 添加新角色
-      const currentUser = await supabase.auth.getUser();
-      const { error: addRoleError } = await supabase
-        .from('user_organization_roles')
-        .insert({
-          user_id: user.id,
-          organization_id: organizationId,
-          role_id: data.role_id,
-          granted_by: currentUser.data.user?.id,
-          is_active: true
+      // 角色有變更時才更新：由資料庫在同一個交易內替換角色，並檢查權限
+      // （不能修改自己或擁有者的角色）
+      if (data.role_id && data.role_id !== user.roles?.[0]?.role_id) {
+        const { error: roleError } = await supabase.rpc('set_member_role', {
+          _organization_id: organizationId,
+          _user_id: user.id,
+          _role_id: data.role_id,
         });
 
-      if (addRoleError) throw addRoleError;
+        if (roleError) throw roleError;
+      }
 
       // 記錄操作日誌
+      const currentUser = await supabase.auth.getUser();
       await supabase
         .from('user_operation_logs')
         .insert({
@@ -115,7 +105,7 @@ export const EditUserDialog = ({ open, onOpenChange, user }: EditUserDialogProps
       onOpenChange(false);
     } catch (error) {
       console.error('Error updating user:', error);
-      toast.error('更新使用者資料失敗');
+      toast.error(`更新使用者資料失敗：${(error as { message?: string }).message ?? '未知錯誤'}`);
     }
   };
 

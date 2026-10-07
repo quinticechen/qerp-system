@@ -17,9 +17,9 @@ done
   echo "-- 自動產生（build-run.sh），請勿手動修改。"
   echo "-- 結果為 \"ALL TESTS PASSED\" 代表通過；\"FAIL: ...\" 或其他錯誤代表未通過。"
   echo "-- 最後一定會丟出例外，整批 SQL 會回滾，不會留下任何變更。"
-  for file in "${migrations[@]}"; do echo; echo "-- ===== migration: $file"; cat "../migrations/$file"; done
+  for file in ${migrations[@]+"${migrations[@]}"}; do echo; echo "-- ===== migration: $file"; cat "../migrations/$file"; done
   echo; echo "-- ===== _helpers.sql"; cat _helpers.sql
-  for file in "${tests[@]}"; do echo; echo "-- ===== test: $file"; grep -v "raise exception 'ALL TESTS PASSED'" "$file"; done
+  for file in ${tests[@]+"${tests[@]}"}; do echo; echo "-- ===== test: $file"; grep -v "raise exception 'ALL TESTS PASSED'" "$file"; done
   echo; echo "do \$\$ begin raise exception 'ALL TESTS PASSED'; end \$\$;"
 } > run.sql
 

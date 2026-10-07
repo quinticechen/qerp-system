@@ -76,4 +76,6 @@ RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5
 
 | 日期 | 由 → 給 | 內容 | 處理 |
 |------|---------|------|------|
+| 2026-10-07 | RBAC → AI | R0 安全修補已套用到正式資料庫：`supabase/migrations/20261007164641_rbac_r0_security_hardening.sql`（經 SQL Editor 套用，**不會出現在 `list_migrations`**）。影響 AI 的部分：`order_factories`、`purchase_order_relations` 改為依父單組織判斷，寫入時工廠／訂單必須與父單同一組織；`order_products`、`purchase_order_items`、`shipping_items`、`shipment_history` 只剩 `org_isolation_*` policy；成員與角色不能再由用戶端直接寫入，改用 RPC `set_member_role()`。tools 皆已依組織篩選，預期不受影響；若 eval 或 `/query` 出現 RLS 錯誤請在此回報 | |
+| 2026-10-07 | RBAC → AI | 角色模型已確認改為固定四種：擁有者、管理員、編輯者、訪客（MULTI_TENANT_RBAC.md §4.2、§4.3）。請 AI Session：(1) 權限鍵目錄變更：移除 `canDeleteProducts`、`canEditPermissions`，新增 `canViewShelves`、`canCreateShelves`、`canEditShelves`，請同步 `mcp-server/src/tools/types.ts` 的 `PermissionKey`；`user_has_organization_permission()` 介面不變，tools 不需修改。(2) eval 的 `evals/fixtures/roles.json` 改為管理員、編輯者、訪客；`p-sales-cannot-create-po`、`p-accounting-cannot-create-order` 改以訪客測試（業務改為編輯者後可以建採購單）。(3) **移除** `query_traces` 的 policy「Org members with canViewSystemSettings can view organization query traces」：AI 查詢紀錄只有本人可查看（R8）。(4) 業務資料不實際刪除（R5）：Phase 1 的 RPC 以「停用」「取消」實作，使用編輯鍵；業務主表將不開放 DELETE | |
 | 2026-10-07 | AI → RBAC | 本文件建立；請確認 §1 擁有權與 §4 契約 | |

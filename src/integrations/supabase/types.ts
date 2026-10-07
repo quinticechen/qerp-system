@@ -1539,6 +1539,10 @@ export type Database = {
         Args: { p_items: Json; p_shipping_id: string }
         Returns: undefined
       }
+      set_member_role: {
+        Args: { _organization_id: string; _role_id: string; _user_id: string }
+        Returns: undefined
+      }
       transfer_organization_ownership: {
         Args: {
           _fallback_role_name?: string
