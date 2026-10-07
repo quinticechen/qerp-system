@@ -23,7 +23,8 @@ import {
   User,
   ClipboardList,
   Truck,
-  Shield
+  Shield,
+  LayoutGrid
 } from 'lucide-react';
 
 export function AppSidebar() {
@@ -35,6 +36,7 @@ export function AppSidebar() {
     { id: 'product', label: '產品管理', icon: Package, path: '/product' },
     { id: 'order', label: '訂單管理', icon: ShoppingCart, path: '/order' },
     { id: 'purchase', label: '採購管理', icon: ClipboardList, path: '/purchase' },
+    { id: 'shelf', label: '貨架管理', icon: LayoutGrid, path: '/shelf' },
     { id: 'inventory', label: '庫存管理', icon: Warehouse, path: '/inventory' },
     { id: 'shipping', label: '出貨管理', icon: Truck, path: '/shipping' },
     { id: 'factory', label: '工廠管理', icon: Factory, path: '/factory' },

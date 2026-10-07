@@ -9,6 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  EditablePurchaseOrderItem,
+  toEditablePurchaseOrderItem,
+  toPurchaseOrderItemsPayload,
+  usePurchaseOrderItems,
+} from '@/hooks/usePurchaseOrderItems';
+import { useProductOptions } from '@/hooks/useProductOptions';
+import { savePurchaseOrderItems } from '@/lib/documentItemsService';
+import { PurchaseLineItemsEditor } from './PurchaseLineItemsEditor';
 
 interface EditPurchaseDialogProps {
   purchase: any;
@@ -23,8 +32,20 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
   const [formData, setFormData] = useState({
     expected_arrival_date: '',
     note: '',
-    status: 'pending' as 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled'
+    status: 'pending' as 'pending' | 'confirmed' | 'partial_arrived' | 'partial_received' | 'completed' | 'cancelled'
   });
+  const [items, setItems] = useState<EditablePurchaseOrderItem[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { data: itemRows } = usePurchaseOrderItems(purchase?.id, open);
+  const { data: products = [] } = useProductOptions(purchase?.organization_id);
+
+  useEffect(() => {
+    if (open && itemRows) {
+      setItems(itemRows.map(toEditablePurchaseOrderItem));
+      setSaveError(null);
+    }
+  }, [open, itemRows]);
 
   useEffect(() => {
     if (purchase) {
@@ -38,12 +59,16 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
 
   const updatePurchaseMutation = useMutation({
     mutationFn: async () => {
+      // Items first: their lock rules are the likely reason a save is rejected
+      await savePurchaseOrderItems(supabase, purchase.id, toPurchaseOrderItemsPayload(items));
+
       const { error } = await supabase
         .from('purchase_orders')
         .update({
           expected_arrival_date: formData.expected_arrival_date || null,
           note: formData.note || null,
-          status: formData.status
+          // The item save recalculates status; only override it when the user changed it here
+          ...(formData.status !== purchase.status ? { status: formData.status } : {})
         })
         .eq('id', purchase.id);
 
@@ -55,20 +80,31 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
         description: "採購單已更新"
       });
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-order-items', purchase.id] });
+      queryClient.invalidateQueries({ queryKey: ['record-audit-logs', purchase.id] });
       onOpenChange(false);
     },
-    onError: (error) => {
-      toast({
-        title: "錯誤",
-        description: "更新採購單失敗",
-        variant: "destructive"
-      });
+    onError: (error: Error) => {
       console.error('Error updating purchase:', error);
+      setSaveError(error.message || '更新採購單失敗');
     }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (items.length === 0) {
+      setSaveError('採購單至少需要一項產品');
+      return;
+    }
+    if (items.some((item) => !item.product_id)) {
+      setSaveError('請為每一項選擇產品');
+      return;
+    }
+    if (items.some((item) => !(Number(item.quantity) > 0) || item.unit_price === '' || Number(item.unit_price) < 0)) {
+      setSaveError('請填寫正確的採購數量與單價');
+      return;
+    }
+    setSaveError(null);
     updatePurchaseMutation.mutate();
   };
 
@@ -76,7 +112,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-900">編輯採購單</DialogTitle>
           <DialogDescription className="text-gray-600">
@@ -87,7 +123,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="status" className="text-gray-700">狀態</Label>
-            <Select value={formData.status} onValueChange={(value: 'pending' | 'confirmed' | 'partial_arrived' | 'completed' | 'cancelled') => setFormData({...formData, status: value})}>
+            <Select value={formData.status} onValueChange={(value: 'pending' | 'confirmed' | 'partial_arrived' | 'partial_received' | 'completed' | 'cancelled') => setFormData({...formData, status: value})}>
               <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue />
               </SelectTrigger>
@@ -95,6 +131,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
                 <SelectItem value="pending">待確認</SelectItem>
                 <SelectItem value="confirmed">已下單</SelectItem>
                 <SelectItem value="partial_arrived">部分到貨</SelectItem>
+                <SelectItem value="partial_received">部分入庫</SelectItem>
                 <SelectItem value="completed">已完成</SelectItem>
                 <SelectItem value="cancelled">已取消</SelectItem>
               </SelectContent>
@@ -122,6 +159,17 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
               className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label className="text-gray-700">採購產品</Label>
+            <PurchaseLineItemsEditor items={items} onChange={setItems} products={products} />
+          </div>
+
+          {saveError && (
+            <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {saveError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

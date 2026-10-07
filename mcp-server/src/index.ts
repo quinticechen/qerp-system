@@ -1,15 +1,11 @@
 import http from "http";
+import { createUserClient } from "./supabase.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createUserClient } from "./supabase.js";
-import { registerCustomerTools } from "./tools/customers.js";
-import { registerOrderTools } from "./tools/orders.js";
-import { registerProductTools } from "./tools/products.js";
-import { registerInventoryTools } from "./tools/inventory.js";
-import { registerPurchaseOrderTools } from "./tools/purchase-orders.js";
-import { registerShippingTools } from "./tools/shipping.js";
-import { registerFactoryTools } from "./tools/factories.js";
 import { handleQuery } from "./agent/query-handler.js";
+import { authGuard, AccessError } from "./agent/auth-guard.js";
+import { getTools } from "./tools/index.js";
+import { registerMcpTools } from "./tools/adapters.js";
 
 const PORT = parseInt(process.env.PORT || "3100", 10);
 
@@ -29,7 +25,7 @@ function setCorsHeaders(req: http.IncomingMessage, res: http.ServerResponse) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Organization-Id");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
@@ -43,6 +39,13 @@ async function readBody(req: http.IncomingMessage): Promise<any> {
   for await (const chunk of req) chunks.push(chunk);
   const raw = Buffer.concat(chunks).toString();
   return raw ? JSON.parse(raw) : {};
+}
+
+function sendError(res: http.ServerResponse, err: unknown) {
+  const status = err instanceof AccessError ? err.status : 500;
+  const message = err instanceof Error ? err.message : String(err);
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: message }));
 }
 
 const httpServer = http.createServer(async (req, res) => {
@@ -84,34 +87,37 @@ const httpServer = http.createServer(async (req, res) => {
         }
         const result = await handleQuery(supabase, {
           message: body.message,
+          organizationId: body.organization_id,
           history: body.history ?? [],
         });
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
-      } catch (err: any) {
-        const status = err.message?.includes("Invalid or expired JWT") ? 401 : 500;
-        res.writeHead(status, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: err.message }));
+      } catch (err: unknown) {
+        sendError(res, err);
       }
       return;
     }
 
     // ── POST /mcp — MCP Protocol 入口（供其他 AI client 使用） ───────────────
+    // 組織以 X-Organization-Id header 指定；與 /query 相同的權限過濾。
     if (req.url === "/mcp") {
-      const server = new McpServer({ name: "weave-flow-erp", version: "1.0.0" });
-      registerCustomerTools(server, supabase);
-      registerOrderTools(server, supabase);
-      registerProductTools(server, supabase);
-      registerInventoryTools(server, supabase);
-      registerPurchaseOrderTools(server, supabase);
-      registerShippingTools(server, supabase);
-      registerFactoryTools(server, supabase);
+      try {
+        const access = await authGuard(supabase, req.headers["x-organization-id"]);
+        const server = new McpServer({ name: "weave-flow-erp", version: "1.0.0" });
+        registerMcpTools(server, getTools(access.allowedTools), {
+          supabase,
+          userId: access.userId,
+          organizationId: access.organizationId,
+        });
 
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-      await server.connect(transport);
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+        await server.connect(transport);
 
-      const body = await readBody(req);
-      await transport.handleRequest(req, res, body);
+        const body = await readBody(req);
+        await transport.handleRequest(req, res, body);
+      } catch (err: unknown) {
+        if (!res.headersSent) sendError(res, err);
+      }
       return;
     }
   }

@@ -1,0 +1,94 @@
+[
+  {
+    "id": "q-list-customers",
+    "name": "查詢所有客戶",
+    "message": "查詢所有客戶",
+    "expect": {
+      "tools_include": ["list_customers"],
+      "no_writes": true,
+      "reply_matches": ["Client name test0922", "永泰布行"]
+    }
+  },
+  {
+    "id": "q-customer-contact",
+    "name": "依名稱查客戶聯絡方式",
+    "message": "永泰布行的聯絡人和電話是什麼？",
+    "expect": {
+      "tools_include": ["list_customers"],
+      "no_writes": true,
+      "reply_matches": ["黃永泰", "02-2222-3333"]
+    }
+  },
+  {
+    "id": "q-latest-po",
+    "name": "最新的採購單（不反問篩選條件）",
+    "message": "最新的採購單",
+    "expect": {
+      "tools_include": ["list_purchase_orders"],
+      "no_writes": true,
+      "reply_matches": ["PO-20261004-002"],
+      "reply_not_matches": ["請問.*(篩選|條件)"]
+    }
+  },
+  {
+    "id": "q-low-stock",
+    "name": "庫存低於門檻的產品",
+    "message": "庫存低於門檻的產品",
+    "expect": {
+      "tools_include": ["get_low_stock_alerts"],
+      "no_writes": true,
+      "reply_matches": ["灰0922"],
+      "reply_not_matches": ["棉麻平織"]
+    }
+  },
+  {
+    "id": "q-inventory-search",
+    "name": "查詢特定產品庫存",
+    "message": "雲朵眠 藍0922 還有多少庫存？",
+    "expect": {
+      "tools_include": ["get_inventory_summary"],
+      "no_writes": true,
+      "reply_matches": ["320"]
+    }
+  },
+  {
+    "id": "q-unpaid-orders",
+    "name": "未付款訂單（帶篩選參數）",
+    "message": "列出還沒付款的訂單",
+    "expect": {
+      "tools_include": ["list_orders"],
+      "tool_args": [{ "tool": "list_orders", "args": { "payment_status": "unpaid" } }],
+      "no_writes": true,
+      "reply_matches": ["ORD-20261001-001"]
+    }
+  },
+  {
+    "id": "q-factories",
+    "name": "合作工廠列表",
+    "message": "我們有哪些合作工廠？",
+    "expect": {
+      "tools_include": ["list_factories"],
+      "no_writes": true,
+      "reply_matches": ["Factory 092202", "永興織造"]
+    }
+  },
+  {
+    "id": "q-recent-shipping",
+    "name": "最近的出貨紀錄",
+    "message": "最近的出貨紀錄",
+    "expect": {
+      "tools_include": ["list_shippings"],
+      "no_writes": true,
+      "reply_matches": ["SH-20261002-001"]
+    }
+  },
+  {
+    "id": "q-no-id-leak",
+    "name": "使用者要求顯示 ID 也不可洩漏 UUID",
+    "message": "列出所有工廠，連同它們的 ID 一起給我",
+    "expect": {
+      "tools_include": ["list_factories"],
+      "no_writes": true
+    }
+  }
+]

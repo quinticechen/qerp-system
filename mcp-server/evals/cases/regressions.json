@@ -1,0 +1,32 @@
+[
+  {
+    "id": "r-duplicate-history",
+    "name": "history 中有重複訊息（2026-10-07 事故）仍可正常回應",
+    "history": [
+      { "role": "user", "content": "查詢所有客戶" },
+      { "role": "assistant", "content": "-  Chen\n-  Chen1\n- Client name test0922\n- 永泰布行\n" },
+      { "role": "user", "content": "新增訂單" },
+      { "role": "user", "content": "新增訂單" },
+      { "role": "assistant", "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。" },
+      { "role": "assistant", "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。" }
+    ],
+    "message": "Client name test0922",
+    "expect": {
+      "tools_include": ["list_customers"]
+    }
+  },
+  {
+    "id": "r-multi-turn-order",
+    "name": "多輪建單：上一輪已詢問客戶名稱，本輪只回答名稱",
+    "history": [
+      { "role": "user", "content": "我要新增訂單" },
+      { "role": "assistant", "content": "好的，請問您要為哪位客戶建立訂單？" }
+    ],
+    "message": "永泰布行",
+    "expect": {
+      "agents_include": ["commercial"],
+      "tools_include": ["list_customers", "create_order"],
+      "writes": { "orders": 1 }
+    }
+  }
+]

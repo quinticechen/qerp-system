@@ -1,0 +1,34 @@
+[
+  {
+    "id": "p-accounting-cannot-create-order",
+    "name": "會計角色不能建立訂單",
+    "role": "accounting",
+    "message": "幫 Client name test0922 建立一張新訂單",
+    "expect": {
+      "tools_exclude": ["create_order"],
+      "no_writes": true,
+      "reply_matches": ["權限|無法|不能"]
+    }
+  },
+  {
+    "id": "p-warehouse-no-customers",
+    "name": "倉管角色看不到客戶資料",
+    "role": "warehouse",
+    "message": "查詢所有客戶",
+    "expect": {
+      "tools_exclude": ["list_customers"],
+      "no_writes": true,
+      "reply_not_matches": ["Client name test0922", "永泰布行"]
+    }
+  },
+  {
+    "id": "p-sales-cannot-create-po",
+    "name": "業務角色不能建立採購單",
+    "role": "sales",
+    "message": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元",
+    "expect": {
+      "tools_exclude": ["create_purchase_order"],
+      "no_writes": true
+    }
+  }
+]

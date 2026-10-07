@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn, User, Mail, UserPlus, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ForgotPasswordDialog from '@/components/auth/ForgotPasswordDialog';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -21,6 +22,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
   const [showUserNotFoundAlert, setShowUserNotFoundAlert] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -494,20 +496,26 @@ const Login = () => {
 
             {/* 忘記密碼連結保持在底部，因為它與電子郵件/密碼登入更相關 */}
             <div className="text-center border-t border-slate-100 pt-6">
-              <a
-                href="#"
+              <button
+                type="button"
+                onClick={() => setForgotPasswordOpen(true)}
                 className="text-blue-600 hover:text-blue-700 text-sm font-semibold transition-colors duration-200 hover:underline decoration-2 underline-offset-4"
               >
                 忘記密碼？點此重設
-              </a>
+              </button>
             </div>
+            <ForgotPasswordDialog
+              open={forgotPasswordOpen}
+              onOpenChange={setForgotPasswordOpen}
+              defaultEmail={email}
+            />
           </CardContent>
         </Card>
 
         {/* 底部資訊 - 保持不變 */}
         <div className="text-center space-y-4">
           <p className="text-slate-500 text-sm font-medium">
-            © 2025 QERP 系統. QWIZ AI LLC 版權所有.
+            © 2026 QERP 系統. QWIZ AI LLC 版權所有.
           </p>
         </div>
       </div>

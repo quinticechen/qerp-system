@@ -179,11 +179,16 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
             "- **客戶 B**：聯絡人 李大華，電話 0923-456-789\n\n"
             "共找到 **2 筆**記錄。"
         )
+        query_requests: list[dict] = []
         def handle_query_route(route):
+            try:
+                query_requests.append(json.loads(route.request.post_data or "{}"))
+            except json.JSONDecodeError:
+                query_requests.append({})
             route.fulfill(
                 status=200,
                 content_type="application/json",
-                body=json.dumps({"reply": MOCK_REPLY, "roles": ["admin"], "allowedToolCount": 16}),
+                body=json.dumps({"reply": MOCK_REPLY, "allowedToolCount": 17}),
             )
         page.route("**/query", handle_query_route)
 
@@ -249,10 +254,19 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
 
         check("Welcome message displayed", page.get_by_text("你好！我是").is_visible())
 
-        suggestion_btn = page.locator("button", has_text="查詢所有客戶")
+        # Conversations persist in Supabase, so the panel may reopen an old session.
+        # Start a fresh one — this also guards against the new session snapping back
+        # to the previous one before the session list refetches.
+        page.locator("button[aria-label='對話紀錄']").click()
+        page.get_by_role("button", name="新對話").click()
+        page.wait_for_timeout(1_500)
+
+        # Scope to the rounded chips — the header button can also contain a session title.
+        suggestion_btn = page.locator("button.rounded-full", has_text="查詢所有客戶")
         check("Quick-reply suggestions visible", suggestion_btn.count() > 0, page, "04_suggestions")
 
-        check("Message input present", page.locator("textarea").count() > 0)
+        chat_input = page.locator("textarea[placeholder^='輸入訊息']")
+        check("Message input present", chat_input.count() > 0)
 
         # ── 4. Suggestion chip → AI response ─────────────────────────────────
         section("4. Quick-Reply Suggestion → AI Response")
@@ -266,6 +280,10 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         # User message: any element containing the suggestion text that isn't a button
         user_msg_visible = page.get_by_text("查詢所有客戶", exact=True).last.is_visible()
         check("User message bubble rendered", user_msg_visible, page, "05_user_msg")
+
+        # The backend rejects /query without the organization selected in the UI (P0-3)
+        sent_org = bool(query_requests) and bool(query_requests[-1].get("organization_id"))
+        check("Request includes organization_id", sent_org)
 
         # Thinking animation is best-effort: mocked API responds instantly so
         # the dots may never be visible. Record as info, not a hard failure.
@@ -299,7 +317,7 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         section("5. Manual Input (Enter to Send)")
         bubbles_before2 = page.locator("div.bg-white.shadow-sm").count()
 
-        textarea = page.locator("textarea")
+        textarea = chat_input
         textarea.click()   # ensure focus
         textarea.fill("目前有哪些庫存低於門檻？")
         textarea.press("Enter")   # target textarea directly, not global keyboard

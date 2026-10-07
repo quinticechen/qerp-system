@@ -67,42 +67,16 @@ export const TransferOwnershipDialog = ({ open, onOpenChange, onSuccess }: Trans
     if (!currentOrganization) return;
 
     try {
-      // 更新組織擁有者
-      const { error: updateError } = await supabase
-        .from('organizations')
-        .update({ owner_id: data.new_owner_id })
-        .eq('id', currentOrganization.id);
+      // 更新 owner_id、新舊擁有者角色調整、寫操作紀錄全部收進一個
+      // transaction 式 RPC：任何一步失敗就整個 rollback，不會讓
+      // organizations.owner_id 跟 user_organization_roles 兩邊對不起來；
+      // 舊擁有者也會自動拿到一個預設角色（admin），不會轉移後變成無角色。
+      const { error } = await supabase.rpc('transfer_organization_ownership', {
+        _organization_id: currentOrganization.id,
+        _new_owner_id: data.new_owner_id,
+      });
 
-      if (updateError) throw updateError;
-
-      // 為新擁有者分配 owner 角色
-      const { data: ownerRole } = await supabase
-        .from('organization_roles')
-        .select('id')
-        .eq('organization_id', currentOrganization.id)
-        .eq('name', 'owner')
-        .single();
-
-      if (ownerRole) {
-        // 移除舊擁有者的 owner 角色
-        await supabase
-          .from('user_organization_roles')
-          .update({ is_active: false })
-          .eq('organization_id', currentOrganization.id)
-          .eq('role_id', ownerRole.id)
-          .eq('user_id', currentOrganization.owner_id);
-
-        // 為新擁有者分配 owner 角色
-        await supabase
-          .from('user_organization_roles')
-          .upsert({
-            user_id: data.new_owner_id,
-            organization_id: currentOrganization.id,
-            role_id: ownerRole.id,
-            granted_by: currentOrganization.owner_id,
-            is_active: true
-          });
-      }
+      if (error) throw error;
 
       toast({
         title: "所有權轉移成功",
@@ -111,11 +85,11 @@ export const TransferOwnershipDialog = ({ open, onOpenChange, onSuccess }: Trans
 
       onOpenChange(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error transferring ownership:', error);
       toast({
         title: "轉移失敗",
-        description: "無法轉移組織所有權，請稍後再試",
+        description: error?.message || "無法轉移組織所有權，請稍後再試",
         variant: "destructive",
       });
     }

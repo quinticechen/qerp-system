@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -181,13 +181,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventories_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_roles"
             referencedColumns: ["id"]
           },
         ]
@@ -431,13 +424,6 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "orders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_roles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       organization_roles: {
@@ -582,13 +568,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "products_new_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_roles"
             referencedColumns: ["id"]
           },
         ]
@@ -798,14 +777,122 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      query_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          session_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          session_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          session_id?: string
+        }
+        Relationships: [
           {
-            foreignKeyName: "purchase_orders_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "query_messages_session_id_fkey"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: "users_with_roles"
+            referencedRelation: "query_sessions"
             referencedColumns: ["id"]
           },
         ]
+      }
+      query_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string | null
+          pinned: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          pinned?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "query_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      record_audit_logs: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_fields: string[]
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          organization_id: string | null
+          parent_id: string | null
+          parent_table: string | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[]
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id?: string | null
+          parent_id?: string | null
+          parent_table?: string | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_fields?: string[]
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          organization_id?: string | null
+          parent_id?: string | null
+          parent_table?: string | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
       }
       shipment_history: {
         Row: {
@@ -983,19 +1070,12 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "shippings_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_roles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       user_operation_logs: {
         Row: {
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           operation_details: Json | null
           operation_type: string
           operator_id: string
@@ -1005,7 +1085,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           operation_details?: Json | null
           operation_type: string
           operator_id: string
@@ -1015,7 +1095,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           operation_details?: Json | null
           operation_type?: string
           operator_id?: string
@@ -1078,9 +1158,12 @@ export type Database = {
       }
       user_organizations: {
         Row: {
+          accepted_at: string | null
           created_at: string
           id: string
+          invited_at: string
           invited_by: string | null
+          invited_role_id: string | null
           is_active: boolean
           joined_at: string
           organization_id: string
@@ -1088,9 +1171,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          accepted_at?: string | null
           created_at?: string
           id?: string
+          invited_at?: string
           invited_by?: string | null
+          invited_role_id?: string | null
           is_active?: boolean
           joined_at?: string
           organization_id: string
@@ -1098,9 +1184,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          accepted_at?: string | null
           created_at?: string
           id?: string
+          invited_at?: string
           invited_by?: string | null
+          invited_role_id?: string | null
           is_active?: boolean
           joined_at?: string
           organization_id?: string
@@ -1109,6 +1198,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "user_organizations_invited_role_id_fkey"
+            columns: ["invited_role_id"]
+            isOneToOne: false
+            referencedRelation: "organization_roles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "user_organizations_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -1116,39 +1212,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          granted_at: string
-          granted_by: string | null
-          id: string
-          is_active: boolean
-          role: Database["public"]["Enums"]["user_role"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          granted_at?: string
-          granted_by?: string | null
-          id?: string
-          is_active?: boolean
-          role: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          granted_at?: string
-          granted_by?: string | null
-          id?: string
-          is_active?: boolean
-          role?: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       warehouses: {
         Row: {
@@ -1232,38 +1295,52 @@ export type Database = {
         }
         Relationships: []
       }
-      users_with_roles: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          full_name: string | null
-          id: string | null
-          is_active: boolean | null
-          phone: string | null
-          roles: Json | null
-          updated_at: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
+      accept_organization_invitation: {
+        Args: { _organization_id: string }
+        Returns: undefined
+      }
+      add_existing_user_to_organization: {
+        Args: { _email: string; _organization_id: string; _role_id: string }
+        Returns: string
+      }
+      complete_user_invitation: {
+        Args: {
+          _full_name?: string
+          _organization_id: string
+          _phone?: string
+          _role_id: string
+          _user_id: string
+        }
+        Returns: undefined
+      }
       create_default_organization_roles: {
         Args: { _organization_id: string }
         Returns: undefined
       }
-      ensure_user_profile: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      ensure_user_profile: { Args: never; Returns: undefined }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
+      }
+      get_my_pending_invitations: {
+        Args: never
+        Returns: {
+          invited_at: string
+          is_expired: boolean
+          organization_id: string
+          organization_name: string
+          role_display_name: string
+        }[]
       }
       get_organization_member_status: {
         Args: { _organization_id: string }
         Returns: {
-          user_id: string
+          email_confirmed: boolean
+          invited_at: string
           is_pending: boolean
+          user_id: string
         }[]
       }
       get_user_organizations: {
@@ -1279,13 +1356,46 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_admin: {
-        Args: { _user_id: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_organization_owner: {
         Args: { _organization_id: string; _user_id: string }
         Returns: boolean
+      }
+      order_product_is_purchased: {
+        Args: { p_order_id: string; p_product_id: string }
+        Returns: boolean
+      }
+      recompute_order_shipments: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
+      recompute_purchase_order_receipts: {
+        Args: { p_purchase_order_id: string }
+        Returns: undefined
+      }
+      save_inventory_rolls: {
+        Args: { p_inventory_id: string; p_rolls: Json }
+        Returns: undefined
+      }
+      save_order_items: {
+        Args: { p_items: Json; p_order_id: string }
+        Returns: undefined
+      }
+      save_purchase_order_items: {
+        Args: { p_items: Json; p_purchase_order_id: string }
+        Returns: undefined
+      }
+      save_shipping_items: {
+        Args: { p_items: Json; p_shipping_id: string }
+        Returns: undefined
+      }
+      transfer_organization_ownership: {
+        Args: {
+          _fallback_role_name?: string
+          _new_owner_id: string
+          _organization_id: string
+        }
+        Returns: undefined
       }
       user_belongs_to_organization: {
         Args: { _organization_id: string; _user_id: string }
@@ -1334,12 +1444,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1363,11 +1473,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1388,11 +1498,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1413,11 +1523,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1430,11 +1540,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

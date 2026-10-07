@@ -1,8 +1,9 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { ToolName, TOOL_GROUPS } from "./permissions.js";
 import { runSubAgent, ConversationMessage } from "./sub-agents.js";
 import { aiGenerateObject } from "./ai-gateway.js";
+import type { QueryObserver } from "./observer.js";
+import type { ToolContext } from "../tools/types.js";
 
 const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負責分析使用者意圖並決定調用哪個子 Agent。
 
@@ -38,9 +39,10 @@ type RouterDecision = z.infer<typeof routerSchema>;
  */
 export async function routeQuery(
   message: string,
+  ctx: ToolContext,
   allowedTools: ToolName[],
-  supabase: SupabaseClient,
-  history: ConversationMessage[] = []
+  history: ConversationMessage[] = [],
+  observer?: QueryObserver
 ): Promise<string> {
   const availableGroups = (["commercial", "supply_chain"] as const).filter(
     (group) => TOOL_GROUPS[group].some((tool) => allowedTools.includes(tool))
@@ -64,13 +66,15 @@ export async function routeQuery(
         ...recentHistory,
         { role: "user" as const, content: message },
       ],
-    } as any);
+    } as any, observer);
+    observer?.onRoute?.(decision, false);
   } catch {
     // 分類失敗時 fallback：用第一個可用群組
     decision = {
       agents: [availableGroups[0]],
       tasks: { [availableGroups[0]]: message },
     };
+    observer?.onRoute?.(decision, true);
   }
 
   // 過濾掉用戶沒有權限的 agent
@@ -82,18 +86,29 @@ export async function routeQuery(
     return "你沒有執行此操作所需的權限。";
   }
 
-  // 並行呼叫子 Agent
-  const results = await Promise.all(
+  // 並行呼叫子 Agent — allSettled so one failing agent doesn't discard the other's answer
+  const settled = await Promise.allSettled(
     authorizedAgents.map((agent) =>
       runSubAgent(
         agent,
         decision.tasks?.[agent] ?? message,
         allowedTools,
-        supabase,
-        history
+        ctx,
+        history,
+        observer
       )
     )
   );
+
+  if (settled.every((s) => s.status === "rejected")) {
+    throw (settled[0] as PromiseRejectedResult).reason;
+  }
+
+  const results = settled.map((s, i) => {
+    if (s.status === "fulfilled") return s.value;
+    console.error(`[Router] ${authorizedAgents[i]} 子 Agent 失敗:`, s.reason);
+    return "⚠️ 這部分處理時發生錯誤，請稍後再試或換個方式描述。";
+  });
 
   if (results.length === 1) return results[0];
 

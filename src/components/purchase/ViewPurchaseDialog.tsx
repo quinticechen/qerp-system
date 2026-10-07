@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
 
 interface ViewPurchaseDialogProps {
   purchase: any;
@@ -171,6 +172,8 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
             </Card>
           )}
         </div>
+
+        <RecordAuditHistory recordId={purchase.id} />
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

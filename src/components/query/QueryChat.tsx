@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, KeyboardEvent } from 'react';
-import { X, Send, Trash2, Loader2 } from 'lucide-react';
+import { X, Send, Trash2, Loader2, ChevronDown, Pin, Plus, Trash } from 'lucide-react';
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
-import { useQueryChat } from '@/hooks/useQueryChat';
+import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface QueryChatProps {
   onClose: () => void;
@@ -19,12 +21,25 @@ const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 �
 有什麼需要幫忙的嗎？`;
 
 export function QueryChat({ onClose }: QueryChatProps) {
-  const { messages, isLoading, sendMessage, clearMessages } = useQueryChat();
+  const {
+    sessions,
+    activeSessionId,
+    messages,
+    isLoading,
+    sendMessage,
+    clearMessages,
+    createSession,
+    switchSession,
+    deleteSession,
+    togglePin,
+  } = useQueryChat();
   // inputKey is incremented on every send to force-remount the textarea,
   // guaranteeing the DOM value and height are fully reset regardless of browser
   // or React controlled-component quirks.
   const [inputKey, setInputKey] = useState(0);
   const [hasInput, setHasInput] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -61,14 +76,41 @@ export function QueryChat({ onClose }: QueryChatProps) {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-t-2xl shrink-0">
-        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20">
-          <MantaRayIcon size={24} className="text-white" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm leading-none">Query</p>
-          <p className="text-white/70 text-xs mt-0.5">ERP 智慧助理</p>
-        </div>
-        <div className="flex items-center gap-1">
+        <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+          <PopoverTrigger asChild>
+            <button
+              aria-label="對話紀錄"
+              className="flex items-center gap-3 min-w-0 flex-1 text-left rounded-lg px-1 -mx-1 py-0.5 hover:bg-white/10 transition-colors"
+            >
+              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 shrink-0">
+                <MantaRayIcon size={24} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm leading-none">Query</p>
+                <p className="text-white/70 text-xs mt-0.5 truncate">
+                  {activeSession?.title && messages.length > 0
+                    ? activeSession.title
+                    : 'ERP 智慧助理'}
+                </p>
+              </div>
+              <ChevronDown
+                size={14}
+                className={`text-white/70 shrink-0 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="start" sideOffset={8} className="w-80 p-0 overflow-hidden">
+            <SessionHistoryPanel
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={(id) => { switchSession(id); setHistoryOpen(false); }}
+              onCreate={() => { createSession(); setHistoryOpen(false); }}
+              onDelete={deleteSession}
+              onTogglePin={togglePin}
+            />
+          </PopoverContent>
+        </Popover>
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={clearMessages}
             className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
@@ -152,6 +194,120 @@ export function QueryChat({ onClose }: QueryChatProps) {
       </div>
     </div>
   );
+}
+
+interface SessionHistoryPanelProps {
+  sessions: QuerySession[];
+  activeSessionId: string | null;
+  onSelect: (id: string) => void;
+  onCreate: () => void;
+  onDelete: (id: string) => void;
+  onTogglePin: (id: string) => void;
+}
+
+function SessionHistoryPanel({
+  sessions,
+  activeSessionId,
+  onSelect,
+  onCreate,
+  onDelete,
+  onTogglePin,
+}: SessionHistoryPanelProps) {
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-800">對話紀錄</p>
+        <button
+          onClick={onCreate}
+          className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded-md hover:bg-indigo-50 transition-colors"
+        >
+          <Plus size={13} />
+          新對話
+        </button>
+      </div>
+
+      {sessions.length === 0 ? (
+        <p className="px-3 py-6 text-center text-xs text-gray-400">還沒有對話紀錄</p>
+      ) : (
+        <ScrollArea className="max-h-80">
+          <div className="py-1">
+            {sessions.map((session) => (
+              <SessionRow
+                key={session.id}
+                session={session}
+                isActive={session.id === activeSessionId}
+                onSelect={() => onSelect(session.id)}
+                onDelete={() => onDelete(session.id)}
+                onTogglePin={() => onTogglePin(session.id)}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
+function SessionRow({
+  session,
+  isActive,
+  onSelect,
+  onDelete,
+  onTogglePin,
+}: {
+  session: QuerySession;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onTogglePin: () => void;
+}) {
+  return (
+    <div
+      className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+        isActive ? 'bg-indigo-50' : 'hover:bg-gray-50'
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm truncate ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
+          {session.title}
+        </p>
+        <p className="text-[11px] text-gray-400 mt-0.5">{formatSessionTime(session.updatedAt)}</p>
+      </div>
+      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 data-[pinned=true]:opacity-100" data-pinned={session.pinned}>
+        <button
+          onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+          className={`p-1.5 rounded-md transition-colors ${
+            session.pinned ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+          }`}
+          title={session.pinned ? '取消釘選' : '釘選對話'}
+        >
+          <Pin size={13} fill={session.pinned ? 'currentColor' : 'none'} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+          title="刪除對話"
+        >
+          <Trash size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function formatSessionTime(date: Date): string {
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  }
+  const isThisYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString('zh-TW', {
+    month: 'numeric',
+    day: 'numeric',
+    year: isThisYear ? undefined : 'numeric',
+  });
 }
 
 function UserBubble({ content }: { content: string }) {

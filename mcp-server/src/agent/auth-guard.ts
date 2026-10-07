@@ -1,61 +1,65 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { getAllowedTools, ToolName } from "./permissions.js";
+import type { ToolName } from "./permissions.js";
+import type { PermissionKey } from "../tools/types.js";
+import { getAllTools } from "../tools/index.js";
 
-export interface AuthResult {
+export class AccessError extends Error {
+  constructor(message: string, readonly status: 400 | 401 | 403) {
+    super(message);
+  }
+}
+
+export interface QueryAccess {
   userId: string;
-  roles: string[];
+  organizationId: string;
+  permissions: ReadonlySet<PermissionKey>;
   allowedTools: ToolName[];
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Tools whose declared permission is in the set, in registry order. */
+export function allowedToolNames(permissions: ReadonlySet<PermissionKey>): ToolName[] {
+  return getAllTools().filter((t) => permissions.has(t.permission)).map((t) => t.name);
 }
 
 /**
  * Auth Guard — 非 AI 層，hard-coded 權限守門員
- * 從 Supabase 取得用戶角色，產出動態工具清單
+ *
+ * 權限完全交給資料庫的 user_has_organization_permission()（RLS 也用同一個函式）：
+ * 有效成員＋有效角色的 permissions，或組織擁有者（organizations.owner_id）。
+ * 不在這裡重寫判斷邏輯，避免 AI 與 UI／RLS 的權限不一致。
  */
-export async function authGuard(supabase: SupabaseClient): Promise<AuthResult> {
-  // 取得當前用戶身份
+export async function authGuard(supabase: SupabaseClient, organizationId: unknown): Promise<QueryAccess> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    throw new Error("Invalid or expired JWT");
+  if (userError || !user) throw new AccessError("Invalid or expired JWT", 401);
+
+  if (typeof organizationId !== "string" || !UUID_RE.test(organizationId)) {
+    throw new AccessError("organization_id is required", 400);
   }
 
-  // 查詢用戶在所屬組織中的角色
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("id", user.id)
-    .single();
+  const [{ data: membership }, { data: isOwner }] = await Promise.all([
+    supabase.from("user_organizations").select("organization_id")
+      .eq("user_id", user.id).eq("organization_id", organizationId).eq("is_active", true).maybeSingle(),
+    supabase.rpc("is_organization_owner", { _user_id: user.id, _organization_id: organizationId }),
+  ]);
+  if (!membership && isOwner !== true) throw new AccessError("Not a member of this organization", 403);
 
-  // 查詢組織角色（多角色支援）
-  // user_organization_roles 本身沒有 role_name 欄位，角色名稱要透過 role_id
-  // 關聯 organization_roles(name) 取得
-  const { data: orgRoles } = await supabase
-    .from("user_organization_roles")
-    .select("organization_roles(name)")
-    .eq("user_id", user.id)
-    .eq("is_active", true);
-
-  // 合併所有角色
-  const roles = new Set<string>();
-
-  if (profile?.role) {
-    roles.add(profile.role);
-  }
-
-  if (orgRoles?.length) {
-    orgRoles.forEach((r: any) => r.organization_roles?.name && roles.add(r.organization_roles.name));
-  }
-
-  // 若查不到角色，預設給 accounting（最低權限）
-  if (roles.size === 0) {
-    roles.add("accounting");
-  }
-
-  const roleList = Array.from(roles);
-  const allowedTools = getAllowedTools(roleList);
+  // Only the keys some tool needs — one RPC each, in parallel.
+  const neededKeys = [...new Set(getAllTools().map((t) => t.permission))];
+  const checks = await Promise.all(neededKeys.map(async (key) => {
+    const { data, error } = await supabase.rpc("user_has_organization_permission", {
+      _user_id: user.id, _organization_id: organizationId, _permission: key,
+    });
+    if (error) throw new Error(`Permission check failed (${key}): ${error.message}`);
+    return [key, data === true] as const;
+  }));
+  const permissions = new Set(checks.filter(([, granted]) => granted).map(([key]) => key));
 
   return {
     userId: user.id,
-    roles: roleList,
-    allowedTools,
+    organizationId,
+    permissions,
+    allowedTools: allowedToolNames(permissions),
   };
 }

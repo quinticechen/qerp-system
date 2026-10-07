@@ -1,4 +1,4 @@
-
+import { useState } from 'react';
 import { Bell, User, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import {
@@ -14,10 +14,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { OrganizationSwitcher } from './organization/OrganizationSwitcher';
+import ProfileSettingsDialog from './auth/ProfileSettingsDialog';
 
 const Header = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -69,7 +71,7 @@ const Header = () => {
                 </p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onSelect={() => setProfileOpen(true)}>
                 <User className="mr-2 h-4 w-4" />
                 <span>個人設定</span>
               </DropdownMenuItem>
@@ -83,6 +85,8 @@ const Header = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <ProfileSettingsDialog open={profileOpen} onOpenChange={setProfileOpen} />
         </div>
       </div>
     </header>

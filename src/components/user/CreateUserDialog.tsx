@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useQuery } from '@tanstack/react-query';
+import { getInvitationRedirectUrl, sendExistingUserInvitationEmail } from '@/hooks/useInvitations';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -60,7 +61,38 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
 
     try {
       console.log('Creating user with data:', data);
-      
+
+      // 信箱若已註冊，signUp 不會報錯而是回傳假的 user id，因此先嘗試
+      // 為既有帳號建立「邀請中」的成員資格；找不到帳號（回傳 null）才走註冊邀請流程。
+      const { data: existingUserId, error: existingUserError } = await supabase.rpc(
+        'add_existing_user_to_organization',
+        {
+          _email: data.email,
+          _organization_id: organizationId,
+          _role_id: data.role_id,
+        }
+      );
+
+      if (existingUserError) {
+        throw existingUserError;
+      }
+
+      if (existingUserId) {
+        queryClient.invalidateQueries({ queryKey: ['organization_users'] });
+        try {
+          await sendExistingUserInvitationEmail(data.email);
+          toast.success('邀請郵件已發送，對方接受邀請後才會成為組織成員');
+        } catch (emailError) {
+          console.error('Error sending invitation email:', emailError);
+          toast.warning(
+            `邀請已建立，但邀請郵件發送失敗：${(emailError as { message?: string }).message ?? '未知錯誤'}。可稍後在使用者列表點「重新發送邀請」`
+          );
+        }
+        reset();
+        onOpenChange(false);
+        return;
+      }
+
       // 使用 signUp 而不是 admin.inviteUserByEmail（前端沒有 service role key）。
       // 透過獨立的 inviteClient 呼叫，避免 signUp 回傳的 session 覆蓋掉目前登入
       // 管理員自己的 session。
@@ -74,9 +106,8 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             organization_id: organizationId,
             role_id: data.role_id
           },
-          // 對應 App.tsx 中受保護的 /dashboard 路由；使用者確認信箱後
-          // 會直接帶著已建立好的組織成員資格進入該組織工作區
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          // 使用者確認信箱後進入接受邀請頁面，接受後才成為組織成員
+          emailRedirectTo: getInvitationRedirectUrl()
         }
       });
 
@@ -85,74 +116,37 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         throw signUpError;
       }
 
-      if (signUpData.user) {
-        // profile 已由資料庫的 handle_new_user trigger 自動建立，
-        // 這裡改用 update 補上 trigger 沒有寫入的欄位（例如 phone）
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: data.full_name,
-            phone: data.phone
-          })
-          .eq('id', signUpData.user.id);
-
-        if (profileError) {
-          console.error('Profile update error:', profileError);
-        }
-
-        // 將用戶加入組織
-        const { error: orgError } = await supabase
-          .from('user_organizations')
-          .insert({
-            user_id: signUpData.user.id,
-            organization_id: organizationId,
-            is_active: true
-          });
-
-        if (orgError) {
-          console.error('Organization membership error:', orgError);
-        }
-
-        // 分配角色
-        const { error: roleError } = await supabase
-          .from('user_organization_roles')
-          .insert({
-            user_id: signUpData.user.id,
-            organization_id: organizationId,
-            role_id: data.role_id,
-            granted_by: (await supabase.auth.getUser()).data.user?.id,
-            is_active: true
-          });
-
-        if (roleError) {
-          console.error('Role assignment error:', roleError);
-        }
+      if (!signUpData.user) {
+        throw new Error('建立帳號失敗，請稍後再試');
       }
 
-      // 記錄操作日誌
-      const currentUser = await supabase.auth.getUser();
-      if (currentUser.data.user) {
-        await supabase
-          .from('user_operation_logs')
-          .insert({
-            operator_id: currentUser.data.user.id,
-            target_user_id: signUpData.user?.id,
-            operation_type: 'create',
-            operation_details: {
-              email: data.email,
-              full_name: data.full_name,
-              organization_id: organizationId
-            }
-          });
+      // 空的 identities 代表信箱已被註冊，回傳的 user id 是假的，不能拿去寫入組織
+      if (signUpData.user.identities?.length === 0) {
+        throw new Error('此信箱已被註冊，請稍後再試一次');
+      }
+
+      // 補 profile 欄位、加入組織、指派角色、寫操作紀錄全部收進一個
+      // transaction 式 RPC，任何一步失敗就整個 rollback，並把錯誤拋出來
+      // 讓下面的 catch 區塊顯示給管理員看，而不是悄悄留下殘缺資料。
+      const { error: completeError } = await supabase.rpc('complete_user_invitation', {
+        _user_id: signUpData.user.id,
+        _organization_id: organizationId,
+        _role_id: data.role_id,
+        _full_name: data.full_name || null,
+        _phone: data.phone || null,
+      });
+
+      if (completeError) {
+        throw completeError;
       }
 
       queryClient.invalidateQueries({ queryKey: ['organization_users'] });
-      toast.success('使用者已創建，邀請郵件已發送');
+      toast.success('邀請郵件已發送，對方完成註冊並接受邀請後才會成為組織成員');
       reset();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating user:', error);
-      toast.error(`創建使用者失敗: ${error.message}`);
+      toast.error(`創建使用者失敗: ${(error as { message?: string }).message ?? '未知錯誤'}`);
     }
   };
 

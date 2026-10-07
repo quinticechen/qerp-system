@@ -1,44 +1,23 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { defineTool, ok, fail } from "./types.js";
+import { applySearch } from "./search.js";
 
-export function registerFactoryTools(server: McpServer, supabase: SupabaseClient) {
-  server.tool(
-    "list_factories",
-    "列出所有工廠，包含聯絡資訊。可用關鍵字搜尋工廠名稱或聯絡人。適合下採購單前確認工廠 ID。",
-    {
-      search: z
-        .string()
-        .optional()
-        .describe("搜尋關鍵字，比對工廠名稱或聯絡人姓名"),
-      limit: z
-        .number()
-        .min(1)
-        .max(100)
-        .default(20)
-        .describe("回傳筆數，預設 20"),
+export const factoryTools = [
+  defineTool({
+    name: "list_factories",
+    domain: "factory",
+    kind: "read",
+    permission: "canViewFactories",
+    description: "列出工廠資料，可搜尋名稱或聯絡人",
+    input: z.object({
+      search: z.string().optional(),
+      limit: z.number().optional(),
+    }),
+    execute: async ({ supabase }, { search, limit }) => {
+      const q = supabase.from("factories").select("id, name, contact_person, phone, email").order("name").limit(limit ?? 20);
+      const { data, error } = await applySearch(q, ["name", "contact_person"], search);
+      if (error) return fail(`查詢失敗：${error.message}`);
+      return ok(data ?? []);
     },
-    async ({ search, limit }) => {
-      let query = supabase
-        .from("factories")
-        .select("id, name, contact_person, phone, landline_phone, email, address, note")
-        .order("name")
-        .limit(limit);
-
-      if (search)
-        query = query.or(
-          `name.ilike.%${search}%,contact_person.ilike.%${search}%`
-        );
-
-      const { data, error } = await query;
-      if (error)
-        return {
-          content: [{ type: "text", text: `查詢工廠失敗：${error.message}` }],
-        };
-      if (!data?.length)
-        return { content: [{ type: "text", text: "沒有找到符合條件的工廠" }] };
-
-      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
-    }
-  );
-}
+  }),
+];

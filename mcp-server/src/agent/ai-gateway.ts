@@ -8,6 +8,7 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, generateObject } from "ai";
 import type { LanguageModelV1 } from "@ai-sdk/provider";
+import type { QueryObserver } from "./observer.js";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY!,
@@ -16,9 +17,16 @@ const openrouter = createOpenRouter({
 // 模型優先級清單（由上往下降級）
 const MODEL_PRIORITY = [
   "google/gemini-2.5-flash-lite",       // 主力：快、便宜
-  "google/gemini-2.0-flash",            // 降級 1：同家族
-  "anthropic/claude-haiku-4-5-20251001", // 降級 2：不同 provider
+  "google/gemini-2.5-flash",            // 降級 1：同家族
+  "anthropic/claude-haiku-4.5",         // 降級 2：不同 provider（OpenRouter ID 格式）
 ] as const;
+
+// OpenRouter's error message is often just the HTTP status text ("Bad Request");
+// the actual reason (e.g. an invalid model ID) lives in the response body.
+function describeError(err: any): string {
+  const body = typeof err?.responseBody === "string" ? ` — ${err.responseBody.slice(0, 500)}` : "";
+  return `${err?.message ?? String(err)}${body}`;
+}
 
 function getModel(modelId: string): LanguageModelV1 {
   return openrouter(modelId) as unknown as LanguageModelV1;
@@ -31,8 +39,10 @@ type GenerateObjectOptions<T> = Omit<Parameters<typeof generateObject>[0], "mode
  * 帶自動 fallback 的 generateText
  * 主模型掛掉會自動嘗試下一個，對上層完全透明
  */
-export async function aiGenerateText(options: GenerateTextOptions) {
-  let lastError: Error | null = null;
+export async function aiGenerateText(options: GenerateTextOptions, observer?: QueryObserver) {
+  // Surface the primary model's error when every model fails — a fallback's error
+  // (e.g. an outage) would hide the real cause.
+  let firstError: Error | null = null;
 
   for (const modelId of MODEL_PRIORITY) {
     try {
@@ -43,23 +53,26 @@ export async function aiGenerateText(options: GenerateTextOptions) {
       if (modelId !== MODEL_PRIORITY[0]) {
         console.warn(`[AI Gateway] 使用降級模型: ${modelId}`);
       }
+      observer?.onModelAttempt?.(modelId);
       return result;
     } catch (err: any) {
-      lastError = err;
-      console.warn(`[AI Gateway] ${modelId} 失敗: ${err.message}`);
+      firstError ??= err;
+      observer?.onModelAttempt?.(modelId, err);
+      console.warn(`[AI Gateway] ${modelId} 失敗: ${describeError(err)}`);
     }
   }
 
-  throw lastError ?? new Error("All AI models failed");
+  throw firstError ?? new Error("All AI models failed");
 }
 
 /**
  * 帶自動 fallback 的 generateObject（結構化輸出）
  */
 export async function aiGenerateObject<T>(
-  options: GenerateObjectOptions<T>
+  options: GenerateObjectOptions<T>,
+  observer?: QueryObserver
 ): Promise<T> {
-  let lastError: Error | null = null;
+  let firstError: Error | null = null;
 
   for (const modelId of MODEL_PRIORITY) {
     try {
@@ -67,12 +80,14 @@ export async function aiGenerateObject<T>(
         ...(options as any),
         model: getModel(modelId),
       });
+      observer?.onModelAttempt?.(modelId);
       return (result as any).object as T;
     } catch (err: any) {
-      lastError = err;
-      console.warn(`[AI Gateway] generateObject ${modelId} 失敗: ${err.message}`);
+      firstError ??= err;
+      observer?.onModelAttempt?.(modelId, err);
+      console.warn(`[AI Gateway] generateObject ${modelId} 失敗: ${describeError(err)}`);
     }
   }
 
-  throw lastError ?? new Error("All AI models failed");
+  throw firstError ?? new Error("All AI models failed");
 }

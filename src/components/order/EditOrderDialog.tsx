@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { EditableOrderItem, toEditableOrderItem, toOrderItemsPayload, useOrderItems } from '@/hooks/useOrderItems';
+import { useProductOptions } from '@/hooks/useProductOptions';
+import { saveOrderItems } from '@/lib/documentItemsService';
+import { OrderItemsEditor } from './OrderItemsEditor';
+import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
 
 type OrderStatus = Database['public']['Enums']['order_status'];
 type PaymentStatus = Database['public']['Enums']['payment_status'];
@@ -36,6 +41,18 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(order.payment_status);
   const [shippingStatus, setShippingStatus] = useState<ShippingStatus>(order.shipping_status);
   const [note, setNote] = useState(order.note || '');
+  const [items, setItems] = useState<EditableOrderItem[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const { data: itemRows } = useOrderItems(order.id, open);
+  const { data: products = [] } = useProductOptions(order.organization_id);
+
+  useEffect(() => {
+    if (open && itemRows) {
+      setItems(itemRows.map(toEditableOrderItem));
+      setSaveError(null);
+    }
+  }, [open, itemRows]);
 
   useEffect(() => {
     setStatus(order.status);
@@ -88,13 +105,27 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     enabled: open
   });
 
+  // Products already on a live purchase order for this order are locked in the editor
+  const purchasedProductIds = useMemo(
+    () =>
+      new Set<string>(
+        (relatedData?.purchaseOrders ?? [])
+          .filter((po) => po.status !== 'cancelled')
+          .flatMap((po) => (po.purchase_order_items ?? []).map((item) => item.product_id)),
+      ),
+    [relatedData],
+  );
+
   const updateOrderMutation = useMutation({
     mutationFn: async (updateData: {
       status: OrderStatus;
       payment_status: PaymentStatus;
-      shipping_status: ShippingStatus;
+      shipping_status?: ShippingStatus;
       note: string;
     }) => {
+      // Items first: their lock rules are the likely reason a save is rejected
+      await saveOrderItems(supabase, order.id, toOrderItemsPayload(items));
+
       const { error } = await supabase
         .from('orders')
         .update(updateData)
@@ -108,24 +139,37 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
         description: "訂單已成功更新",
       });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-items', order.id] });
+      queryClient.invalidateQueries({ queryKey: ['order-related-data', order.id] });
+      queryClient.invalidateQueries({ queryKey: ['record-audit-logs', order.id] });
       onOrderUpdated();
       onOpenChange(false);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error updating order:', error);
-      toast({
-        title: "錯誤",
-        description: "更新訂單時發生錯誤",
-        variant: "destructive",
-      });
+      setSaveError(error.message || '更新訂單時發生錯誤');
     },
   });
 
   const handleSubmit = () => {
+    if (items.length === 0) {
+      setSaveError('訂單至少需要一項產品');
+      return;
+    }
+    if (items.some((item) => !item.product_id)) {
+      setSaveError('請為每一項選擇產品');
+      return;
+    }
+    if (items.some((item) => !(Number(item.quantity) > 0) || item.unit_price === '' || Number(item.unit_price) < 0)) {
+      setSaveError('請填寫正確的數量與單價');
+      return;
+    }
+    setSaveError(null);
     updateOrderMutation.mutate({
       status,
       payment_status: paymentStatus,
-      shipping_status: shippingStatus,
+      // The item save recalculates shipping status; only override it when the user changed it here
+      ...(shippingStatus !== order.shipping_status ? { shipping_status: shippingStatus } : {}),
       note,
     });
   };
@@ -172,11 +216,8 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const calculateOrderTotal = () => {
-    return order.order_products.reduce((total: number, product: any) => 
-      total + (product.quantity * product.unit_price), 0
-    );
-  };
+  const calculateOrderTotal = () =>
+    items.reduce((total, item) => total + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -260,25 +301,12 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           {/* Product Details */}
           <div className="space-y-2">
             <Label className="text-gray-800">訂單產品</Label>
-            <div className="space-y-2">
-              {order.order_products.map((product: any, index: number) => (
-                <div key={index} className="bg-gray-50 p-3 rounded border">
-                  <div className="text-sm text-gray-900">
-                    <strong>{product.products_new.name}</strong>
-                    {product.products_new.color && ` (${product.products_new.color})`}
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    數量: {product.quantity}kg | 單價: ${product.unit_price} | 
-                    小計: ${(product.quantity * product.unit_price).toLocaleString()}
-                    {product.shipped_quantity > 0 && (
-                      <span className="ml-2 text-blue-600">
-                        | 已出貨: {product.shipped_quantity}kg
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <OrderItemsEditor
+              items={items}
+              onChange={setItems}
+              products={products}
+              purchasedProductIds={purchasedProductIds}
+            />
           </div>
 
           {/* Status Updates */}
@@ -340,6 +368,14 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             />
           </div>
         </div>
+
+        <RecordAuditHistory recordId={order.id} />
+
+        {saveError && (
+          <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {saveError}
+          </p>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

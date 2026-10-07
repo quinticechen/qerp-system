@@ -313,6 +313,8 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
       queryClient.invalidateQueries({ queryKey: ['inventories'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders-for-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['shelves'] });
+      queryClient.invalidateQueries({ queryKey: ['shelf-products'] });
       onOpenChange(false);
       resetForm();
       onInventoryCreated?.(inventory.id);

@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { PendingInvitationsCard } from '@/components/organization/PendingInvitationsCard';
 
 interface CreateOrganizationForm {
   name: string;
@@ -124,6 +125,9 @@ const CreateOrganization = () => {
             開始使用前，請為您的團隊創建一個組織
           </p>
         </div>
+
+        {/* 收到的組織邀請（沒有邀請時不顯示） */}
+        <PendingInvitationsCard />
 
         {/* 功能介紹 */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

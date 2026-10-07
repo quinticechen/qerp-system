@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { RecordAuditHistory } from '@/components/common/RecordAuditHistory';
 
 interface ViewShippingDialogProps {
   open: boolean;
@@ -123,6 +124,8 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
             </CardContent>
           </Card>
         </div>
+
+        <RecordAuditHistory recordId={shipping.id} />
 
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

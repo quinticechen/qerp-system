@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { StockBadge } from './StockBadge';
+import { ProductRollsDialog, ProductRollsTarget } from './ProductRollsDialog';
 
 interface InventorySummaryItem {
   product_id: string;
@@ -40,6 +41,7 @@ interface InventorySummaryItem {
 export const EnhancedInventorySummary = () => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<ProductRollsTarget | null>(null);
 
   const { data: inventoryData = [], isLoading } = useQuery({
     queryKey: ['inventory-summary-enhanced', organizationId],
@@ -407,7 +409,7 @@ export const EnhancedInventorySummary = () => {
         <CardHeader>
           <CardTitle>產品庫存明細</CardTitle>
           <CardDescription>
-            按產品分類的詳細庫存信息，包含各等級庫存分布
+            按產品分類的詳細庫存信息，包含各等級庫存分布。點擊產品可查看並編輯布卷
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -419,9 +421,18 @@ export const EnhancedInventorySummary = () => {
             onSearch={search}
             searchPlaceholder="搜尋產品名稱、顏色..."
             emptyMessage="暫無庫存數據"
+            onRowClick={(row: InventorySummaryItem) =>
+              setSelectedProduct({ productId: row.product_id, productName: row.product_name, color: row.color })
+            }
           />
         </CardContent>
       </Card>
+
+      <ProductRollsDialog
+        product={selectedProduct}
+        organizationId={organizationId}
+        onOpenChange={(isOpen) => !isOpen && setSelectedProduct(null)}
+      />
     </div>
   );
 };

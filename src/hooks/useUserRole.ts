@@ -1,59 +1,24 @@
+import { useOrganizationPermissions } from './useOrganizationPermissions';
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
-
+// Roles are scoped to the current organization (user_organization_roles), not global.
+// The legacy global `user_roles` table has been dropped.
 export const useUserRole = () => {
-  const { user } = useAuth();
-  const [roles, setRoles] = useState<string[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { userRoles, isOwner, loading } = useOrganizationPermissions();
 
-  useEffect(() => {
-    const fetchUserRoles = async () => {
-      if (!user) {
-        setRoles([]);
-        setIsAdmin(false);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('is_active', true);
-
-        if (error) {
-          console.error('Error fetching user roles:', error);
-          setRoles([]);
-          setIsAdmin(false);
-        } else {
-          const userRoles = data.map(r => r.role);
-          setRoles(userRoles);
-          setIsAdmin(userRoles.includes('admin'));
-        }
-      } catch (error) {
-        console.error('Error fetching user roles:', error);
-        setRoles([]);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserRoles();
-  }, [user]);
+  const roles = userRoles
+    .filter((userRole) => userRole.role?.is_active)
+    .map((userRole) => userRole.role.name);
 
   const hasRole = (role: string) => roles.includes(role);
-  const hasAnyRole = (roleList: string[]) => roleList.some(role => roles.includes(role));
+  const hasAnyRole = (roleList: string[]) => roleList.some((role) => roles.includes(role));
 
   return {
     roles,
-    isAdmin,
+    isOwner,
+    // The organization owner holds every permission, so treat them as admin too
+    isAdmin: isOwner || roles.includes('admin'),
     loading,
     hasRole,
-    hasAnyRole
+    hasAnyRole,
   };
 };

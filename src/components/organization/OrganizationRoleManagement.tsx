@@ -41,16 +41,7 @@ export const OrganizationRoleManagement = () => {
 
       const { data, error } = await supabase
         .from('organization_roles')
-        .select(`
-          id,
-          name,
-          display_name,
-          description,
-          permissions,
-          is_system_role,
-          is_active,
-          user_organization_roles(count)
-        `)
+        .select('id, name, display_name, description, permissions, is_system_role, is_active')
         .eq('organization_id', currentOrganization.id)
         .eq('is_active', true)
         .order('is_system_role', { ascending: false })
@@ -58,9 +49,41 @@ export const OrganizationRoleManagement = () => {
 
       if (error) throw error;
 
+      // 「使用者數量」必須跟使用者管理頁面（UserList）採用同一套成員定義：
+      // 只算該組織目前啟用中的成員（user_organizations.is_active = true）
+      // 所持有的啟用中角色（user_organization_roles.is_active = true）。
+      // 直接用 user_organization_roles(count) 嵌入查詢會把已停用成員、
+      // 已停用的角色指派也算進去，導致跟使用者管理頁面的人數對不起來。
+      const { data: activeMemberships, error: membershipsError } = await supabase
+        .from('user_organizations')
+        .select('user_id')
+        .eq('organization_id', currentOrganization.id)
+        .eq('is_active', true);
+
+      if (membershipsError) throw membershipsError;
+
+      const activeUserIds = activeMemberships?.map(m => m.user_id) || [];
+
+      let roleCounts: Record<string, number> = {};
+      if (activeUserIds.length > 0) {
+        const { data: activeRoleAssignments, error: roleAssignmentsError } = await supabase
+          .from('user_organization_roles')
+          .select('role_id')
+          .eq('organization_id', currentOrganization.id)
+          .eq('is_active', true)
+          .in('user_id', activeUserIds);
+
+        if (roleAssignmentsError) throw roleAssignmentsError;
+
+        roleCounts = (activeRoleAssignments || []).reduce((acc, { role_id }) => {
+          acc[role_id] = (acc[role_id] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+      }
+
       return data.map(role => ({
         ...role,
-        user_count: role.user_organization_roles?.[0]?.count || 0
+        user_count: roleCounts[role.id] || 0
       }));
     },
     enabled: !!currentOrganization,

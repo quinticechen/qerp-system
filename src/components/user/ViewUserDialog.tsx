@@ -64,9 +64,15 @@ export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDia
               <div>
                 <label className="text-sm font-medium text-gray-500">狀態</label>
                 {user?.is_pending ? (
-                  <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
-                    邀請待接受
-                  </Badge>
+                  user?.is_expired ? (
+                    <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                      已過期
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
+                      邀請中
+                    </Badge>
+                  )
                 ) : (
                   <Badge variant="outline" className={user?.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
                     {user?.is_active ? '啟用' : '停用'}

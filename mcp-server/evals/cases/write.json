@@ -1,0 +1,43 @@
+[
+  {
+    "id": "w-create-order",
+    "name": "為既有客戶建立訂單",
+    "note": "P0-5 導入草稿確認後，預期改為建立草稿而非直接寫入 orders",
+    "message": "幫 Client name test0922 建立一張新訂單",
+    "expect": {
+      "tools_include": ["list_customers", "create_order"],
+      "tool_args": [{ "tool": "create_order", "args": { "customer_id": "c0000000-0000-4000-8000-000000000003" } }],
+      "writes": { "orders": 1 }
+    }
+  },
+  {
+    "id": "w-order-unknown-customer",
+    "name": "找不到客戶時詢問是否新增，不可直接建單",
+    "message": "幫王大明布行建立一張訂單",
+    "expect": {
+      "tools_include": ["list_customers"],
+      "no_writes": true,
+      "reply_matches": ["找不到|查無|沒有.*客戶|新增"]
+    }
+  },
+  {
+    "id": "w-create-po",
+    "name": "建立採購單（工廠＋產品＋數量＋單價）",
+    "note": "P0-5 導入草稿確認後，預期改為建立草稿",
+    "message": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元",
+    "expect": {
+      "tools_include": ["list_factories", "list_products", "create_purchase_order"],
+      "writes": { "purchase_orders": 1, "purchase_order_items": 1 }
+    }
+  },
+  {
+    "id": "w-cross-domain-order",
+    "name": "跨領域建單：客戶＋工廠＋產品（2026-10-07 事故原句）",
+    "known_gap": "create_order 無法帶入品項與工廠，需 Phase 1 訂單主流程的 tools",
+    "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922",
+    "expect": {
+      "tools_include": ["list_customers", "list_factories", "list_products"],
+      "writes": { "orders": 1 }
+    }
+  }
+]

@@ -14,7 +14,7 @@ interface InventoryListProps {
 }
 
 export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryId, onInventorySelected }) => {
-  const [selectedInventory, setSelectedInventory] = useState<any | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
@@ -84,8 +84,11 @@ export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryI
     return qualityMap[quality as keyof typeof qualityMap] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
+  // Derive from the query data so the dialog reflects saved edits after refetch
+  const selectedInventory = inventories?.find(inv => inv.id === selectedId) ?? null;
+
   const handleView = (inventory: any) => {
-    setSelectedInventory(inventory);
+    setSelectedId(inventory.id);
     setViewDialogOpen(true);
     onInventorySelected?.(inventory.id);
   };
@@ -223,7 +226,11 @@ export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryI
       {selectedInventory && (
         <ViewInventoryDialog
           open={viewDialogOpen}
-          onOpenChange={setViewDialogOpen}
+          onOpenChange={(isOpen) => {
+            setViewDialogOpen(isOpen);
+            // Clear the auto-open selection so a refetch after editing doesn't reopen the dialog
+            if (!isOpen) onInventorySelected?.(null);
+          }}
           inventory={selectedInventory}
         />
       )}
