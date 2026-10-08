@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, KeyboardEvent, type ReactNode } from 'react';
-import { X, Send, Trash2, Loader2, ChevronDown, Pin, Plus, Trash } from 'lucide-react';
+import { X, Send, Trash2, Loader2, ChevronDown, ChevronLeft, Pin, Plus, Trash } from 'lucide-react';
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ActionCard } from './ActionCard';
@@ -9,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface QueryChatProps {
   onClose: () => void;
+  /** Mobile full-screen page: a back arrow replaces the close button. */
+  fullScreen?: boolean;
 }
 
 const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 🐟
@@ -21,7 +23,7 @@ const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 �
 
 有什麼需要幫忙的嗎？`;
 
-export function QueryChat({ onClose }: QueryChatProps) {
+export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
   const {
     sessions,
     activeSessionId,
@@ -53,10 +55,10 @@ export function QueryChat({ onClose }: QueryChatProps) {
     inputRef.current?.focus();
   }, [inputKey]);
 
-  // Initial focus
+  // Initial focus — not on mobile, where it would pop the keyboard over the conversation
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (!fullScreen) inputRef.current?.focus();
+  }, [fullScreen]);
 
   const handleSend = () => {
     const text = inputRef.current?.value?.trim() ?? '';
@@ -76,7 +78,17 @@ export function QueryChat({ onClose }: QueryChatProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 rounded-t-2xl shrink-0">
+      <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0 ${fullScreen ? 'pl-2' : 'rounded-t-2xl'}`}>
+        {fullScreen && (
+          <button
+            onClick={onClose}
+            aria-label="返回 ERP"
+            title="返回 ERP"
+            className="p-1.5 rounded-lg text-white hover:bg-white/10 transition-colors shrink-0"
+          >
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
           <PopoverTrigger asChild>
             <button
@@ -119,17 +131,19 @@ export function QueryChat({ onClose }: QueryChatProps) {
           >
             <Trash2 size={15} />
           </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X size={15} />
-          </button>
+          {!fullScreen && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-gray-50/80">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 bg-gray-50/80">
         {/* Welcome bubble */}
         <AssistantBubble>
           <MarkdownMessage content={WELCOME_MESSAGE} />
@@ -170,7 +184,7 @@ export function QueryChat({ onClose }: QueryChatProps) {
       )}
 
       {/* Input */}
-      <div className="px-3 py-3 bg-white border-t border-gray-100 rounded-b-2xl shrink-0">
+      <div className={`px-3 py-3 bg-white border-t border-gray-100 shrink-0 ${fullScreen ? '' : 'rounded-b-2xl'}`}>
         <div className="flex items-end gap-2 bg-gray-100 rounded-xl px-3 py-2">
           <textarea
             key={inputKey}
