@@ -84,21 +84,28 @@ describe("EditPurchaseDialog product editing", () => {
 
     await user.click(screen.getByRole("button", { name: "更新" }));
 
+    // One update_purchase_order call carries the items together with the dates and note; unchanged status is left out
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
         {
-          fn: "save_purchase_order_items",
+          fn: "update_purchase_order",
           args: {
+            p_organization_id: "org-1",
             p_purchase_order_id: "po-1",
-            p_items: [
-              { id: "poi-1", product_id: "p-1", ordered_quantity: 150, ordered_rolls: 6, unit_price: 5, specifications: { width: 60 } },
-              { product_id: "p-3", ordered_quantity: 40, ordered_rolls: 2, unit_price: 7, specifications: null },
-            ],
+            p_changes: {
+              items: [
+                { id: "poi-1", product_id: "p-1", ordered_quantity: 150, ordered_rolls: 6, unit_price: 5, specifications: { width: 60 } },
+                { product_id: "p-3", ordered_quantity: 40, ordered_rolls: 2, unit_price: 7, specifications: null },
+              ],
+              expected_arrival_date: "2026-10-20",
+              note: "",
+            },
+            p_dry_run: false,
           },
         },
       ]),
     );
-    await waitFor(() => expect(fake.current!.updates.some((u) => u.table === "purchase_orders")).toBe(true));
+    expect(fake.current!.updates.some((u) => u.table === "purchase_orders")).toBe(false);
   });
 
   it("locks the product and removal of an item that has been received", async () => {
@@ -108,5 +115,20 @@ describe("EditPurchaseDialog product editing", () => {
     expect(within(row).getByText("已入庫 100 公斤")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "刪除第 1 項" })).toBeDisabled();
     expect(within(row).getByLabelText("第 1 項產品")).toBeDisabled();
+  });
+
+  it("shows a cancelled purchase order read-only, without save or cancel buttons", async () => {
+    fake.current = createFakeSupabase(seedTables());
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditPurchaseDialog purchase={{ ...purchase, status: "cancelled", cancel_reason: "工廠缺料" }} open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("此採購單已取消，原因：工廠缺料，不能再修改。")).toBeInTheDocument();
+    expect(await screen.findByLabelText("第 1 項採購數量（公斤）")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "更新" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "取消採購單" })).not.toBeInTheDocument();
   });
 });

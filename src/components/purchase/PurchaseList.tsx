@@ -71,9 +71,9 @@ export const PurchaseList = () => {
 
   const getStatusText = (status: string) => {
     const textMap = {
-      'pending': '待處理',
-      'confirmed': '已確認',
-      'partial_received': '部分收貨',
+      'pending': '待確認',
+      'confirmed': '已下單',
+      'partial_received': '部分入庫',
       'completed': '已完成',
       'cancelled': '已取消'
     };
@@ -101,9 +101,9 @@ export const PurchaseList = () => {
       sortable: true,
       filterable: true,
       filterOptions: [
-        { value: 'pending', label: '待處理' },
-        { value: 'confirmed', label: '已確認' },
-        { value: 'partial_received', label: '部分收貨' },
+        { value: 'pending', label: '待確認' },
+        { value: 'confirmed', label: '已下單' },
+        { value: 'partial_received', label: '部分入庫' },
         { value: 'completed', label: '已完成' },
         { value: 'cancelled', label: '已取消' }
       ],
@@ -195,7 +195,7 @@ export const PurchaseList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             purchase={selectedPurchase}
-            onEdit={canEdit ? () => {
+            onEdit={canEdit && selectedPurchase.status !== 'cancelled' ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
             } : undefined}

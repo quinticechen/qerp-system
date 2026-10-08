@@ -2,187 +2,188 @@
 -- 結果為 "ALL TESTS PASSED" 代表通過；"FAIL: ..." 或其他錯誤代表未通過。
 -- 最後一定會丟出例外，整批 SQL 會回滾，不會留下任何變更。
 
--- ===== migration: 20261008185816_api_a6_products.sql
--- 業務 API A6 產品（docs/BUSINESS_API.md §7，決策 B5、B7）
+-- ===== migration: 20261008193554_api_a3_purchase_orders.sql
+-- 業務 API A3 採購單（docs/BUSINESS_API.md §3、§5）
 --
--- 1. 產品改為兩層：產品（母，product_groups：名稱、類別、單位、啟用）＋顏色（子，既有的 products_new：
---    顏色、色號、色值、安全庫存、狀態）。單據與庫存原本就指向顏色那一列，關聯不變。
--- 2. 產品名稱組織內唯一；同一產品下「顏色＋色號」唯一（取代全域的 UNIQUE (name, color, color_code)，B5）。
--- 3. 顏色列保留 name／category／unit_of_measure，一律由母表同步；尚未改用 API 的寫入會自動歸到同名產品。
--- 4. 唯讀 view product_catalog：產品、顏色、每個顏色的庫存與是否低於安全庫存。
--- 5. API：create_product、update_product、set_product_active、add_product_color、update_product_color、
---    set_product_color_active；停用的產品不能再下新訂單。
--- 6. save_order_items 補回固定 search_path（A2 重新定義時遺漏）。
+-- 1. save_purchase_order_items 的錯誤改為 SQLSTATE＋HINT 代碼（訊息與鎖定規則不變）；已取消的採購單不能修改品項；
+--    同一次新增的品項依傳入順序排列
+-- 2. 採購單新增 cancelled_at、cancel_reason
+-- 3. create_purchase_order、update_purchase_order、cancel_purchase_order：
+--    - 編號 P＋YYYYMMDD＋四位流水號（B8）
+--    - 關聯訂單：建立或新增關聯時，「待確認」「已確認」的訂單改為「已向工廠下單」；
+--      取消採購單或移除關聯後，若訂單已沒有其他進行中的採購單，「已向工廠下單」改回「已確認」
+--    - 已有入庫紀錄的採購單不能取消，也不能更換工廠
 
-ALTER FUNCTION public.save_order_items(uuid, jsonb) SET search_path TO 'public';
+-- ===== 1. save_purchase_order_items：錯誤代碼
 
--- ===== 1. 產品（母）
-
-CREATE TABLE public.product_groups (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid NOT NULL REFERENCES public.organizations(id),
-  name text NOT NULL,
-  category text NOT NULL DEFAULT '布料',
-  unit_of_measure text NOT NULL DEFAULT 'KG',
-  is_active boolean NOT NULL DEFAULT true,
-  created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE UNIQUE INDEX product_groups_organization_name_key ON public.product_groups (organization_id, lower(name));
-
-ALTER TABLE public.product_groups ENABLE ROW LEVEL SECURITY;
-
--- Products are written only through the APIs; members who may view products can read them
-CREATE POLICY "Members with canViewProducts can view products" ON public.product_groups
-  FOR SELECT TO authenticated
-  USING (public.user_has_organization_permission(auth.uid(), organization_id, 'canViewProducts'));
-
-REVOKE ALL ON public.product_groups FROM anon, authenticated;
-GRANT SELECT ON public.product_groups TO authenticated;
-
-CREATE TRIGGER update_product_groups_updated_at
-  BEFORE UPDATE ON public.product_groups
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
-
-CREATE TRIGGER audit_record_changes
-  AFTER INSERT OR UPDATE OR DELETE ON public.product_groups
-  FOR EACH ROW EXECUTE FUNCTION public.log_record_change();
-
--- Existing products: one product per organization and name, keeping the earliest row's spelling, category and unit
-INSERT INTO public.product_groups (organization_id, name, category, unit_of_measure, created_by, created_at)
-SELECT DISTINCT ON (organization_id, lower(btrim(name)))
-       organization_id, btrim(name), category, unit_of_measure, user_id, created_at
-FROM public.products_new
-ORDER BY organization_id, lower(btrim(name)), created_at, id;
-
--- ===== 2. 顏色（子）
-
-ALTER TABLE public.products_new ADD COLUMN group_id uuid REFERENCES public.product_groups(id);
-ALTER TABLE public.products_new ADD COLUMN color_hex text CHECK (color_hex ~ '^#[0-9A-Fa-f]{6}$');
-
--- Filing existing colors under their product is not an edit of the color: keep it out of the colors' history
-ALTER TABLE public.products_new DISABLE TRIGGER audit_record_changes;
-UPDATE public.products_new p
-SET group_id = g.id
-FROM public.product_groups g
-WHERE g.organization_id = p.organization_id AND lower(g.name) = lower(btrim(p.name));
-ALTER TABLE public.products_new ENABLE TRIGGER audit_record_changes;
-
-ALTER TABLE public.products_new ALTER COLUMN group_id SET NOT NULL;
-
--- Each layer has its own history: a product's name, category or unit copied onto its colors (by the trigger
--- below) is recorded once, on the product, not again on every color
-DROP TRIGGER audit_record_changes ON public.products_new;
-CREATE TRIGGER audit_record_changes
-  AFTER INSERT OR UPDATE OR DELETE ON public.products_new
-  FOR EACH ROW WHEN (pg_trigger_depth() = 0) EXECUTE FUNCTION public.log_record_change();
-
-ALTER TABLE public.products_new DROP CONSTRAINT products_new_name_color_color_code_key;
-CREATE UNIQUE INDEX products_new_group_color_key
-  ON public.products_new (group_id, lower(btrim(coalesce(color, ''))), lower(btrim(coalesce(color_code, ''))));
-
--- A color always carries its product's name, category and unit. Writers that predate products (pages and
--- tools not yet using the APIs) give only a name: the color is filed under that product, created if needed.
-CREATE FUNCTION public.sync_product_color_with_group()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_group public.product_groups%ROWTYPE;
-BEGIN
-  IF NEW.group_id IS NULL THEN
-    SELECT * INTO v_group FROM public.product_groups
-    WHERE organization_id = NEW.organization_id AND lower(name) = lower(btrim(NEW.name));
-    IF NOT FOUND THEN
-      INSERT INTO public.product_groups (organization_id, name, category, unit_of_measure, created_by)
-      VALUES (NEW.organization_id, btrim(NEW.name), coalesce(NEW.category, '布料'), coalesce(NEW.unit_of_measure, 'KG'), NEW.user_id)
-      RETURNING * INTO v_group;
-    END IF;
-    NEW.group_id := v_group.id;
-  ELSE
-    SELECT * INTO v_group FROM public.product_groups WHERE id = NEW.group_id;
-    IF v_group.organization_id IS DISTINCT FROM NEW.organization_id THEN
-      RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
-    END IF;
-  END IF;
-
-  NEW.name := v_group.name;
-  NEW.category := v_group.category;
-  NEW.unit_of_measure := v_group.unit_of_measure;
-  RETURN NEW;
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.sync_product_color_with_group() FROM PUBLIC, anon, authenticated;
-
-CREATE TRIGGER sync_product_color_with_group
-  BEFORE INSERT OR UPDATE ON public.products_new
-  FOR EACH ROW EXECUTE FUNCTION public.sync_product_color_with_group();
-
--- Renaming a product, or changing its category or unit, updates every color of it
-CREATE FUNCTION public.sync_product_group_to_colors()
-RETURNS trigger
+CREATE OR REPLACE FUNCTION public.save_purchase_order_items(p_purchase_order_id uuid, p_items jsonb)
+RETURNS void
 LANGUAGE plpgsql
 SET search_path TO 'public'
 AS $function$
+declare
+  v_org uuid;
+  v_status purchase_order_status;
+  v_number text;
+  v_item record;
+  v_existing purchase_order_items;
+  v_name text;
+begin
+  select organization_id, status, po_number into v_org, v_status, v_number
+  from purchase_orders where id = p_purchase_order_id for update;
+  if not found then
+    raise exception '找不到採購單，或沒有編輯權限' using errcode = 'P0002', hint = 'purchase_order_not_found';
+  end if;
+  if v_status = 'cancelled' then
+    raise exception '採購單 % 已取消，不能修改', v_number using errcode = '55000', hint = 'purchase_order_cancelled';
+  end if;
+  if jsonb_typeof(coalesce(p_items, '[]')) <> 'array' or jsonb_array_length(coalesce(p_items, '[]')) = 0 then
+    raise exception '採購單至少需要一項產品' using errcode = '22023', hint = 'items_required';
+  end if;
+
+  for v_item in
+    select * from jsonb_to_recordset(p_items)
+      as x(id uuid, product_id uuid, ordered_quantity numeric, ordered_rolls int, unit_price numeric, specifications jsonb)
+  loop
+    if v_item.product_id is null
+      or not exists (select 1 from products_new where id = v_item.product_id and organization_id = v_org) then
+      raise exception '請選擇此組織的產品' using errcode = 'P0002', hint = 'product_not_found';
+    end if;
+    if coalesce(v_item.ordered_quantity, 0) <= 0 then
+      raise exception '採購數量必須大於 0' using errcode = '22023', hint = 'invalid_quantity';
+    end if;
+    if coalesce(v_item.unit_price, 0) < 0 then
+      raise exception '單價不可為負數' using errcode = '22023', hint = 'invalid_unit_price';
+    end if;
+  end loop;
+
+  for v_existing in
+    select * from purchase_order_items poi
+    where poi.purchase_order_id = p_purchase_order_id
+      and poi.id not in (
+        select x.id from jsonb_to_recordset(p_items) as x(id uuid) where x.id is not null
+      )
+  loop
+    if coalesce(v_existing.received_quantity, 0) > 0 then
+      select name into v_name from products_new where id = v_existing.product_id;
+      raise exception '產品「%」已入庫，不可刪除', v_name using errcode = '55000', hint = 'item_received';
+    end if;
+    delete from purchase_order_items where id = v_existing.id;
+  end loop;
+
+  for v_item in
+    select * from jsonb_to_recordset(p_items)
+      as x(id uuid, product_id uuid, ordered_quantity numeric, ordered_rolls int, unit_price numeric, specifications jsonb)
+  loop
+    if v_item.id is null then
+      -- clock_timestamp() rather than now(): items added in one call keep the order they were given in
+      insert into purchase_order_items (purchase_order_id, product_id, ordered_quantity, ordered_rolls, unit_price, specifications, created_at)
+      values (p_purchase_order_id, v_item.product_id, v_item.ordered_quantity, v_item.ordered_rolls, v_item.unit_price, v_item.specifications, clock_timestamp());
+      continue;
+    end if;
+
+    select * into v_existing from purchase_order_items where id = v_item.id and purchase_order_id = p_purchase_order_id;
+    if not found then
+      raise exception '採購項目不屬於此採購單' using errcode = 'P0002', hint = 'item_not_found';
+    end if;
+    select name into v_name from products_new where id = v_existing.product_id;
+
+    if v_item.product_id <> v_existing.product_id and coalesce(v_existing.received_quantity, 0) > 0 then
+      raise exception '產品「%」已入庫，不可更換產品', v_name using errcode = '55000', hint = 'item_received';
+    end if;
+    if v_item.ordered_quantity < coalesce(v_existing.received_quantity, 0) then
+      raise exception '產品「%」的採購數量不可低於已入庫 % 公斤', v_name, v_existing.received_quantity
+        using errcode = '55000', hint = 'quantity_below_received';
+    end if;
+
+    update purchase_order_items
+    set product_id = v_item.product_id,
+        ordered_quantity = v_item.ordered_quantity,
+        ordered_rolls = v_item.ordered_rolls,
+        unit_price = v_item.unit_price,
+        specifications = v_item.specifications
+    where id = v_item.id;
+  end loop;
+
+  perform recompute_purchase_order_receipts(p_purchase_order_id);
+end;
+$function$;
+
+-- ===== 2. 取消紀錄
+
+ALTER TABLE public.purchase_orders ADD COLUMN cancelled_at timestamptz;
+ALTER TABLE public.purchase_orders ADD COLUMN cancel_reason text;
+
+-- ===== 3. 輔助函式
+
+-- Display labels for purchase order statuses
+CREATE FUNCTION public.api_purchase_status_label(p_status text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path TO 'public'
+AS $function$
+  SELECT CASE p_status
+    WHEN 'pending' THEN '待確認' WHEN 'confirmed' THEN '已下單' WHEN 'partial_arrived' THEN '部分到貨'
+    WHEN 'partial_received' THEN '部分入庫' WHEN 'completed' THEN '已完成' WHEN 'cancelled' THEN '已取消'
+    ELSE p_status END;
+$function$;
+
+-- A date given as text ('' or null clears it); raises on anything that is not a date
+CREATE FUNCTION public.api_date(p_value text)
+RETURNS date
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path TO 'public'
+AS $function$
 BEGIN
-  IF NEW.name IS DISTINCT FROM OLD.name OR NEW.category IS DISTINCT FROM OLD.category
-     OR NEW.unit_of_measure IS DISTINCT FROM OLD.unit_of_measure THEN
-    UPDATE public.products_new
-    SET name = NEW.name, category = NEW.category, unit_of_measure = NEW.unit_of_measure
-    WHERE group_id = NEW.id;
+  IF public.api_clean(p_value) IS NULL THEN
+    RETURN NULL;
   END IF;
-  RETURN NULL;
+  RETURN public.api_clean(p_value)::date;
+EXCEPTION WHEN invalid_datetime_format OR datetime_field_overflow THEN
+  RAISE EXCEPTION '日期格式不正確：%', p_value USING ERRCODE = '22023', HINT = 'invalid_date';
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.sync_product_group_to_colors() FROM PUBLIC, anon, authenticated;
+-- Numbers of the orders linked to a purchase order, in number order
+CREATE FUNCTION public.api_purchase_order_numbers(p_purchase_order_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $function$
+  SELECT string_agg(o.order_number, '、' ORDER BY o.order_number)
+  FROM public.purchase_order_relations r JOIN public.orders o ON o.id = r.order_id
+  WHERE r.purchase_order_id = p_purchase_order_id;
+$function$;
 
-CREATE TRIGGER sync_product_group_to_colors
-  AFTER UPDATE ON public.product_groups
-  FOR EACH ROW EXECUTE FUNCTION public.sync_product_group_to_colors();
+-- Card fields describing a whole purchase order: factory, linked orders, each item, dates, note and total
+CREATE FUNCTION public.api_purchase_order_fields(p_purchase_order_id uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $function$
+  SELECT public.api_fields('工廠', f.name, '關聯訂單', public.api_purchase_order_numbers(po.id))
+    || coalesce((
+         SELECT jsonb_agg(jsonb_build_object('label', '品項 ' || rn, 'value', public.api_order_line_label(product_id, ordered_quantity, unit_price)) ORDER BY rn)
+         FROM (SELECT poi.*, row_number() OVER (ORDER BY poi.created_at, poi.id) AS rn
+               FROM public.purchase_order_items poi WHERE poi.purchase_order_id = po.id) items
+       ), '[]'::jsonb)
+    || public.api_fields(
+         '下單日期', po.order_date::text,
+         '預計到貨日期', po.expected_arrival_date::text,
+         '備註', po.note,
+         '採購總額', (SELECT public.api_number(sum(ordered_quantity * unit_price)) FROM public.purchase_order_items WHERE purchase_order_id = po.id)
+       )
+  FROM public.purchase_orders po JOIN public.factories f ON f.id = po.factory_id
+  WHERE po.id = p_purchase_order_id;
+$function$;
 
--- ===== 3. 產品目錄（前端與 AI 共用的唯讀 view）
-
-CREATE VIEW public.product_catalog WITH (security_invoker = true) AS
-SELECT
-  g.organization_id,
-  g.id AS product_id,
-  g.name AS product_name,
-  g.category,
-  g.unit_of_measure,
-  g.is_active AS product_is_active,
-  p.id AS color_id,
-  p.color,
-  p.color_code,
-  p.color_hex,
-  p.stock_thresholds AS stock_threshold,
-  p.status = 'Available' AS color_is_active,
-  coalesce(stock.quantity, 0) AS stock_quantity,
-  coalesce(stock.rolls, 0) AS stock_rolls,
-  p.stock_thresholds IS NOT NULL AND coalesce(stock.quantity, 0) < p.stock_thresholds AS is_low_stock,
-  g.created_by AS product_created_by,
-  g.created_at AS product_created_at,
-  p.user_id AS color_created_by,
-  p.created_at AS color_created_at
-FROM public.product_groups g
-JOIN public.products_new p ON p.group_id = g.id
-LEFT JOIN LATERAL (
-  SELECT sum(ir.current_quantity) AS quantity, count(*) FILTER (WHERE ir.current_quantity > 0)::int AS rolls
-  FROM public.inventory_rolls ir
-  WHERE ir.product_id = p.id
-) stock ON true;
-
-REVOKE ALL ON public.product_catalog FROM anon, authenticated;
-GRANT SELECT ON public.product_catalog TO authenticated;
-
--- ===== 4. 停用的產品不能再下新訂單（A2 的檢查加上母層狀態）
-
-CREATE OR REPLACE FUNCTION public.api_check_order_products(p_organization_id uuid, p_order_id uuid, p_items jsonb)
+-- Raise unless every product of the given items belongs to the organization and is available.
+-- Items that keep an existing product (same id and product as before) may keep a product that was disabled since.
+CREATE FUNCTION public.api_check_purchase_products(p_organization_id uuid, p_purchase_order_id uuid, p_items jsonb)
 RETURNS void
 LANGUAGE plpgsql
 STABLE
@@ -193,7 +194,7 @@ DECLARE
   v_available boolean;
 BEGIN
   IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
-    RAISE EXCEPTION '訂單至少需要一項產品' USING ERRCODE = '22023', HINT = 'items_required';
+    RAISE EXCEPTION '採購單至少需要一項產品' USING ERRCODE = '22023', HINT = 'items_required';
   END IF;
 
   FOR v_line IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id uuid, product_id uuid) LOOP
@@ -203,10 +204,9 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
     END IF;
-    -- Lines that keep their product may keep one that was disabled since
     IF NOT v_available AND NOT EXISTS (
-      SELECT 1 FROM public.order_products
-      WHERE order_id = p_order_id AND id = v_line.id AND product_id = v_line.product_id
+      SELECT 1 FROM public.purchase_order_items
+      WHERE purchase_order_id = p_purchase_order_id AND id = v_line.id AND product_id = v_line.product_id
     ) THEN
       RAISE EXCEPTION '產品「%」已停用', public.api_product_label(v_line.product_id) USING ERRCODE = '22023', HINT = 'product_unavailable';
     END IF;
@@ -214,77 +214,107 @@ BEGIN
 END;
 $function$;
 
--- ===== 5. 產品 API
-
--- Raise unless a product name is given and not used by another product of the organization
-CREATE FUNCTION public.api_check_product_name(p_organization_id uuid, p_name text, p_except_id uuid)
+-- Raise unless the factory belongs to the organization and is active (the purchase order's current factory may stay)
+CREATE FUNCTION public.api_check_purchase_factory(p_organization_id uuid, p_factory_id uuid, p_current_factory_id uuid)
 RETURNS void
 LANGUAGE plpgsql
 STABLE
 SET search_path TO 'public'
 AS $function$
+DECLARE
+  v_factory public.factories%ROWTYPE;
 BEGIN
-  IF p_name IS NULL THEN
-    RAISE EXCEPTION '請輸入產品名稱' USING ERRCODE = '22023', HINT = 'name_required';
+  SELECT * INTO v_factory FROM public.factories WHERE id = p_factory_id AND organization_id = p_organization_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '找不到此工廠' USING ERRCODE = 'P0002', HINT = 'factory_not_found';
   END IF;
-  IF EXISTS (
-    SELECT 1 FROM public.product_groups
-    WHERE organization_id = p_organization_id AND lower(name) = lower(p_name) AND id IS DISTINCT FROM p_except_id
-  ) THEN
-    RAISE EXCEPTION '已有同名的產品「%」，請在該產品下新增顏色', p_name USING ERRCODE = '23505', HINT = 'product_name_taken';
+  IF NOT v_factory.is_active AND p_factory_id IS DISTINCT FROM p_current_factory_id THEN
+    RAISE EXCEPTION '工廠「%」已停用', v_factory.name USING ERRCODE = '22023', HINT = 'factory_inactive';
   END IF;
 END;
 $function$;
 
--- Raise unless a color is valid and not already on the product (p_except_id: the color being edited)
-CREATE FUNCTION public.api_check_product_color(
-  p_group_id uuid, p_color text, p_color_code text, p_color_hex text, p_stock_threshold numeric, p_except_id uuid
-)
+-- Raise unless every order belongs to the organization; newly linked ones must not be cancelled
+CREATE FUNCTION public.api_check_purchase_orders(p_organization_id uuid, p_purchase_order_id uuid, p_order_ids uuid[])
 RETURNS void
 LANGUAGE plpgsql
 STABLE
 SET search_path TO 'public'
 AS $function$
+DECLARE
+  v_order record;
 BEGIN
-  IF p_color IS NULL THEN
-    RAISE EXCEPTION '請輸入顏色' USING ERRCODE = '22023', HINT = 'color_required';
-  END IF;
-  IF p_color_hex IS NOT NULL AND p_color_hex !~ '^#[0-9A-Fa-f]{6}$' THEN
-    RAISE EXCEPTION '色值格式不正確，請使用 #RRGGBB' USING ERRCODE = '22023', HINT = 'invalid_color_hex';
-  END IF;
-  IF p_stock_threshold IS NOT NULL AND p_stock_threshold < 0 THEN
-    RAISE EXCEPTION '安全庫存不可為負數' USING ERRCODE = '22023', HINT = 'invalid_stock_threshold';
-  END IF;
-  IF p_group_id IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.products_new
-    WHERE group_id = p_group_id AND id IS DISTINCT FROM p_except_id
-      AND lower(btrim(coalesce(color, ''))) = lower(p_color)
-      AND lower(btrim(coalesce(color_code, ''))) = lower(coalesce(p_color_code, ''))
-  ) THEN
-    RAISE EXCEPTION '此產品已有顏色「%」', p_color || coalesce('（色號 ' || p_color_code || '）', '')
-      USING ERRCODE = '23505', HINT = 'product_color_taken';
-  END IF;
+  FOR v_order IN
+    SELECT ids.id, o.order_number, o.status, o.organization_id
+    FROM unnest(coalesce(p_order_ids, '{}')) AS ids(id) LEFT JOIN public.orders o ON o.id = ids.id
+  LOOP
+    IF v_order.organization_id IS DISTINCT FROM p_organization_id THEN
+      RAISE EXCEPTION '找不到此訂單' USING ERRCODE = 'P0002', HINT = 'order_not_found';
+    END IF;
+    IF v_order.status = 'cancelled' AND NOT EXISTS (
+      SELECT 1 FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = v_order.id
+    ) THEN
+      RAISE EXCEPTION '訂單 % 已取消', v_order.order_number USING ERRCODE = '55000', HINT = 'order_cancelled';
+    END IF;
+  END LOOP;
 END;
 $function$;
 
--- 「顏色（色號 X），安全庫存 N 公斤」 for a color
-CREATE FUNCTION public.api_color_label(p_color text, p_color_code text, p_stock_threshold numeric)
-RETURNS text
+-- Orders marked 已向工廠下單 that no longer have a live purchase order go back to 已確認
+CREATE FUNCTION public.api_release_orders(p_order_ids uuid[])
+RETURNS void
 LANGUAGE sql
-IMMUTABLE
 SET search_path TO 'public'
 AS $function$
-  SELECT p_color || coalesce('（色號 ' || p_color_code || '）', '')
-    || coalesce('，安全庫存 ' || public.api_number(p_stock_threshold) || ' 公斤', '');
+  UPDATE public.orders o
+  SET status = 'confirmed'
+  WHERE o.id = ANY (coalesce(p_order_ids, '{}'))
+    AND o.status = 'factory_ordered'
+    AND NOT EXISTS (
+      SELECT 1 FROM public.purchase_orders po
+      WHERE po.status <> 'cancelled'
+        AND (po.order_id = o.id
+             OR EXISTS (SELECT 1 FROM public.purchase_order_relations r WHERE r.purchase_order_id = po.id AND r.order_id = o.id))
+    );
 $function$;
 
--- p_colors: [{ color, color_code?, color_hex?, stock_threshold? }]
-CREATE FUNCTION public.create_product(
+-- Link a purchase order to exactly these orders: newly linked open orders become 已向工廠下單,
+-- unlinked ones are released
+CREATE FUNCTION public.api_link_purchase_orders(p_purchase_order_id uuid, p_order_ids uuid[])
+RETURNS void
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_removed uuid[];
+BEGIN
+  SELECT coalesce(array_agg(order_id), '{}') INTO v_removed
+  FROM public.purchase_order_relations
+  WHERE purchase_order_id = p_purchase_order_id AND order_id <> ALL (coalesce(p_order_ids, '{}'));
+
+  DELETE FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = ANY (v_removed);
+  INSERT INTO public.purchase_order_relations (purchase_order_id, order_id)
+  SELECT p_purchase_order_id, o FROM (SELECT DISTINCT unnest(coalesce(p_order_ids, '{}')) AS o) ids
+  WHERE NOT EXISTS (SELECT 1 FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = ids.o);
+
+  UPDATE public.orders SET status = 'factory_ordered'
+  WHERE id = ANY (coalesce(p_order_ids, '{}')) AND status IN ('pending', 'confirmed');
+
+  PERFORM public.api_release_orders(v_removed);
+END;
+$function$;
+
+-- ===== 4. 採購單 API
+
+-- p_items: [{ product_id, ordered_quantity, unit_price, ordered_rolls?, specifications? }]
+CREATE FUNCTION public.create_purchase_order(
   p_organization_id uuid,
-  p_name text,
-  p_colors jsonb,
-  p_category text DEFAULT '布料',
-  p_unit_of_measure text DEFAULT 'KG',
+  p_factory_id uuid,
+  p_items jsonb,
+  p_order_ids uuid[] DEFAULT '{}',
+  p_expected_arrival_date date DEFAULT NULL,
+  p_note text DEFAULT NULL,
+  p_order_date date DEFAULT NULL,
   p_dry_run boolean DEFAULT false
 )
 RETURNS jsonb
@@ -293,55 +323,46 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_name text := public.api_clean(p_name);
-  v_category text := coalesce(public.api_clean(p_category), '布料');
-  v_unit text := coalesce(public.api_clean(p_unit_of_measure), 'KG');
-  v_color record;
-  v_group_id uuid;
+  v_order_date date := coalesce(p_order_date, (now() AT TIME ZONE 'Asia/Taipei')::date);
+  v_id uuid;
+  v_number text;
   v_fields jsonb;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canCreateProducts');
-  PERFORM public.api_check_product_name(p_organization_id, v_name, NULL);
-  IF p_colors IS NULL OR jsonb_typeof(p_colors) <> 'array' OR jsonb_array_length(p_colors) = 0 THEN
-    RAISE EXCEPTION '產品至少需要一個顏色' USING ERRCODE = '22023', HINT = 'colors_required';
+  PERFORM public.api_require_permission(p_organization_id, 'canCreatePurchases');
+  PERFORM public.api_check_purchase_factory(p_organization_id, p_factory_id, NULL);
+  PERFORM public.api_check_purchase_products(p_organization_id, NULL, p_items);
+  PERFORM public.api_check_purchase_orders(p_organization_id, NULL, p_order_ids);
+  IF p_expected_arrival_date < v_order_date THEN
+    RAISE EXCEPTION '預計到貨日期不可早於下單日期' USING ERRCODE = '22023', HINT = 'invalid_expected_arrival_date';
   END IF;
 
   -- Write for real; a dry run rolls this block back after collecting the summary
   BEGIN
-    INSERT INTO public.product_groups (organization_id, name, category, unit_of_measure, created_by)
-    VALUES (p_organization_id, v_name, v_category, v_unit, auth.uid())
-    RETURNING id INTO v_group_id;
+    v_number := public.api_next_document_number(p_organization_id, 'purchase_order');
+    INSERT INTO public.purchase_orders (po_number, factory_id, organization_id, user_id, order_date, expected_arrival_date, note, status)
+    VALUES (v_number, p_factory_id, p_organization_id, auth.uid(), v_order_date, p_expected_arrival_date, public.api_clean(p_note), 'confirmed')
+    RETURNING id INTO v_id;
 
-    FOR v_color IN
-      SELECT public.api_clean(x->>'color') AS color, public.api_clean(x->>'color_code') AS color_code,
-             public.api_clean(x->>'color_hex') AS color_hex, (x->>'stock_threshold')::numeric AS stock_threshold
-      FROM jsonb_array_elements(p_colors) WITH ORDINALITY AS c(x, n) ORDER BY n
-    LOOP
-      PERFORM public.api_check_product_color(v_group_id, v_color.color, v_color.color_code, v_color.color_hex, v_color.stock_threshold, NULL);
-      INSERT INTO public.products_new (group_id, organization_id, name, color, color_code, color_hex, stock_thresholds, status, user_id, created_at)
-      VALUES (v_group_id, p_organization_id, v_name, v_color.color, v_color.color_code, v_color.color_hex, v_color.stock_threshold,
-              'Available', auth.uid(), clock_timestamp());
-    END LOOP;
+    PERFORM public.save_purchase_order_items(v_id, public.api_order_items_payload(p_items, false));
+    PERFORM public.api_link_purchase_orders(v_id, p_order_ids);
 
-    v_fields := public.api_fields('產品名稱', v_name, '類別', v_category, '單位', v_unit)
-      || (SELECT jsonb_agg(jsonb_build_object('label', '顏色 ' || row_number, 'value', label) ORDER BY row_number)
-          FROM (SELECT row_number() OVER (ORDER BY created_at, id), public.api_color_label(color, color_code, stock_thresholds) AS label
-                FROM public.products_new WHERE group_id = v_group_id) colors);
+    v_fields := public.api_purchase_order_fields(v_id);
     IF p_dry_run THEN
       RAISE EXCEPTION USING ERRCODE = 'DRYRN';
     END IF;
   EXCEPTION WHEN SQLSTATE 'DRYRN' THEN
-    RETURN public.api_result(true, NULL, NULL, '建立產品', v_fields);
+    RETURN public.api_result(true, NULL, NULL, '建立採購單', v_fields);
   END;
 
-  RETURN public.api_result(false, v_group_id, NULL, '建立產品', v_fields);
+  RETURN public.api_result(false, v_id, v_number, '建立採購單', v_fields);
 END;
 $function$;
 
--- p_changes may hold name, category, unit_of_measure; the colors follow automatically
-CREATE FUNCTION public.update_product(
+-- p_changes may hold: items (the complete list, as save_purchase_order_items expects), order_ids (the complete list),
+-- factory_id, order_date, expected_arrival_date, note, status (pending / confirmed / partial_received / completed)
+CREATE FUNCTION public.update_purchase_order(
   p_organization_id uuid,
-  p_product_id uuid,
+  p_purchase_order_id uuid,
   p_changes jsonb,
   p_dry_run boolean DEFAULT false
 )
@@ -351,43 +372,130 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_old public.product_groups%ROWTYPE;
-  v_name text;
-  v_category text;
-  v_unit text;
+  v_old public.purchase_orders%ROWTYPE;
+  v_new public.purchase_orders%ROWTYPE;
+  v_old_items jsonb;
+  v_old_orders text;
+  v_old_factory text;
+  v_order_ids uuid[];
+  v_factory_id uuid;
+  v_order_date date;
+  v_arrival date;
   v_fields jsonb;
   v_title text;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditProducts');
-  PERFORM public.api_check_change_keys(p_changes, ARRAY['name', 'category', 'unit_of_measure']);
+  PERFORM public.api_require_permission(p_organization_id, 'canEditPurchases');
+  PERFORM public.api_check_change_keys(p_changes,
+    ARRAY['items', 'order_ids', 'factory_id', 'order_date', 'expected_arrival_date', 'note', 'status']);
 
-  SELECT * INTO v_old FROM public.product_groups WHERE id = p_product_id AND organization_id = p_organization_id FOR UPDATE;
+  SELECT * INTO v_old FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
+    RAISE EXCEPTION '找不到此採購單' USING ERRCODE = 'P0002', HINT = 'purchase_order_not_found';
+  END IF;
+  IF v_old.status = 'cancelled' THEN
+    RAISE EXCEPTION '採購單 % 已取消，不能修改', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_cancelled';
   END IF;
 
-  v_name := public.api_changed(p_changes, 'name', v_old.name);
-  v_category := coalesce(public.api_changed(p_changes, 'category', v_old.category), '布料');
-  v_unit := coalesce(public.api_changed(p_changes, 'unit_of_measure', v_old.unit_of_measure), 'KG');
-  PERFORM public.api_check_product_name(p_organization_id, v_name, p_product_id);
-
-  v_title := format('修改產品「%s」', v_old.name);
-  v_fields := public.api_changed_fields('產品名稱', v_old.name, v_name, '類別', v_old.category, v_category, '單位', v_old.unit_of_measure, v_unit);
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_product_id, NULL, v_title, v_fields);
+  IF p_changes->>'status' = 'cancelled' THEN
+    RAISE EXCEPTION '請使用取消採購單' USING ERRCODE = '22023', HINT = 'use_cancel_purchase_order';
+  END IF;
+  IF p_changes ? 'status' AND coalesce(p_changes->>'status', '') NOT IN ('pending', 'confirmed', 'partial_received', 'completed') THEN
+    RAISE EXCEPTION '採購單狀態不正確' USING ERRCODE = '22023', HINT = 'invalid_status';
   END IF;
 
-  UPDATE public.product_groups SET name = v_name, category = v_category, unit_of_measure = v_unit WHERE id = p_product_id;
+  IF p_changes ? 'items' THEN
+    PERFORM public.api_check_purchase_products(p_organization_id, p_purchase_order_id, p_changes->'items');
+  END IF;
+  IF p_changes ? 'order_ids' THEN
+    IF jsonb_typeof(p_changes->'order_ids') <> 'array' THEN
+      RAISE EXCEPTION '訂單清單格式不正確' USING ERRCODE = '22023', HINT = 'invalid_order_ids';
+    END IF;
+    SELECT coalesce(array_agg(DISTINCT value::uuid), '{}') INTO v_order_ids FROM jsonb_array_elements_text(p_changes->'order_ids');
+    PERFORM public.api_check_purchase_orders(p_organization_id, p_purchase_order_id, v_order_ids);
+  END IF;
 
-  RETURN public.api_result(false, p_product_id, NULL, v_title, v_fields);
+  v_factory_id := coalesce((public.api_clean(p_changes->>'factory_id'))::uuid, v_old.factory_id);
+  IF v_factory_id <> v_old.factory_id THEN
+    PERFORM public.api_check_purchase_factory(p_organization_id, v_factory_id, v_old.factory_id);
+    IF EXISTS (SELECT 1 FROM public.inventories WHERE purchase_order_id = p_purchase_order_id) THEN
+      RAISE EXCEPTION '採購單 % 已有入庫紀錄，不能更換工廠', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_received';
+    END IF;
+  END IF;
+
+  v_order_date := CASE WHEN p_changes ? 'order_date' THEN coalesce(public.api_date(p_changes->>'order_date'), v_old.order_date) ELSE v_old.order_date END;
+  v_arrival := CASE WHEN p_changes ? 'expected_arrival_date' THEN public.api_date(p_changes->>'expected_arrival_date') ELSE v_old.expected_arrival_date END;
+  IF v_arrival < v_order_date THEN
+    RAISE EXCEPTION '預計到貨日期不可早於下單日期' USING ERRCODE = '22023', HINT = 'invalid_expected_arrival_date';
+  END IF;
+
+  SELECT coalesce(jsonb_object_agg(poi.id, jsonb_build_object('product_id', poi.product_id, 'quantity', poi.ordered_quantity, 'unit_price', poi.unit_price)), '{}')
+  INTO v_old_items FROM public.purchase_order_items poi WHERE poi.purchase_order_id = p_purchase_order_id;
+  v_old_orders := public.api_purchase_order_numbers(p_purchase_order_id);
+  SELECT name INTO v_old_factory FROM public.factories WHERE id = v_old.factory_id;
+  v_title := format('修改採購單 %s', v_old.po_number);
+
+  BEGIN
+    IF p_changes ? 'items' THEN
+      PERFORM public.save_purchase_order_items(p_purchase_order_id, public.api_order_items_payload(p_changes->'items', true));
+    END IF;
+    IF p_changes ? 'order_ids' THEN
+      PERFORM public.api_link_purchase_orders(p_purchase_order_id, v_order_ids);
+    END IF;
+
+    -- The item save recalculates the status; an explicit status overrides it
+    UPDATE public.purchase_orders
+    SET status = CASE WHEN p_changes ? 'status' THEN (p_changes->>'status')::purchase_order_status ELSE status END,
+        factory_id = v_factory_id,
+        order_date = v_order_date,
+        expected_arrival_date = v_arrival,
+        note = public.api_changed(p_changes, 'note', note)
+    WHERE id = p_purchase_order_id
+    RETURNING * INTO v_new;
+
+    v_fields := public.api_changed_fields(
+        '狀態', public.api_purchase_status_label(v_old.status::text), public.api_purchase_status_label(v_new.status::text),
+        '工廠', v_old_factory, (SELECT name FROM public.factories WHERE id = v_new.factory_id),
+        '關聯訂單', v_old_orders, public.api_purchase_order_numbers(p_purchase_order_id),
+        '下單日期', v_old.order_date::text, v_new.order_date::text,
+        '預計到貨日期', v_old.expected_arrival_date::text, v_new.expected_arrival_date::text,
+        '備註', v_old.note, v_new.note)
+      || coalesce((
+           SELECT jsonb_agg(jsonb_build_object('label', '移除品項', 'value',
+                    public.api_order_line_label((old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric, (old.value->>'unit_price')::numeric)))
+           FROM jsonb_each(v_old_items) AS old
+           WHERE NOT EXISTS (SELECT 1 FROM public.purchase_order_items WHERE id = old.key::uuid)
+         ), '[]'::jsonb)
+      || coalesce((
+           SELECT jsonb_agg(jsonb_build_object('label', '修改品項', 'value',
+                    public.api_order_line_label((old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric, (old.value->>'unit_price')::numeric)
+                    || ' → ' || public.api_order_line_label(poi.product_id, poi.ordered_quantity, poi.unit_price)) ORDER BY poi.created_at)
+           FROM jsonb_each(v_old_items) AS old JOIN public.purchase_order_items poi ON poi.id = old.key::uuid
+           WHERE poi.product_id <> (old.value->>'product_id')::uuid
+              OR poi.ordered_quantity <> (old.value->>'quantity')::numeric
+              OR poi.unit_price <> (old.value->>'unit_price')::numeric
+         ), '[]'::jsonb)
+      || coalesce((
+           SELECT jsonb_agg(jsonb_build_object('label', '新增品項', 'value', public.api_order_line_label(poi.product_id, poi.ordered_quantity, poi.unit_price)) ORDER BY poi.created_at)
+           FROM public.purchase_order_items poi
+           WHERE poi.purchase_order_id = p_purchase_order_id AND NOT v_old_items ? poi.id::text
+         ), '[]'::jsonb);
+
+    IF p_dry_run THEN
+      RAISE EXCEPTION USING ERRCODE = 'DRYRN';
+    END IF;
+  EXCEPTION WHEN SQLSTATE 'DRYRN' THEN
+    RETURN public.api_result(true, p_purchase_order_id, v_old.po_number, v_title, v_fields);
+  END;
+
+  RETURN public.api_result(false, p_purchase_order_id, v_old.po_number, v_title, v_fields);
 END;
 $function$;
 
--- A disabled product keeps its colors on existing documents but none of them can be ordered again
-CREATE FUNCTION public.set_product_active(
+-- Cancelling is refused once goods have been received against the purchase order
+CREATE FUNCTION public.cancel_purchase_order(
   p_organization_id uuid,
-  p_product_id uuid,
-  p_is_active boolean,
+  p_purchase_order_id uuid,
+  p_reason text DEFAULT NULL,
   p_dry_run boolean DEFAULT false
 )
 RETURNS jsonb
@@ -396,189 +504,59 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_old public.product_groups%ROWTYPE;
+  v_old public.purchase_orders%ROWTYPE;
+  v_order_ids uuid[];
   v_title text;
   v_fields jsonb;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditProducts');
-  IF p_is_active IS NULL THEN
-    RAISE EXCEPTION '請指定要啟用或停用' USING ERRCODE = '22023', HINT = 'is_active_required';
-  END IF;
+  PERFORM public.api_require_permission(p_organization_id, 'canEditPurchases');
 
-  SELECT * INTO v_old FROM public.product_groups WHERE id = p_product_id AND organization_id = p_organization_id FOR UPDATE;
+  SELECT * INTO v_old FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
+    RAISE EXCEPTION '找不到此採購單' USING ERRCODE = 'P0002', HINT = 'purchase_order_not_found';
+  END IF;
+  IF v_old.status = 'cancelled' THEN
+    RAISE EXCEPTION '採購單 % 已取消', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_already_cancelled';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.inventories WHERE purchase_order_id = p_purchase_order_id) THEN
+    RAISE EXCEPTION '採購單 % 已有入庫紀錄，不能取消', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_received';
   END IF;
 
-  v_title := format('%s產品「%s」', CASE WHEN p_is_active THEN '啟用' ELSE '停用' END, v_old.name);
-  v_fields := public.api_changed_fields('狀態',
-    CASE WHEN v_old.is_active THEN '啟用' ELSE '停用' END,
-    CASE WHEN p_is_active THEN '啟用' ELSE '停用' END);
+  v_title := format('取消採購單 %s', v_old.po_number);
+  v_fields := public.api_changed_fields('狀態', public.api_purchase_status_label(v_old.status::text), '已取消')
+    || public.api_fields('取消原因', public.api_clean(p_reason));
   IF p_dry_run THEN
-    RETURN public.api_result(true, p_product_id, NULL, v_title, v_fields);
+    RETURN public.api_result(true, p_purchase_order_id, v_old.po_number, v_title, v_fields);
   END IF;
 
-  UPDATE public.product_groups SET is_active = p_is_active WHERE id = p_product_id AND is_active IS DISTINCT FROM p_is_active;
+  UPDATE public.purchase_orders
+  SET status = 'cancelled', cancelled_at = now(), cancel_reason = public.api_clean(p_reason)
+  WHERE id = p_purchase_order_id;
 
-  RETURN public.api_result(false, p_product_id, NULL, v_title, v_fields);
+  -- Linked orders stay linked (for the record) but no longer count this purchase order as placed
+  SELECT coalesce(array_agg(order_id), '{}') INTO v_order_ids FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id;
+  PERFORM public.api_release_orders(array_append(v_order_ids, v_old.order_id));
+
+  RETURN public.api_result(false, p_purchase_order_id, v_old.po_number, v_title, v_fields);
 END;
 $function$;
 
-CREATE FUNCTION public.add_product_color(
-  p_organization_id uuid,
-  p_product_id uuid,
-  p_color text,
-  p_color_code text DEFAULT NULL,
-  p_color_hex text DEFAULT NULL,
-  p_stock_threshold numeric DEFAULT NULL,
-  p_dry_run boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_group public.product_groups%ROWTYPE;
-  v_color text := public.api_clean(p_color);
-  v_color_code text := public.api_clean(p_color_code);
-  v_color_hex text := public.api_clean(p_color_hex);
-  v_id uuid;
-  v_title text;
-  v_fields jsonb;
-BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canCreateProducts');
+REVOKE ALL ON FUNCTION public.api_purchase_status_label(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_date(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_purchase_order_numbers(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_purchase_order_fields(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_check_purchase_products(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_check_purchase_factory(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_check_purchase_orders(uuid, uuid, uuid[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_release_orders(uuid[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_link_purchase_orders(uuid, uuid[]) FROM PUBLIC, anon, authenticated;
 
-  SELECT * INTO v_group FROM public.product_groups WHERE id = p_product_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
-  END IF;
-  PERFORM public.api_check_product_color(p_product_id, v_color, v_color_code, v_color_hex, p_stock_threshold, NULL);
-
-  v_title := format('新增顏色到「%s」', v_group.name);
-  v_fields := public.api_fields('顏色', v_color, '色號', v_color_code, '色值', v_color_hex,
-    '安全庫存', public.api_number(p_stock_threshold) || ' 公斤');
-  IF p_dry_run THEN
-    RETURN public.api_result(true, NULL, NULL, v_title, v_fields);
-  END IF;
-
-  INSERT INTO public.products_new (group_id, organization_id, name, color, color_code, color_hex, stock_thresholds, status, user_id)
-  VALUES (p_product_id, p_organization_id, v_group.name, v_color, v_color_code, v_color_hex, p_stock_threshold, 'Available', auth.uid())
-  RETURNING id INTO v_id;
-
-  RETURN public.api_result(false, v_id, NULL, v_title, v_fields);
-END;
-$function$;
-
--- p_changes may hold color, color_code, color_hex, stock_threshold
-CREATE FUNCTION public.update_product_color(
-  p_organization_id uuid,
-  p_color_id uuid,
-  p_changes jsonb,
-  p_dry_run boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_old public.products_new%ROWTYPE;
-  v_color text;
-  v_color_code text;
-  v_color_hex text;
-  v_threshold numeric;
-  v_title text;
-  v_fields jsonb;
-BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditProducts');
-  PERFORM public.api_check_change_keys(p_changes, ARRAY['color', 'color_code', 'color_hex', 'stock_threshold']);
-
-  SELECT * INTO v_old FROM public.products_new WHERE id = p_color_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此顏色' USING ERRCODE = 'P0002', HINT = 'product_color_not_found';
-  END IF;
-
-  v_color := public.api_changed(p_changes, 'color', v_old.color);
-  v_color_code := public.api_changed(p_changes, 'color_code', v_old.color_code);
-  v_color_hex := public.api_changed(p_changes, 'color_hex', v_old.color_hex);
-  v_threshold := CASE WHEN p_changes ? 'stock_threshold' THEN (public.api_clean(p_changes->>'stock_threshold'))::numeric ELSE v_old.stock_thresholds END;
-  PERFORM public.api_check_product_color(v_old.group_id, v_color, v_color_code, v_color_hex, v_threshold, p_color_id);
-
-  v_title := format('修改顏色「%s」', public.api_product_label(p_color_id));
-  v_fields := public.api_changed_fields(
-    '顏色', v_old.color, v_color, '色號', v_old.color_code, v_color_code, '色值', v_old.color_hex, v_color_hex,
-    '安全庫存', public.api_number(v_old.stock_thresholds) || ' 公斤', public.api_number(v_threshold) || ' 公斤');
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_color_id, NULL, v_title, v_fields);
-  END IF;
-
-  UPDATE public.products_new
-  SET color = v_color, color_code = v_color_code, color_hex = v_color_hex, stock_thresholds = v_threshold
-  WHERE id = p_color_id;
-
-  RETURN public.api_result(false, p_color_id, NULL, v_title, v_fields);
-END;
-$function$;
-
-CREATE FUNCTION public.set_product_color_active(
-  p_organization_id uuid,
-  p_color_id uuid,
-  p_is_active boolean,
-  p_dry_run boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_old public.products_new%ROWTYPE;
-  v_title text;
-  v_fields jsonb;
-BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditProducts');
-  IF p_is_active IS NULL THEN
-    RAISE EXCEPTION '請指定要啟用或停用' USING ERRCODE = '22023', HINT = 'is_active_required';
-  END IF;
-
-  SELECT * INTO v_old FROM public.products_new WHERE id = p_color_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此顏色' USING ERRCODE = 'P0002', HINT = 'product_color_not_found';
-  END IF;
-
-  v_title := format('%s顏色「%s」', CASE WHEN p_is_active THEN '啟用' ELSE '停用' END, public.api_product_label(p_color_id));
-  v_fields := public.api_changed_fields('狀態',
-    CASE WHEN v_old.status = 'Unavailable' THEN '停用' ELSE '啟用' END,
-    CASE WHEN p_is_active THEN '啟用' ELSE '停用' END);
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_color_id, NULL, v_title, v_fields);
-  END IF;
-
-  UPDATE public.products_new
-  SET status = CASE WHEN p_is_active THEN 'Available' ELSE 'Unavailable' END::product_status
-  WHERE id = p_color_id AND (status = 'Unavailable') IS DISTINCT FROM NOT p_is_active;
-
-  RETURN public.api_result(false, p_color_id, NULL, v_title, v_fields);
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.api_check_product_name(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_check_product_color(uuid, text, text, text, numeric, uuid) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_color_label(text, text, numeric) FROM PUBLIC, anon, authenticated;
-
-REVOKE ALL ON FUNCTION public.create_product(uuid, text, jsonb, text, text, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.update_product(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.set_product_active(uuid, uuid, boolean, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.add_product_color(uuid, uuid, text, text, text, numeric, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.update_product_color(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.set_product_color_active(uuid, uuid, boolean, boolean) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.create_product(uuid, text, jsonb, text, text, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_product(uuid, uuid, jsonb, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.set_product_active(uuid, uuid, boolean, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.add_product_color(uuid, uuid, text, text, text, numeric, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_product_color(uuid, uuid, jsonb, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.set_product_color_active(uuid, uuid, boolean, boolean) TO authenticated;
+REVOKE ALL ON FUNCTION public.create_purchase_order(uuid, uuid, jsonb, uuid[], date, text, date, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.update_purchase_order(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.cancel_purchase_order(uuid, uuid, text, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_purchase_order(uuid, uuid, jsonb, uuid[], date, text, date, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_purchase_order(uuid, uuid, jsonb, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.cancel_purchase_order(uuid, uuid, text, boolean) TO authenticated;
 
 -- ===== _helpers.sql
 -- SQL 測試共用工具。
@@ -1219,6 +1197,278 @@ begin
   perform pg_temp.check(not has_function_privilege('authenticated', 'public.api_next_document_number(uuid, text)', 'EXECUTE'), 'numbering is internal');
   perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select public.api_assign_document_number(%L, %L)', v_org, 'order'),
     '42501', 'forbidden', 'nobody can read another organization''s numbering');
+end $$;
+
+
+-- ===== test: api_a3_purchase_orders.test.sql
+-- 業務 API A3：採購單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+
+-- Add an active factory to an organization (test setup; same as in api_a2_orders.test.sql)
+create or replace function pg_temp.add_factory(org_id uuid, factory_name text, active boolean default true)
+returns uuid language plpgsql as $$
+declare
+  v_id uuid;
+begin
+  insert into public.factories (name, organization_id, is_active) values (factory_name, org_id, active) returning id into v_id;
+  return v_id;
+end $$;
+
+-- create_purchase_order writes the purchase order, its items and linked orders, numbers it and marks the orders
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_date text := to_char(now() at time zone 'Asia/Taipei', 'YYYYMMDD');
+  v_today date := (now() at time zone 'Asia/Taipei')::date;
+  v_order uuid;
+  v_items jsonb;
+  v_result jsonb;
+  v_po public.purchase_orders%rowtype;
+  v_other jsonb;
+begin
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'confirmed') returning id into v_order;
+
+  v_items := jsonb_build_array(
+    jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 200, 'unit_price', 4.5, 'ordered_rolls', 8),
+    jsonb_build_object('product_id', fx->>'product2_id', 'ordered_quantity', 50, 'unit_price', 6));
+
+  v_result := pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[], %L, %L)',
+    v_org, fx->>'factory_id', v_items, v_order, v_today + 14, '先做白色'));
+  select * into v_po from public.purchase_orders where id = (v_result->>'id')::uuid;
+
+  -- seed_fixture already created today's first purchase order for this organization
+  perform pg_temp.check(v_result->>'number' = 'P' || v_date || '0002', 'the purchase order is numbered P<date>, got ' || coalesce(v_result->>'number', 'none'));
+  perform pg_temp.check(v_po.po_number = v_result->>'number' and v_po.organization_id = v_org and v_po.user_id = v_editor, 'the purchase order is stored with its number and creator');
+  perform pg_temp.check(v_po.status = 'confirmed' and v_po.order_date = v_today and v_po.expected_arrival_date = v_today + 14 and v_po.note = '先做白色',
+    'the purchase order is placed today with its arrival date and note');
+  perform pg_temp.check((select count(*) from public.purchase_order_items where purchase_order_id = v_po.id) = 2, 'both items are stored');
+  perform pg_temp.check(exists (select 1 from public.purchase_order_items where purchase_order_id = v_po.id and product_id = (fx->>'product_id')::uuid
+      and ordered_quantity = 200 and ordered_rolls = 8 and unit_price = 4.5 and status = 'pending'), 'an item keeps its quantity, rolls and price');
+  perform pg_temp.check(exists (select 1 from public.purchase_order_relations where purchase_order_id = v_po.id and order_id = v_order), 'the order is linked');
+  perform pg_temp.check((select status from public.orders where id = v_order) = 'factory_ordered', 'the linked order becomes 已向工廠下單');
+
+  perform pg_temp.check(v_result->'summary'->>'title' = '建立採購單', 'the summary has a title');
+  perform pg_temp.check(v_result->'summary'->'fields' @> jsonb_build_array(
+      jsonb_build_object('label', '工廠', 'value', '測試工廠'),
+      jsonb_build_object('label', '關聯訂單', 'value', (select order_number from public.orders where id = v_order)),
+      jsonb_build_object('label', '品項 1', 'value', public.api_product_label((fx->>'product_id')::uuid) || ' × 200 公斤，單價 4.5'),
+      jsonb_build_object('label', '預計到貨日期', 'value', (v_today + 14)::text),
+      jsonb_build_object('label', '採購總額', 'value', '1200')),
+    'the summary describes factory, orders, items, arrival and total, got ' || (v_result->'summary'->'fields')::text);
+
+  v_other := pg_temp.call_as((other->>'user_id')::uuid, format('select public.create_purchase_order(%L, %L, %L)', other->>'org_id', other->>'factory_id',
+    jsonb_build_array(jsonb_build_object('product_id', other->>'product_id', 'ordered_quantity', 1, 'unit_price', 1))));
+  perform pg_temp.check(v_other->>'number' = 'P' || v_date || '0002', 'another organization counts its own numbers, got ' || coalesce(v_other->>'number', 'none'));
+end $$;
+
+-- A dry run stores nothing, does not touch the linked orders and shows the same summary
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_order uuid;
+  v_items jsonb := jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 10, 'unit_price', 5));
+  v_pos int;
+  v_logs int;
+  v_preview jsonb;
+  v_real jsonb;
+begin
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'pending') returning id into v_order;
+  select count(*) into v_pos from public.purchase_orders where organization_id = v_org;
+  select count(*) into v_logs from public.record_audit_logs where organization_id = v_org;
+
+  v_preview := pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[], p_dry_run => true)',
+    v_org, fx->>'factory_id', v_items, v_order));
+  perform pg_temp.check((v_preview->>'dry_run')::boolean and v_preview->>'id' is null and v_preview->>'number' is null, 'a dry run has no id or number');
+  perform pg_temp.check((select count(*) from public.purchase_orders where organization_id = v_org) = v_pos, 'a dry run stores no purchase order');
+  perform pg_temp.check((select count(*) from public.record_audit_logs where organization_id = v_org) = v_logs, 'a dry run leaves no audit trail');
+  perform pg_temp.check((select status from public.orders where id = v_order) = 'pending', 'a dry run leaves the order alone');
+
+  v_real := pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id', v_items, v_order));
+  perform pg_temp.check(v_preview->'summary' = v_real->'summary', 'the dry run shows the same summary as the real call');
+end $$;
+
+-- create_purchase_order refuses bad input and needs canCreatePurchases
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_items jsonb := jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 10, 'unit_price', 5));
+  v_inactive uuid;
+  v_cancelled uuid;
+  v_today date := (now() at time zone 'Asia/Taipei')::date;
+  v_call text := 'select public.create_purchase_order(%L, %L, %L)';
+begin
+  insert into public.factories (name, organization_id, is_active) values ('停用工廠', v_org, false) returning id into v_inactive;
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'cancelled') returning id into v_cancelled;
+
+  perform pg_temp.check_api_error_as(v_viewer, format(v_call, v_org, fx->>'factory_id', v_items), '42501', 'forbidden', 'a viewer cannot create purchase orders');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, other->>'org_id', other->>'factory_id', v_items), '42501', 'forbidden',
+    'nobody can create purchase orders in another organization');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, other->>'factory_id', v_items), 'P0002', 'factory_not_found',
+    'another organization''s factory is not found');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, v_inactive, v_items), '22023', 'factory_inactive', 'a disabled factory gets no new purchase orders');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'factory_id', '[]'), '22023', 'items_required', 'a purchase order needs an item');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'factory_id',
+      jsonb_build_array(jsonb_build_object('product_id', other->>'product_id', 'ordered_quantity', 1, 'unit_price', 1))),
+    'P0002', 'product_not_found', 'another organization''s product is not found');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'factory_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 0, 'unit_price', 1))),
+    '22023', 'invalid_quantity', 'the quantity must be positive');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'factory_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 1, 'unit_price', -1))),
+    '22023', 'invalid_unit_price', 'the price cannot be negative');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id', v_items, other->>'order_id'),
+    'P0002', 'order_not_found', 'another organization''s order is not found');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id', v_items, v_cancelled),
+    '55000', 'order_cancelled', 'a cancelled order cannot be purchased for');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, p_expected_arrival_date => %L)', v_org, fx->>'factory_id', v_items, v_today - 1),
+    '22023', 'invalid_expected_arrival_date', 'the arrival date cannot be before the order date');
+
+  update public.products_new set status = 'Unavailable' where id = (fx->>'product_id')::uuid;
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'factory_id', v_items), '22023', 'product_unavailable', 'a disabled product cannot be purchased');
+end $$;
+
+-- update_purchase_order changes items, dates, note and linked orders, respecting what has been received
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_today date := (now() at time zone 'Asia/Taipei')::date;
+  v_first uuid;
+  v_second uuid;
+  v_po uuid;
+  v_number text;
+  v_item uuid;
+  v_preview jsonb;
+  v_result jsonb;
+  v_changes jsonb;
+begin
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'confirmed') returning id into v_first;
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'confirmed') returning id into v_second;
+
+  v_po := (pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id',
+    jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 100, 'unit_price', 5)), v_first))->>'id')::uuid;
+  select po_number into v_number from public.purchase_orders where id = v_po;
+  select id into v_item from public.purchase_order_items where purchase_order_id = v_po;
+
+  v_changes := jsonb_build_object(
+    'items', jsonb_build_array(
+      jsonb_build_object('id', v_item, 'product_id', fx->>'product_id', 'ordered_quantity', 120, 'unit_price', 5),
+      jsonb_build_object('product_id', fx->>'product2_id', 'ordered_quantity', 30, 'unit_price', 8)),
+    'order_ids', jsonb_build_array(v_second),
+    'expected_arrival_date', (v_today + 7)::text,
+    'note', '改量');
+
+  v_preview := pg_temp.call_as(v_editor, format('select public.update_purchase_order(%L, %L, %L, true)', v_org, v_po, v_changes));
+  perform pg_temp.check((select ordered_quantity from public.purchase_order_items where id = v_item) = 100, 'a dry run changes nothing');
+  perform pg_temp.check((select status from public.orders where id = v_second) = 'confirmed', 'a dry run links no order');
+
+  v_result := pg_temp.call_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, v_changes));
+  perform pg_temp.check(v_preview->'summary' = v_result->'summary', 'the dry run shows the same summary');
+  perform pg_temp.check(v_result->'summary'->>'title' = '修改採購單 ' || v_number and v_result->>'number' = v_number, 'the summary names the purchase order');
+  perform pg_temp.check(v_result->'summary'->'fields' @> jsonb_build_array(
+      jsonb_build_object('label', '預計到貨日期', 'value', '（空白） → ' || (v_today + 7)::text),
+      jsonb_build_object('label', '備註', 'value', '（空白） → 改量'),
+      jsonb_build_object('label', '修改品項', 'value', public.api_product_label((fx->>'product_id')::uuid) || ' × 100 公斤，單價 5 → '
+        || public.api_product_label((fx->>'product_id')::uuid) || ' × 120 公斤，單價 5'),
+      jsonb_build_object('label', '新增品項', 'value', public.api_product_label((fx->>'product2_id')::uuid) || ' × 30 公斤，單價 8')),
+    'the summary lists the changes, got ' || (v_result->'summary'->'fields')::text);
+
+  perform pg_temp.check((select ordered_quantity from public.purchase_order_items where id = v_item) = 120, 'the item is updated');
+  perform pg_temp.check((select count(*) from public.purchase_order_items where purchase_order_id = v_po) = 2, 'the new item is added');
+  perform pg_temp.check((select status from public.orders where id = v_second) = 'factory_ordered', 'a newly linked order becomes 已向工廠下單');
+  perform pg_temp.check((select status from public.orders where id = v_first) = 'confirmed', 'an unlinked order without other purchase orders goes back to 已確認');
+  perform pg_temp.check(not exists (select 1 from public.purchase_order_relations where purchase_order_id = v_po and order_id = v_first), 'the old order is unlinked');
+
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"note":"x"}'),
+    '42501', 'forbidden', 'a viewer cannot edit purchase orders');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"status":"cancelled"}'),
+    '22023', 'use_cancel_purchase_order', 'cancelling goes through cancel_purchase_order');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"status":"partial_arrived"}'),
+    '22023', 'invalid_status', 'only the listed statuses can be set');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"expected_arrival_date":"明天"}'),
+    '22023', 'invalid_date', 'dates must be dates');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"po_number":"x"}'),
+    '22023', 'unknown_field', 'the number cannot be changed');
+
+  -- The fixture's purchase order has goods received: the received item is locked and the factory cannot change
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, fx->>'po_id',
+      jsonb_build_object('items', jsonb_build_array(jsonb_build_object('product_id', fx->>'product2_id', 'ordered_quantity', 1, 'unit_price', 1)))),
+    '55000', 'item_received', 'a received item cannot be removed');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, fx->>'po_id',
+      jsonb_build_object('items', jsonb_build_array(jsonb_build_object('id', fx->>'po_item_id', 'product_id', fx->>'product_id', 'ordered_quantity', 50, 'unit_price', 5)))),
+    '55000', 'quantity_below_received', 'the quantity cannot drop below what was received');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, fx->>'po_id',
+      jsonb_build_object('factory_id', gen_random_uuid())),
+    'P0002', 'factory_not_found', 'a missing factory is not found');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, fx->>'po_id',
+      jsonb_build_object('factory_id', pg_temp.add_factory(v_org, '新工廠'))),
+    '55000', 'purchase_order_received', 'a purchase order with goods received cannot change factory');
+end $$;
+
+-- cancel_purchase_order: refused once goods are received; releases the linked orders; a cancelled one is frozen
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_order uuid;
+  v_po uuid;
+  v_other_po uuid;
+  v_number text;
+  v_result jsonb;
+  v_items jsonb := jsonb_build_array(jsonb_build_object('product_id', fx->>'product2_id', 'ordered_quantity', 10, 'unit_price', 5));
+begin
+  insert into public.orders (customer_id, user_id, organization_id, status)
+  values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, v_org, 'confirmed') returning id into v_order;
+  v_po := (pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id', v_items, v_order))->>'id')::uuid;
+  v_other_po := (pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L, array[%L]::uuid[])', v_org, fx->>'factory_id', v_items, v_order))->>'id')::uuid;
+  select po_number into v_number from public.purchase_orders where id = v_po;
+
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.cancel_purchase_order(%L, %L)', v_org, v_po), '42501', 'forbidden', 'a viewer cannot cancel');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.cancel_purchase_order(%L, %L)', v_org, fx->>'po_id'),
+    '55000', 'purchase_order_received', 'a purchase order with goods received cannot be cancelled');
+
+  v_result := pg_temp.call_as(v_editor, format('select public.cancel_purchase_order(%L, %L, %L, true)', v_org, v_po, '工廠缺料'));
+  perform pg_temp.check((select status from public.purchase_orders where id = v_po) = 'confirmed', 'a dry run cancels nothing');
+  perform pg_temp.check(v_result->'summary'->'fields' = jsonb_build_array(
+      jsonb_build_object('label', '狀態', 'value', '已下單 → 已取消'),
+      jsonb_build_object('label', '取消原因', 'value', '工廠缺料')),
+    'the summary shows the cancellation, got ' || (v_result->'summary'->'fields')::text);
+
+  perform pg_temp.call_as(v_editor, format('select public.cancel_purchase_order(%L, %L, %L)', v_org, v_po, '工廠缺料'));
+  perform pg_temp.check((select status = 'cancelled' and cancelled_at is not null and cancel_reason = '工廠缺料' from public.purchase_orders where id = v_po),
+    'the purchase order is cancelled with its reason');
+  perform pg_temp.check((select status from public.orders where id = v_order) = 'factory_ordered', 'an order with another live purchase order stays 已向工廠下單');
+
+  perform pg_temp.call_as(v_editor, format('select public.cancel_purchase_order(%L, %L)', v_org, v_other_po));
+  perform pg_temp.check((select status from public.orders where id = v_order) = 'confirmed', 'an order without live purchase orders goes back to 已確認');
+
+  perform pg_temp.check_api_error_as(v_editor, format('select public.cancel_purchase_order(%L, %L)', v_org, v_po),
+    '55000', 'purchase_order_already_cancelled', 'a purchase order is cancelled once');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_purchase_order(%L, %L, %L)', v_org, v_po, '{"note":"x"}'),
+    '55000', 'purchase_order_cancelled', 'a cancelled purchase order cannot be edited');
+  perform pg_temp.check_raises_as(v_editor, format('select public.save_purchase_order_items(%L, %L)', v_po, v_items),
+    '已取消', 'the items of a cancelled purchase order cannot be saved directly either');
+
+  -- The order itself can now be cancelled
+  perform pg_temp.call_as(v_editor, format('select public.cancel_order(%L, %L)', v_org, v_order));
+  perform pg_temp.check((select status from public.orders where id = v_order) = 'cancelled', 'an order whose purchase orders are all cancelled can be cancelled');
 end $$;
 
 

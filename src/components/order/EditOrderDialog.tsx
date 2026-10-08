@@ -25,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Ban } from 'lucide-react';
 import { OrderItemsEditor } from './OrderItemsEditor';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
@@ -418,11 +419,14 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           {!readOnly && (
             <Button
               variant="outline"
+              size="icon"
               className="mr-auto border-red-300 text-red-700 hover:bg-red-50"
               onClick={() => setCancelDialogOpen(true)}
               disabled={cancelOrderMutation.isPending}
+              aria-label="取消訂單"
+              title="取消訂單"
             >
-              取消訂單
+              <Ban className="h-4 w-4" />
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>

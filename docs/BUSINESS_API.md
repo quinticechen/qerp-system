@@ -100,9 +100,9 @@
 | A2 訂單 | `create_order` | `canCreateOrders` | 客戶、品項（產品、數量、單價、卷數、規格）、指定工廠、備註；回傳訂單編號 | ✅ |
 | | `update_order` | `canEditOrders` | 品項（沿用 `save_order_items` 的鎖定規則）、工廠、備註、付款狀態 | ✅ |
 | | `cancel_order` | `canEditOrders` | 已有出貨或有效採購單時不可取消 | ✅ |
-| A3 採購 | `create_purchase_order` | `canCreatePurchases` | 工廠、關聯訂單、品項、下單日、預計到貨日；關聯訂單改為「已向工廠下單」 | ⏳ |
-| | `update_purchase_order` | `canEditPurchases` | 沿用 `save_purchase_order_items` 的鎖定規則 | ⏳ |
-| | `cancel_purchase_order` | `canEditPurchases` | 已入庫時不可取消 | ⏳ |
+| A3 採購 | `create_purchase_order` | `canCreatePurchases` | 工廠、關聯訂單、品項、下單日、預計到貨日；關聯訂單改為「已向工廠下單」 | ✅ |
+| | `update_purchase_order` | `canEditPurchases` | 沿用 `save_purchase_order_items` 的鎖定規則 | ✅ |
+| | `cancel_purchase_order` | `canEditPurchases` | 已入庫時不可取消；關聯訂單沒有其他進行中的採購單時改回「已確認」 | ✅ |
 | A4 入庫 | `receive_inventory` | `canCreateInventory` | 採購單、到貨日、布卷（產品、貨架、品質、重量、捲號）；更新採購單收貨進度 | ⏳ |
 | | `update_inventory` | `canEditInventory` | 批次資料與布卷（沿用 `save_inventory_rolls`） | ⏳ |
 | A5 出貨 | `create_shipping` | `canCreateShipping` | 訂單、出貨日、布卷與重量；扣庫存、更新訂單出貨進度 | ⏳ |
@@ -242,6 +242,47 @@ Migration：`supabase/migrations/20261008181853_api_a2_orders.sql`；測試：`s
 | `22023` | `use_cancel_order`、`invalid_status`、`invalid_payment_status`、`invalid_shipping_status`、`invalid_factory_ids` | 請使用取消訂單、狀態不正確… |
 | `55000` | `item_shipped`、`item_purchased`、`quantity_below_shipped` | 產品「…」已出貨／已採購，不可刪除或更換；數量不可低於已出貨 … 公斤 |
 | `55000` | `order_cancelled`、`order_already_cancelled`、`order_has_shipments`、`order_has_purchase_orders` | 訂單 … 已取消，不能修改；已有出貨紀錄／有進行中的採購單 …，不能取消 |
+
+### A3 採購單
+
+Migration：`supabase/migrations/20261008193554_api_a3_purchase_orders.sql`；測試：`supabase/tests/api_a3_purchase_orders.test.sql`；前端：`src/lib/api/purchases.ts`。
+
+**`create_purchase_order`**（`canCreatePurchases`）
+
+| 參數 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| `p_factory_id` | uuid | ✅ | 同組織且未停用的工廠 |
+| `p_items` | jsonb | ✅ | 至少一項：`[{ product_id, ordered_quantity, unit_price, ordered_rolls?, specifications? }]`；產品（顏色）與其產品都須啟用；數量 > 0、單價 ≥ 0 |
+| `p_order_ids` | uuid[] | | 關聯訂單（同組織、未取消）；「待確認」「已確認」的訂單改為「已向工廠下單」 |
+| `p_expected_arrival_date` | date | | 不可早於下單日期 |
+| `p_note` | text | | |
+| `p_order_date` | date | | 預設為台灣今天 |
+
+回傳：`id`、`number`（採購單編號 P＋YYYYMMDD＋四位流水號；試算時兩者皆為 `null`）。狀態為「已下單」（`confirmed`）。`summary.title` 為「建立採購單」，`fields` 依序為工廠、關聯訂單、品項 1…n（「產品 - 顏色（色號）× 數量 公斤，單價 X」）、下單日期、預計到貨日期、備註、採購總額。
+
+**`update_purchase_order`**（`canEditPurchases`）：`p_changes` 可含
+
+| 鍵 | 說明 |
+|----|------|
+| `items` | 完整的品項清單（與 `save_purchase_order_items` 相同）：有 `id` 的更新、沒有的新增、沒列出的刪除。已入庫的品項不可刪除或更換產品；數量不可低於已入庫量 |
+| `order_ids` | 完整的關聯訂單清單；新關聯的訂單改為「已向工廠下單」，移除關聯的訂單若沒有其他進行中的採購單則改回「已確認」 |
+| `factory_id` | 已有入庫紀錄時不可更換 |
+| `order_date`、`expected_arrival_date` | `YYYY-MM-DD`；預計到貨日期可用空字串清除 |
+| `note` | 空字串清除 |
+| `status` | `pending`、`confirmed`、`partial_received`、`completed`；入庫時會自動重算。取消請用 `cancel_purchase_order` |
+
+`summary` 只列有變的欄位，品項以「移除品項／修改品項（舊 → 新）／新增品項」表示。
+
+**`cancel_purchase_order`**（`canEditPurchases`）：`p_purchase_order_id`、`p_reason?`。已有入庫紀錄時不可取消。取消後記錄 `cancelled_at`、`cancel_reason`，採購單不能再修改；關聯保留作為紀錄，關聯訂單若沒有其他進行中的採購單，「已向工廠下單」改回「已確認」（之後才能取消該訂單）。
+
+| SQLSTATE | 代碼 | 訊息 |
+|----------|------|------|
+| `P0002` | `purchase_order_not_found`、`factory_not_found`、`product_not_found`、`order_not_found`、`item_not_found` | 找不到此採購單／工廠／產品／訂單，採購項目不屬於此採購單 |
+| `22023` | `factory_inactive`、`product_unavailable` | 工廠「…」已停用、產品「…」已停用 |
+| `22023` | `items_required`、`invalid_quantity`、`invalid_unit_price`、`invalid_date`、`invalid_expected_arrival_date` | 採購單至少需要一項產品、採購數量必須大於 0、單價不可為負數、日期格式不正確、預計到貨日期不可早於下單日期 |
+| `22023` | `use_cancel_purchase_order`、`invalid_status`、`invalid_order_ids`、`unknown_field` | 請使用取消採購單、採購單狀態不正確… |
+| `55000` | `item_received`、`quantity_below_received` | 產品「…」已入庫，不可刪除或更換；採購數量不可低於已入庫 … 公斤 |
+| `55000` | `order_cancelled`、`purchase_order_cancelled`、`purchase_order_already_cancelled`、`purchase_order_received` | 訂單 … 已取消；採購單 … 已取消，不能修改；已有入庫紀錄，不能取消或更換工廠 |
 
 ### A6 產品與顏色
 

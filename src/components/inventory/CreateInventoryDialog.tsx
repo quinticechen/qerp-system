@@ -96,6 +96,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
           )
         `)
         .eq('organization_id', organizationId)
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (error) {

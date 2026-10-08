@@ -21,6 +21,7 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
       pending: { label: '待確認', variant: 'secondary' as const },
       confirmed: { label: '已下單', variant: 'default' as const },
       partial_arrived: { label: '部分到貨', variant: 'outline' as const },
+      partial_received: { label: '部分入庫', variant: 'outline' as const },
       completed: { label: '已完成', variant: 'default' as const },
       cancelled: { label: '已取消', variant: 'destructive' as const }
     };
@@ -91,6 +92,12 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
                   }
                 </p>
               </div>
+              {purchase.status === 'cancelled' && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">取消原因</p>
+                  <p className="font-medium text-gray-900">{purchase.cancel_reason || '未填寫'}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-gray-500">總金額</p>
                 <p className="font-medium text-gray-900">${totalAmount.toFixed(2)}</p>

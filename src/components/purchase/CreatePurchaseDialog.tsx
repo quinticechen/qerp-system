@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { createPurchaseOrder } from '@/lib/api/purchases';
+import { apiErrorMessage } from '@/lib/api/client';
 import { FactorySelector } from './FactorySelector';
 import { OrderSelector } from './OrderSelector';
 import { OrderProductsDisplay } from './OrderProductsDisplay';
@@ -123,30 +125,32 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     enabled: !!organizationId
   });
 
-  // Fetch products for manual addition (organization-specific)
+  // Colors that can be purchased: the color and its product are both enabled
   const { data: products } = useQuery({
-    queryKey: ['products', organizationId],
+    queryKey: ['all-products', organizationId],
     queryFn: async () => {
-      console.log('Fetching products...');
       const { data, error } = await supabase
-        .from('products_new')
-        .select('id, name, color, color_code')
-        .eq('organization_id', organizationId)
-        .order('name, color');
-      
-      if (error) {
-        console.error('Error fetching products:', error);
-        throw error;
-      }
-      console.log('Products fetched:', data?.length || 0, 'products');
-      return data;
+        .from('product_catalog')
+        .select('color_id, product_name, color, color_code')
+        .eq('organization_id', organizationId!)
+        .eq('product_is_active', true)
+        .eq('color_is_active', true)
+        .order('product_name')
+        .order('color')
+        .order('color_code');
+      if (error) throw error;
+      return (data ?? []).map((row) => ({
+        id: row.color_id as string,
+        name: row.product_name as string,
+        color: row.color,
+        color_code: row.color_code,
+      }));
     },
     enabled: !!organizationId
   });
 
   // Get unique product names
   const uniqueProductNames = [...new Set(products?.map(p => p.name) || [])];
-  console.log('Unique product names:', uniqueProductNames.length, uniqueProductNames);
 
   // Get color variants for a specific product name
   const getColorVariants = (productName: string) => {
@@ -166,85 +170,23 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       note?: string;
       items: PurchaseItem[];
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!organizationId) throw new Error('請先選擇組織');
 
-      // Create purchase order
-      const insertData: any = {
-        factory_id: purchaseData.factory_id,
-        expected_arrival_date: purchaseData.expected_arrival_date || null,
-        note: purchaseData.note || null,
-        status: 'confirmed',
-        user_id: user.id,
-        organization_id: organizationId
-      };
+      // One call writes the purchase order, its items and linked orders, and marks the orders 已向工廠下單
+      const result = await createPurchaseOrder(organizationId, {
+        factoryId: purchaseData.factory_id,
+        orderIds: purchaseData.order_ids,
+        expectedArrivalDate: purchaseData.expected_arrival_date,
+        note: purchaseData.note,
+        items: purchaseData.items.map((item) => ({
+          product_id: item.product_id,
+          ordered_quantity: item.ordered_quantity,
+          unit_price: item.unit_price,
+          specifications: item.specifications ? JSON.parse(item.specifications) : null,
+        })),
+      });
 
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('purchase_orders')
-        .insert(insertData)
-        .select(`
-          *,
-          factories (name),
-          purchase_order_items (
-            id,
-            ordered_quantity,
-            received_quantity,
-            unit_price,
-            specifications,
-            products_new (name, color, color_code)
-          ),
-          purchase_order_relations (
-            orders (order_number, note)
-          )
-        `)
-        .single();
-
-      if (purchaseError) throw purchaseError;
-
-      // Create purchase order items
-      const itemsToInsert = purchaseData.items.map(item => ({
-        purchase_order_id: purchase.id,
-        product_id: item.product_id,
-        ordered_quantity: item.ordered_quantity,
-        ordered_rolls: 0,
-        unit_price: item.unit_price,
-        specifications: item.specifications ? JSON.parse(item.specifications) : null
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('purchase_order_items')
-        .insert(itemsToInsert);
-
-      if (itemsError) throw itemsError;
-
-      // Create order associations using the new purchase_order_relations table
-      if (purchaseData.order_ids.length > 0) {
-        const orderRelations = purchaseData.order_ids.map(orderId => ({
-          purchase_order_id: purchase.id,
-          order_id: orderId,
-        }));
-
-        const { error: relationsError } = await supabase
-          .from('purchase_order_relations')
-          .insert(orderRelations);
-
-        if (relationsError) {
-          console.error('Error creating order relations:', relationsError);
-          throw relationsError;
-        }
-
-        // Update order status to 'factory_ordered' for associated orders
-        const { error: orderUpdateError } = await supabase
-          .from('orders')
-          .update({ status: 'factory_ordered' })
-          .in('id', purchaseData.order_ids);
-
-        if (orderUpdateError) {
-          console.error('Error updating order status:', orderUpdateError);
-        }
-      }
-
-      // 重新查詢完整的採購單數據包含所有關聯
+      // The complete purchase order, for the preview that opens next
       const { data: completePurchase, error: queryError } = await supabase
         .from('purchase_orders')
         .select(`
@@ -262,21 +204,16 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
             orders (order_number, note)
           )
         `)
-        .eq('id', purchase.id)
+        .eq('id', result.id!)
         .single();
 
-      if (queryError) {
-        console.error('Error fetching complete purchase data:', queryError);
-        // 如果查詢失敗，返回基本數據
-        return purchase;
-      }
-
+      if (queryError) throw queryError;
       return completePurchase;
     },
     onSuccess: async (purchase) => {
       toast({
         title: "成功",
-        description: "採購單已成功建立並設為已下單狀態，關聯訂單狀態已更新為「已向工廠下單」",
+        description: `採購單 ${purchase.po_number} 已建立，關聯訂單已更新為「已向工廠下單」`,
       });
       
       // 更積極的查詢刷新 - 使用 refetchQueries 確保立即重新載入
@@ -307,7 +244,7 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
       console.error('Error creating purchase order:', error);
       toast({
         title: "錯誤",
-        description: "建立採購單時發生錯誤",
+        description: apiErrorMessage(error, '建立採購單時發生錯誤'),
         variant: "destructive",
       });
     },

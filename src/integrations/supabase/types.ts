@@ -776,6 +776,8 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           expected_arrival_date: string | null
           factory_id: string
@@ -790,6 +792,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           expected_arrival_date?: string | null
           factory_id: string
@@ -804,6 +808,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           expected_arrival_date?: string | null
           factory_id?: string
@@ -1564,6 +1570,37 @@ export type Database = {
       }
     }
     Functions: {
+      cancel_purchase_order: {
+        Args: {
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_purchase_order_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
+      create_purchase_order: {
+        Args: {
+          p_dry_run?: boolean
+          p_expected_arrival_date?: string
+          p_factory_id: string
+          p_items: Json
+          p_note?: string
+          p_order_date?: string
+          p_order_ids?: string[]
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      update_purchase_order: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_purchase_order_id: string
+        }
+        Returns: Json
+      }
       add_product_color: {
         Args: {
           p_color: string
