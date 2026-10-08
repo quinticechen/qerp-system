@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { todayInTaiwan } from '@/lib/dates';
 import { createShipping } from '@/lib/api/shipping';
 import { apiErrorMessage } from '@/lib/api/client';
 
@@ -57,7 +58,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
-  const [shippingDate, setShippingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shippingDate, setShippingDate] = useState(todayInTaiwan());
   const [note, setNote] = useState('');
   const [selectedItems, setSelectedItems] = useState<ShippingItem[]>([]);
   
@@ -234,7 +235,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   const resetForm = () => {
     setCustomerId('');
     setOrderId('');
-    setShippingDate(new Date().toISOString().split('T')[0]);
+    setShippingDate(todayInTaiwan());
     setNote('');
     setSelectedItems([]);
     setRollSelectors({});

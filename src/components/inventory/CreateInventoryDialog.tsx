@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { todayInTaiwan } from '@/lib/dates';
 import { receiveInventory } from '@/lib/api/inventory';
 import { apiErrorMessage } from '@/lib/api/client';
 
@@ -62,7 +63,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
   const { organizationId, hasOrganization } = useCurrentOrganization();
   
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState('');
-  const [arrivalDate, setArrivalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [arrivalDate, setArrivalDate] = useState(todayInTaiwan());
   const [note, setNote] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
   const [purchaseOrderSearchOpen, setPurchaseOrderSearchOpen] = useState(false);
@@ -287,7 +288,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
   const resetForm = () => {
     setSelectedPurchaseOrderId('');
-    setArrivalDate(new Date().toISOString().split('T')[0]);
+    setArrivalDate(todayInTaiwan());
     setNote('');
     setSelectedProducts([]);
     setForceCreateInventory(false);

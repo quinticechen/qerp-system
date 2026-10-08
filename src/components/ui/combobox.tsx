@@ -61,6 +61,8 @@ export const Combobox: React.FC<ComboboxProps> = ({
                 <CommandItem
                   key={option.value}
                   value={option.value}
+                  // The value is an id; search by the name the user sees
+                  keywords={[option.label]}
                   onSelect={(currentValue) => {
                     onValueChange(currentValue === value ? "" : currentValue);
                     setOpen(false);
