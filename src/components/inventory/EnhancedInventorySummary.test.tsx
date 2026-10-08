@@ -80,10 +80,9 @@ describe("EnhancedInventorySummary roll editing", () => {
     await user.click(within(rollDialog).getByRole("button", { name: "儲存" }));
 
     await waitFor(() =>
-      expect(fake.current!.updates).toContainEqual({
-        table: "inventory_rolls",
-        payload: { shelf: "C-07" },
-        filter: ["id", "roll-1"],
+      expect(fake.current!.rpcCalls).toContainEqual({
+        fn: "update_inventory_roll",
+        args: { p_organization_id: "org-1", p_roll_id: "roll-1", p_changes: { shelf: "C-07" }, p_dry_run: false },
       }),
     );
   });

@@ -2,319 +2,277 @@
 -- 結果為 "ALL TESTS PASSED" 代表通過；"FAIL: ..." 或其他錯誤代表未通過。
 -- 最後一定會丟出例外，整批 SQL 會回滾，不會留下任何變更。
 
--- ===== migration: 20261008193554_api_a3_purchase_orders.sql
--- 業務 API A3 採購單（docs/BUSINESS_API.md §3、§5）
+-- ===== migration: 20261008233705_api_a4_receiving.sql
+-- 業務 API A4 入庫（進貨單）（docs/BUSINESS_API.md §3、§5）
 --
--- 1. save_purchase_order_items 的錯誤改為 SQLSTATE＋HINT 代碼（訊息與鎖定規則不變）；已取消的採購單不能修改品項；
---    同一次新增的品項依傳入順序排列
--- 2. 採購單新增 cancelled_at、cancel_reason
--- 3. create_purchase_order、update_purchase_order、cancel_purchase_order：
---    - 編號 P＋YYYYMMDD＋四位流水號（B8）
---    - 關聯訂單：建立或新增關聯時，「待確認」「已確認」的訂單改為「已向工廠下單」；
---      取消採購單或移除關聯後，若訂單已沒有其他進行中的採購單，「已向工廠下單」改回「已確認」
---    - 已有入庫紀錄的採購單不能取消，也不能更換工廠
+-- 1. save_inventory_rolls 的錯誤改為 SQLSTATE＋HINT 代碼（訊息與鎖定規則不變）；新增布卷沒有給編號時由系統產生，
+--    重複的布卷編號回報 roll_number_taken；同一次新增的布卷依傳入順序排列
+-- 2. receive_inventory：依採購單入庫，進貨單編號 I＋YYYYMMDD＋四位流水號（B8）；工廠沿用採購單；
+--    布卷的產品必須在採購單上；已取消的採購單不能入庫；超過採購量仍可入庫，摘要會列出
+-- 3. update_inventory（到貨日期、備註、完整布卷清單）、update_inventory_roll（單一布卷的重量、品質、倉庫、貨架）
 
--- ===== 1. save_purchase_order_items：錯誤代碼
+-- ===== 1. save_inventory_rolls：錯誤代碼
 
-CREATE OR REPLACE FUNCTION public.save_purchase_order_items(p_purchase_order_id uuid, p_items jsonb)
+-- A new roll number in the existing format: R + YYMMDD (Taiwan) + nine random digits, unused so far
+CREATE FUNCTION public.api_new_roll_number()
+RETURNS text
+LANGUAGE plpgsql
+VOLATILE
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_number text;
+BEGIN
+  LOOP
+    v_number := 'R' || to_char(now() AT TIME ZONE 'Asia/Taipei', 'YYMMDD') || lpad(floor(random() * 1e9)::bigint::text, 9, '0');
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.inventory_rolls WHERE roll_number = v_number);
+  END LOOP;
+  RETURN v_number;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.save_inventory_rolls(p_inventory_id uuid, p_rolls jsonb)
 RETURNS void
 LANGUAGE plpgsql
 SET search_path TO 'public'
 AS $function$
 declare
   v_org uuid;
-  v_status purchase_order_status;
+  v_roll record;
+  v_existing inventory_rolls;
+  v_shipped numeric;
   v_number text;
-  v_item record;
-  v_existing purchase_order_items;
-  v_name text;
 begin
-  select organization_id, status, po_number into v_org, v_status, v_number
-  from purchase_orders where id = p_purchase_order_id for update;
+  select organization_id into v_org from inventories where id = p_inventory_id for update;
   if not found then
-    raise exception '找不到採購單，或沒有編輯權限' using errcode = 'P0002', hint = 'purchase_order_not_found';
+    raise exception '找不到入庫紀錄，或沒有編輯權限' using errcode = 'P0002', hint = 'inventory_not_found';
   end if;
-  if v_status = 'cancelled' then
-    raise exception '採購單 % 已取消，不能修改', v_number using errcode = '55000', hint = 'purchase_order_cancelled';
-  end if;
-  if jsonb_typeof(coalesce(p_items, '[]')) <> 'array' or jsonb_array_length(coalesce(p_items, '[]')) = 0 then
-    raise exception '採購單至少需要一項產品' using errcode = '22023', hint = 'items_required';
+  if jsonb_typeof(coalesce(p_rolls, '[]')) <> 'array' or jsonb_array_length(coalesce(p_rolls, '[]')) = 0 then
+    raise exception '入庫紀錄至少需要一卷布' using errcode = '22023', hint = 'rolls_required';
   end if;
 
-  for v_item in
-    select * from jsonb_to_recordset(p_items)
-      as x(id uuid, product_id uuid, ordered_quantity numeric, ordered_rolls int, unit_price numeric, specifications jsonb)
+  for v_roll in
+    select * from jsonb_to_recordset(p_rolls)
+      as x(id uuid, product_id uuid, warehouse_id uuid, shelf text, quality fabric_quality,
+           quantity numeric, roll_number text, specifications jsonb)
   loop
-    if v_item.product_id is null
-      or not exists (select 1 from products_new where id = v_item.product_id and organization_id = v_org) then
+    if v_roll.product_id is null
+      or not exists (select 1 from products_new where id = v_roll.product_id and organization_id = v_org) then
       raise exception '請選擇此組織的產品' using errcode = 'P0002', hint = 'product_not_found';
     end if;
-    if coalesce(v_item.ordered_quantity, 0) <= 0 then
-      raise exception '採購數量必須大於 0' using errcode = '22023', hint = 'invalid_quantity';
+    if v_roll.warehouse_id is null
+      or not exists (select 1 from warehouses where id = v_roll.warehouse_id and organization_id = v_org) then
+      raise exception '請選擇此組織的倉庫' using errcode = 'P0002', hint = 'warehouse_not_found';
     end if;
-    if coalesce(v_item.unit_price, 0) < 0 then
-      raise exception '單價不可為負數' using errcode = '22023', hint = 'invalid_unit_price';
+    if coalesce(v_roll.quantity, 0) <= 0 then
+      raise exception '布卷重量必須大於 0' using errcode = '22023', hint = 'invalid_quantity';
     end if;
   end loop;
 
   for v_existing in
-    select * from purchase_order_items poi
-    where poi.purchase_order_id = p_purchase_order_id
-      and poi.id not in (
-        select x.id from jsonb_to_recordset(p_items) as x(id uuid) where x.id is not null
+    select * from inventory_rolls ir
+    where ir.inventory_id = p_inventory_id
+      and ir.id not in (
+        select x.id from jsonb_to_recordset(p_rolls) as x(id uuid) where x.id is not null
       )
   loop
-    if coalesce(v_existing.received_quantity, 0) > 0 then
-      select name into v_name from products_new where id = v_existing.product_id;
-      raise exception '產品「%」已入庫，不可刪除', v_name using errcode = '55000', hint = 'item_received';
+    if exists (select 1 from shipping_items where inventory_roll_id = v_existing.id) then
+      raise exception '布卷「%」已出貨，不可刪除', v_existing.roll_number using errcode = '55000', hint = 'roll_shipped';
     end if;
-    delete from purchase_order_items where id = v_existing.id;
+    delete from inventory_rolls where id = v_existing.id;
   end loop;
 
-  for v_item in
-    select * from jsonb_to_recordset(p_items)
-      as x(id uuid, product_id uuid, ordered_quantity numeric, ordered_rolls int, unit_price numeric, specifications jsonb)
+  for v_roll in
+    select * from jsonb_to_recordset(p_rolls)
+      as x(id uuid, product_id uuid, warehouse_id uuid, shelf text, quality fabric_quality,
+           quantity numeric, roll_number text, specifications jsonb)
   loop
-    if v_item.id is null then
-      -- clock_timestamp() rather than now(): items added in one call keep the order they were given in
-      insert into purchase_order_items (purchase_order_id, product_id, ordered_quantity, ordered_rolls, unit_price, specifications, created_at)
-      values (p_purchase_order_id, v_item.product_id, v_item.ordered_quantity, v_item.ordered_rolls, v_item.unit_price, v_item.specifications, clock_timestamp());
+    if v_roll.id is null then
+      v_number := coalesce(nullif(trim(v_roll.roll_number), ''), api_new_roll_number());
+      if exists (select 1 from inventory_rolls where roll_number = v_number) then
+        raise exception '布卷編號「%」已被使用', v_number using errcode = '23505', hint = 'roll_number_taken';
+      end if;
+      -- clock_timestamp() rather than now(): rolls added in one call keep the order they were given in
+      insert into inventory_rolls (inventory_id, product_id, warehouse_id, shelf, quality, quantity, current_quantity, roll_number, specifications, created_at)
+      values (p_inventory_id, v_roll.product_id, v_roll.warehouse_id, nullif(trim(v_roll.shelf), ''),
+              coalesce(v_roll.quality, 'A'), v_roll.quantity, v_roll.quantity, v_number, v_roll.specifications, clock_timestamp());
       continue;
     end if;
 
-    select * into v_existing from purchase_order_items where id = v_item.id and purchase_order_id = p_purchase_order_id;
+    select * into v_existing from inventory_rolls where id = v_roll.id and inventory_id = p_inventory_id;
     if not found then
-      raise exception '採購項目不屬於此採購單' using errcode = 'P0002', hint = 'item_not_found';
-    end if;
-    select name into v_name from products_new where id = v_existing.product_id;
-
-    if v_item.product_id <> v_existing.product_id and coalesce(v_existing.received_quantity, 0) > 0 then
-      raise exception '產品「%」已入庫，不可更換產品', v_name using errcode = '55000', hint = 'item_received';
-    end if;
-    if v_item.ordered_quantity < coalesce(v_existing.received_quantity, 0) then
-      raise exception '產品「%」的採購數量不可低於已入庫 % 公斤', v_name, v_existing.received_quantity
-        using errcode = '55000', hint = 'quantity_below_received';
+      raise exception '布卷不屬於此入庫紀錄' using errcode = 'P0002', hint = 'roll_not_found';
     end if;
 
-    update purchase_order_items
-    set product_id = v_item.product_id,
-        ordered_quantity = v_item.ordered_quantity,
-        ordered_rolls = v_item.ordered_rolls,
-        unit_price = v_item.unit_price,
-        specifications = v_item.specifications
-    where id = v_item.id;
+    if v_roll.product_id <> v_existing.product_id
+      and exists (select 1 from shipping_items where inventory_roll_id = v_existing.id) then
+      raise exception '布卷「%」已出貨，不可更換產品', v_existing.roll_number using errcode = '55000', hint = 'roll_shipped';
+    end if;
+
+    -- Shipped weight stays fixed; current stock follows the corrected received weight
+    v_shipped := v_existing.quantity - v_existing.current_quantity;
+    if v_roll.quantity < v_shipped then
+      raise exception '布卷「%」的入庫重量不可低於已出貨 % 公斤', v_existing.roll_number, v_shipped
+        using errcode = '55000', hint = 'quantity_below_shipped';
+    end if;
+
+    update inventory_rolls
+    set product_id = v_roll.product_id,
+        warehouse_id = v_roll.warehouse_id,
+        shelf = nullif(trim(v_roll.shelf), ''),
+        quality = coalesce(v_roll.quality, v_existing.quality),
+        quantity = v_roll.quantity,
+        current_quantity = v_roll.quantity - v_shipped,
+        is_allocated = (v_roll.quantity - v_shipped) <= 0,
+        specifications = v_roll.specifications
+    where id = v_roll.id;
   end loop;
-
-  perform recompute_purchase_order_receipts(p_purchase_order_id);
 end;
 $function$;
 
--- ===== 2. 取消紀錄
+-- ===== 2. 輔助函式
 
-ALTER TABLE public.purchase_orders ADD COLUMN cancelled_at timestamptz;
-ALTER TABLE public.purchase_orders ADD COLUMN cancel_reason text;
-
--- ===== 3. 輔助函式
-
--- Display labels for purchase order statuses
-CREATE FUNCTION public.api_purchase_status_label(p_status text)
+CREATE FUNCTION public.api_quality_label(p_quality text)
 RETURNS text
 LANGUAGE sql
 IMMUTABLE
 SET search_path TO 'public'
 AS $function$
-  SELECT CASE p_status
-    WHEN 'pending' THEN '待確認' WHEN 'confirmed' THEN '已下單' WHEN 'partial_arrived' THEN '部分到貨'
-    WHEN 'partial_received' THEN '部分入庫' WHEN 'completed' THEN '已完成' WHEN 'cancelled' THEN '已取消'
-    ELSE p_status END;
+  SELECT CASE p_quality WHEN 'defective' THEN '瑕疵' ELSE p_quality || ' 級' END;
 $function$;
 
--- A date given as text ('' or null clears it); raises on anything that is not a date
-CREATE FUNCTION public.api_date(p_value text)
-RETURNS date
-LANGUAGE plpgsql
-IMMUTABLE
-SET search_path TO 'public'
-AS $function$
-BEGIN
-  IF public.api_clean(p_value) IS NULL THEN
-    RETURN NULL;
-  END IF;
-  RETURN public.api_clean(p_value)::date;
-EXCEPTION WHEN invalid_datetime_format OR datetime_field_overflow THEN
-  RAISE EXCEPTION '日期格式不正確：%', p_value USING ERRCODE = '22023', HINT = 'invalid_date';
-END;
-$function$;
-
--- Numbers of the orders linked to a purchase order, in number order
-CREATE FUNCTION public.api_purchase_order_numbers(p_purchase_order_id uuid)
+-- 「R2610080001 產品 - 顏色 100 公斤（A 級，倉庫 一號倉 B-03）」 for a roll
+CREATE FUNCTION public.api_roll_label(
+  p_roll_number text, p_product_id uuid, p_quantity numeric, p_quality text, p_warehouse_id uuid, p_shelf text
+)
 RETURNS text
 LANGUAGE sql
 STABLE
 SET search_path TO 'public'
 AS $function$
-  SELECT string_agg(o.order_number, '、' ORDER BY o.order_number)
-  FROM public.purchase_order_relations r JOIN public.orders o ON o.id = r.order_id
-  WHERE r.purchase_order_id = p_purchase_order_id;
+  SELECT concat_ws(' ', p_roll_number, public.api_product_label(p_product_id), public.api_number(p_quantity) || ' 公斤')
+    || '（' || public.api_quality_label(p_quality)
+    || coalesce('，倉庫 ' || (SELECT name FROM public.warehouses WHERE id = p_warehouse_id), '')
+    || coalesce(' ' || public.api_clean(p_shelf), '') || '）';
 $function$;
 
--- Card fields describing a whole purchase order: factory, linked orders, each item, dates, note and total
-CREATE FUNCTION public.api_purchase_order_fields(p_purchase_order_id uuid)
+-- Card fields describing a whole receiving batch: purchase order, factory, date, rolls per product, note, totals,
+-- and any product received beyond what was ordered
+CREATE FUNCTION public.api_inventory_fields(p_inventory_id uuid)
 RETURNS jsonb
 LANGUAGE sql
 STABLE
 SET search_path TO 'public'
 AS $function$
-  SELECT public.api_fields('工廠', f.name, '關聯訂單', public.api_purchase_order_numbers(po.id))
+  SELECT public.api_fields('採購單', po.po_number, '工廠', f.name, '到貨日期', i.arrival_date::text)
     || coalesce((
-         SELECT jsonb_agg(jsonb_build_object('label', '品項 ' || rn, 'value', public.api_order_line_label(product_id, ordered_quantity, unit_price)) ORDER BY rn)
-         FROM (SELECT poi.*, row_number() OVER (ORDER BY poi.created_at, poi.id) AS rn
-               FROM public.purchase_order_items poi WHERE poi.purchase_order_id = po.id) items
+         SELECT jsonb_agg(jsonb_build_object('label', '產品 ' || rn,
+                  'value', public.api_product_label(product_id) || ' × ' || rolls || ' 卷，共 ' || public.api_number(qty) || ' 公斤') ORDER BY rn)
+         FROM (SELECT product_id, count(*) AS rolls, sum(quantity) AS qty, row_number() OVER (ORDER BY min(created_at)) AS rn
+               FROM public.inventory_rolls WHERE inventory_id = i.id GROUP BY product_id) per_product
        ), '[]'::jsonb)
     || public.api_fields(
-         '下單日期', po.order_date::text,
-         '預計到貨日期', po.expected_arrival_date::text,
-         '備註', po.note,
-         '採購總額', (SELECT public.api_number(sum(ordered_quantity * unit_price)) FROM public.purchase_order_items WHERE purchase_order_id = po.id)
-       )
-  FROM public.purchase_orders po JOIN public.factories f ON f.id = po.factory_id
-  WHERE po.id = p_purchase_order_id;
+         '備註', i.note,
+         '合計', (SELECT count(*) || ' 卷，' || public.api_number(sum(quantity)) || ' 公斤' FROM public.inventory_rolls WHERE inventory_id = i.id))
+    || coalesce((
+         SELECT jsonb_agg(jsonb_build_object('label', '超過採購量',
+                  'value', public.api_product_label(poi.product_id) || ' 已入庫 ' || public.api_number(poi.received_quantity)
+                    || ' 公斤，採購 ' || public.api_number(poi.ordered_quantity) || ' 公斤')
+                  ORDER BY poi.created_at)
+         FROM public.purchase_order_items poi
+         WHERE poi.purchase_order_id = i.purchase_order_id AND poi.received_quantity > poi.ordered_quantity
+           AND EXISTS (SELECT 1 FROM public.inventory_rolls ir WHERE ir.inventory_id = i.id AND ir.product_id = poi.product_id)
+       ), '[]'::jsonb)
+  FROM public.inventories i
+  JOIN public.purchase_orders po ON po.id = i.purchase_order_id
+  JOIN public.factories f ON f.id = i.factory_id
+  WHERE i.id = p_inventory_id;
 $function$;
 
--- Raise unless every product of the given items belongs to the organization and is available.
--- Items that keep an existing product (same id and product as before) may keep a product that was disabled since.
-CREATE FUNCTION public.api_check_purchase_products(p_organization_id uuid, p_purchase_order_id uuid, p_items jsonb)
+-- Raise unless every roll's product is on the purchase order. Rolls that keep their product
+-- (same id and product as before) are left alone.
+CREATE FUNCTION public.api_check_inventory_products(p_organization_id uuid, p_purchase_order_id uuid, p_inventory_id uuid, p_rolls jsonb)
 RETURNS void
 LANGUAGE plpgsql
 STABLE
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_line record;
-  v_available boolean;
+  v_roll record;
 BEGIN
-  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
-    RAISE EXCEPTION '採購單至少需要一項產品' USING ERRCODE = '22023', HINT = 'items_required';
+  IF p_rolls IS NULL OR jsonb_typeof(p_rolls) <> 'array' OR jsonb_array_length(p_rolls) = 0 THEN
+    RAISE EXCEPTION '入庫紀錄至少需要一卷布' USING ERRCODE = '22023', HINT = 'rolls_required';
   END IF;
 
-  FOR v_line IN SELECT * FROM jsonb_to_recordset(p_items) AS x(id uuid, product_id uuid) LOOP
-    SELECT p.status IS DISTINCT FROM 'Unavailable' AND g.is_active INTO v_available
-    FROM public.products_new p JOIN public.product_groups g ON g.id = p.group_id
-    WHERE p.id = v_line.product_id AND p.organization_id = p_organization_id;
-    IF NOT FOUND THEN
+  FOR v_roll IN SELECT * FROM jsonb_to_recordset(p_rolls) AS x(id uuid, product_id uuid) LOOP
+    IF NOT EXISTS (SELECT 1 FROM public.products_new WHERE id = v_roll.product_id AND organization_id = p_organization_id) THEN
       RAISE EXCEPTION '找不到此產品' USING ERRCODE = 'P0002', HINT = 'product_not_found';
     END IF;
-    IF NOT v_available AND NOT EXISTS (
-      SELECT 1 FROM public.purchase_order_items
-      WHERE purchase_order_id = p_purchase_order_id AND id = v_line.id AND product_id = v_line.product_id
-    ) THEN
-      RAISE EXCEPTION '產品「%」已停用', public.api_product_label(v_line.product_id) USING ERRCODE = '22023', HINT = 'product_unavailable';
+    IF NOT EXISTS (SELECT 1 FROM public.purchase_order_items WHERE purchase_order_id = p_purchase_order_id AND product_id = v_roll.product_id)
+       AND NOT EXISTS (SELECT 1 FROM public.inventory_rolls WHERE inventory_id = p_inventory_id AND id = v_roll.id AND product_id = v_roll.product_id) THEN
+      RAISE EXCEPTION '產品「%」不在採購單上', public.api_product_label(v_roll.product_id)
+        USING ERRCODE = '22023', HINT = 'product_not_on_purchase_order';
     END IF;
   END LOOP;
 END;
 $function$;
 
--- Raise unless the factory belongs to the organization and is active (the purchase order's current factory may stay)
-CREATE FUNCTION public.api_check_purchase_factory(p_organization_id uuid, p_factory_id uuid, p_current_factory_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-STABLE
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_factory public.factories%ROWTYPE;
-BEGIN
-  SELECT * INTO v_factory FROM public.factories WHERE id = p_factory_id AND organization_id = p_organization_id;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此工廠' USING ERRCODE = 'P0002', HINT = 'factory_not_found';
-  END IF;
-  IF NOT v_factory.is_active AND p_factory_id IS DISTINCT FROM p_current_factory_id THEN
-    RAISE EXCEPTION '工廠「%」已停用', v_factory.name USING ERRCODE = '22023', HINT = 'factory_inactive';
-  END IF;
-END;
-$function$;
-
--- Raise unless every order belongs to the organization; newly linked ones must not be cancelled
-CREATE FUNCTION public.api_check_purchase_orders(p_organization_id uuid, p_purchase_order_id uuid, p_order_ids uuid[])
-RETURNS void
-LANGUAGE plpgsql
-STABLE
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_order record;
-BEGIN
-  FOR v_order IN
-    SELECT ids.id, o.order_number, o.status, o.organization_id
-    FROM unnest(coalesce(p_order_ids, '{}')) AS ids(id) LEFT JOIN public.orders o ON o.id = ids.id
-  LOOP
-    IF v_order.organization_id IS DISTINCT FROM p_organization_id THEN
-      RAISE EXCEPTION '找不到此訂單' USING ERRCODE = 'P0002', HINT = 'order_not_found';
-    END IF;
-    IF v_order.status = 'cancelled' AND NOT EXISTS (
-      SELECT 1 FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = v_order.id
-    ) THEN
-      RAISE EXCEPTION '訂單 % 已取消', v_order.order_number USING ERRCODE = '55000', HINT = 'order_cancelled';
-    END IF;
-  END LOOP;
-END;
-$function$;
-
--- Orders marked 已向工廠下單 that no longer have a live purchase order go back to 已確認
-CREATE FUNCTION public.api_release_orders(p_order_ids uuid[])
-RETURNS void
+-- Roll-level change lines (removed, changed, added) between a snapshot taken before a save and the rolls now
+CREATE FUNCTION public.api_roll_changes(p_inventory_id uuid, p_old_rolls jsonb)
+RETURNS jsonb
 LANGUAGE sql
+STABLE
 SET search_path TO 'public'
 AS $function$
-  UPDATE public.orders o
-  SET status = 'confirmed'
-  WHERE o.id = ANY (coalesce(p_order_ids, '{}'))
-    AND o.status = 'factory_ordered'
-    AND NOT EXISTS (
-      SELECT 1 FROM public.purchase_orders po
-      WHERE po.status <> 'cancelled'
-        AND (po.order_id = o.id
-             OR EXISTS (SELECT 1 FROM public.purchase_order_relations r WHERE r.purchase_order_id = po.id AND r.order_id = o.id))
-    );
+  SELECT coalesce((
+           SELECT jsonb_agg(jsonb_build_object('label', '移除布卷', 'value',
+                    public.api_roll_label(old.value->>'roll_number', (old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric,
+                      old.value->>'quality', (old.value->>'warehouse_id')::uuid, old.value->>'shelf')))
+           FROM jsonb_each(p_old_rolls) AS old
+           WHERE NOT EXISTS (SELECT 1 FROM public.inventory_rolls WHERE id = old.key::uuid)
+         ), '[]'::jsonb)
+    || coalesce((
+         SELECT jsonb_agg(jsonb_build_object('label', '修改布卷', 'value',
+                  public.api_roll_label(old.value->>'roll_number', (old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric,
+                    old.value->>'quality', (old.value->>'warehouse_id')::uuid, old.value->>'shelf')
+                  || ' → ' || public.api_roll_label(ir.roll_number, ir.product_id, ir.quantity, ir.quality::text, ir.warehouse_id, ir.shelf))
+                ORDER BY ir.created_at)
+         FROM jsonb_each(p_old_rolls) AS old JOIN public.inventory_rolls ir ON ir.id = old.key::uuid
+         WHERE ir.product_id <> (old.value->>'product_id')::uuid
+            OR ir.quantity <> (old.value->>'quantity')::numeric
+            OR ir.quality::text <> old.value->>'quality'
+            OR ir.warehouse_id <> (old.value->>'warehouse_id')::uuid
+            OR ir.shelf IS DISTINCT FROM old.value->>'shelf'
+       ), '[]'::jsonb)
+    || coalesce((
+         SELECT jsonb_agg(jsonb_build_object('label', '新增布卷', 'value',
+                  public.api_roll_label(ir.roll_number, ir.product_id, ir.quantity, ir.quality::text, ir.warehouse_id, ir.shelf)) ORDER BY ir.created_at)
+         FROM public.inventory_rolls ir
+         WHERE ir.inventory_id = p_inventory_id AND NOT p_old_rolls ? ir.id::text
+       ), '[]'::jsonb);
 $function$;
 
--- Link a purchase order to exactly these orders: newly linked open orders become 已向工廠下單,
--- unlinked ones are released
-CREATE FUNCTION public.api_link_purchase_orders(p_purchase_order_id uuid, p_order_ids uuid[])
-RETURNS void
-LANGUAGE plpgsql
+-- Snapshot of a batch's rolls, keyed by roll id, for api_roll_changes
+CREATE FUNCTION public.api_roll_snapshot(p_inventory_id uuid)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
 SET search_path TO 'public'
 AS $function$
-DECLARE
-  v_removed uuid[];
-BEGIN
-  SELECT coalesce(array_agg(order_id), '{}') INTO v_removed
-  FROM public.purchase_order_relations
-  WHERE purchase_order_id = p_purchase_order_id AND order_id <> ALL (coalesce(p_order_ids, '{}'));
-
-  DELETE FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = ANY (v_removed);
-  INSERT INTO public.purchase_order_relations (purchase_order_id, order_id)
-  SELECT p_purchase_order_id, o FROM (SELECT DISTINCT unnest(coalesce(p_order_ids, '{}')) AS o) ids
-  WHERE NOT EXISTS (SELECT 1 FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id AND order_id = ids.o);
-
-  UPDATE public.orders SET status = 'factory_ordered'
-  WHERE id = ANY (coalesce(p_order_ids, '{}')) AND status IN ('pending', 'confirmed');
-
-  PERFORM public.api_release_orders(v_removed);
-END;
+  SELECT coalesce(jsonb_object_agg(id, jsonb_build_object('roll_number', roll_number, 'product_id', product_id, 'quantity', quantity,
+           'quality', quality, 'warehouse_id', warehouse_id, 'shelf', shelf)), '{}')
+  FROM public.inventory_rolls WHERE inventory_id = p_inventory_id;
 $function$;
 
--- ===== 4. 採購單 API
+-- ===== 3. 入庫 API
 
--- p_items: [{ product_id, ordered_quantity, unit_price, ordered_rolls?, specifications? }]
-CREATE FUNCTION public.create_purchase_order(
+-- p_rolls: [{ product_id, quantity, warehouse_id, shelf?, quality? (A/B/C/D/defective, default A), roll_number?, specifications? }]
+CREATE FUNCTION public.receive_inventory(
   p_organization_id uuid,
-  p_factory_id uuid,
-  p_items jsonb,
-  p_order_ids uuid[] DEFAULT '{}',
-  p_expected_arrival_date date DEFAULT NULL,
+  p_purchase_order_id uuid,
+  p_rolls jsonb,
+  p_arrival_date date DEFAULT NULL,
   p_note text DEFAULT NULL,
-  p_order_date date DEFAULT NULL,
   p_dry_run boolean DEFAULT false
 )
 RETURNS jsonb
@@ -323,46 +281,48 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_order_date date := coalesce(p_order_date, (now() AT TIME ZONE 'Asia/Taipei')::date);
+  v_po public.purchase_orders%ROWTYPE;
   v_id uuid;
   v_number text;
   v_fields jsonb;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canCreatePurchases');
-  PERFORM public.api_check_purchase_factory(p_organization_id, p_factory_id, NULL);
-  PERFORM public.api_check_purchase_products(p_organization_id, NULL, p_items);
-  PERFORM public.api_check_purchase_orders(p_organization_id, NULL, p_order_ids);
-  IF p_expected_arrival_date < v_order_date THEN
-    RAISE EXCEPTION '預計到貨日期不可早於下單日期' USING ERRCODE = '22023', HINT = 'invalid_expected_arrival_date';
+  PERFORM public.api_require_permission(p_organization_id, 'canCreateInventory');
+
+  SELECT * INTO v_po FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '找不到此採購單' USING ERRCODE = 'P0002', HINT = 'purchase_order_not_found';
   END IF;
+  IF v_po.status = 'cancelled' THEN
+    RAISE EXCEPTION '採購單 % 已取消，不能入庫', v_po.po_number USING ERRCODE = '55000', HINT = 'purchase_order_cancelled';
+  END IF;
+  PERFORM public.api_check_inventory_products(p_organization_id, p_purchase_order_id, NULL, p_rolls);
 
   -- Write for real; a dry run rolls this block back after collecting the summary
   BEGIN
-    v_number := public.api_next_document_number(p_organization_id, 'purchase_order');
-    INSERT INTO public.purchase_orders (po_number, factory_id, organization_id, user_id, order_date, expected_arrival_date, note, status)
-    VALUES (v_number, p_factory_id, p_organization_id, auth.uid(), v_order_date, p_expected_arrival_date, public.api_clean(p_note), 'confirmed')
+    v_number := public.api_next_document_number(p_organization_id, 'receiving');
+    INSERT INTO public.inventories (receipt_number, purchase_order_id, factory_id, organization_id, user_id, arrival_date, note)
+    VALUES (v_number, p_purchase_order_id, v_po.factory_id, p_organization_id, auth.uid(),
+            coalesce(p_arrival_date, (now() AT TIME ZONE 'Asia/Taipei')::date), public.api_clean(p_note))
     RETURNING id INTO v_id;
 
-    PERFORM public.save_purchase_order_items(v_id, public.api_order_items_payload(p_items, false));
-    PERFORM public.api_link_purchase_orders(v_id, p_order_ids);
+    PERFORM public.save_inventory_rolls(v_id, public.api_order_items_payload(p_rolls, false));
 
-    v_fields := public.api_purchase_order_fields(v_id);
+    v_fields := public.api_inventory_fields(v_id);
     IF p_dry_run THEN
       RAISE EXCEPTION USING ERRCODE = 'DRYRN';
     END IF;
   EXCEPTION WHEN SQLSTATE 'DRYRN' THEN
-    RETURN public.api_result(true, NULL, NULL, '建立採購單', v_fields);
+    RETURN public.api_result(true, NULL, NULL, '入庫', v_fields);
   END;
 
-  RETURN public.api_result(false, v_id, v_number, '建立採購單', v_fields);
+  RETURN public.api_result(false, v_id, v_number, '入庫', v_fields);
 END;
 $function$;
 
--- p_changes may hold: items (the complete list, as save_purchase_order_items expects), order_ids (the complete list),
--- factory_id, order_date, expected_arrival_date, note, status (pending / confirmed / partial_received / completed)
-CREATE FUNCTION public.update_purchase_order(
+-- p_changes may hold: rolls (the complete list, as save_inventory_rolls expects), arrival_date, note
+CREATE FUNCTION public.update_inventory(
   p_organization_id uuid,
-  p_purchase_order_id uuid,
+  p_inventory_id uuid,
   p_changes jsonb,
   p_dry_run boolean DEFAULT false
 )
@@ -372,130 +332,58 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_old public.purchase_orders%ROWTYPE;
-  v_new public.purchase_orders%ROWTYPE;
-  v_old_items jsonb;
-  v_old_orders text;
-  v_old_factory text;
-  v_order_ids uuid[];
-  v_factory_id uuid;
-  v_order_date date;
+  v_old public.inventories%ROWTYPE;
+  v_new public.inventories%ROWTYPE;
+  v_old_rolls jsonb;
   v_arrival date;
   v_fields jsonb;
   v_title text;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditPurchases');
-  PERFORM public.api_check_change_keys(p_changes,
-    ARRAY['items', 'order_ids', 'factory_id', 'order_date', 'expected_arrival_date', 'note', 'status']);
+  PERFORM public.api_require_permission(p_organization_id, 'canEditInventory');
+  PERFORM public.api_check_change_keys(p_changes, ARRAY['rolls', 'arrival_date', 'note']);
 
-  SELECT * INTO v_old FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
+  SELECT * INTO v_old FROM public.inventories WHERE id = p_inventory_id AND organization_id = p_organization_id FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此採購單' USING ERRCODE = 'P0002', HINT = 'purchase_order_not_found';
-  END IF;
-  IF v_old.status = 'cancelled' THEN
-    RAISE EXCEPTION '採購單 % 已取消，不能修改', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_cancelled';
+    RAISE EXCEPTION '找不到此入庫紀錄' USING ERRCODE = 'P0002', HINT = 'inventory_not_found';
   END IF;
 
-  IF p_changes->>'status' = 'cancelled' THEN
-    RAISE EXCEPTION '請使用取消採購單' USING ERRCODE = '22023', HINT = 'use_cancel_purchase_order';
+  IF p_changes ? 'rolls' THEN
+    PERFORM public.api_check_inventory_products(p_organization_id, v_old.purchase_order_id, p_inventory_id, p_changes->'rolls');
   END IF;
-  IF p_changes ? 'status' AND coalesce(p_changes->>'status', '') NOT IN ('pending', 'confirmed', 'partial_received', 'completed') THEN
-    RAISE EXCEPTION '採購單狀態不正確' USING ERRCODE = '22023', HINT = 'invalid_status';
-  END IF;
+  v_arrival := CASE WHEN p_changes ? 'arrival_date' THEN coalesce(public.api_date(p_changes->>'arrival_date'), v_old.arrival_date) ELSE v_old.arrival_date END;
 
-  IF p_changes ? 'items' THEN
-    PERFORM public.api_check_purchase_products(p_organization_id, p_purchase_order_id, p_changes->'items');
-  END IF;
-  IF p_changes ? 'order_ids' THEN
-    IF jsonb_typeof(p_changes->'order_ids') <> 'array' THEN
-      RAISE EXCEPTION '訂單清單格式不正確' USING ERRCODE = '22023', HINT = 'invalid_order_ids';
-    END IF;
-    SELECT coalesce(array_agg(DISTINCT value::uuid), '{}') INTO v_order_ids FROM jsonb_array_elements_text(p_changes->'order_ids');
-    PERFORM public.api_check_purchase_orders(p_organization_id, p_purchase_order_id, v_order_ids);
-  END IF;
-
-  v_factory_id := coalesce((public.api_clean(p_changes->>'factory_id'))::uuid, v_old.factory_id);
-  IF v_factory_id <> v_old.factory_id THEN
-    PERFORM public.api_check_purchase_factory(p_organization_id, v_factory_id, v_old.factory_id);
-    IF EXISTS (SELECT 1 FROM public.inventories WHERE purchase_order_id = p_purchase_order_id) THEN
-      RAISE EXCEPTION '採購單 % 已有入庫紀錄，不能更換工廠', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_received';
-    END IF;
-  END IF;
-
-  v_order_date := CASE WHEN p_changes ? 'order_date' THEN coalesce(public.api_date(p_changes->>'order_date'), v_old.order_date) ELSE v_old.order_date END;
-  v_arrival := CASE WHEN p_changes ? 'expected_arrival_date' THEN public.api_date(p_changes->>'expected_arrival_date') ELSE v_old.expected_arrival_date END;
-  IF v_arrival < v_order_date THEN
-    RAISE EXCEPTION '預計到貨日期不可早於下單日期' USING ERRCODE = '22023', HINT = 'invalid_expected_arrival_date';
-  END IF;
-
-  SELECT coalesce(jsonb_object_agg(poi.id, jsonb_build_object('product_id', poi.product_id, 'quantity', poi.ordered_quantity, 'unit_price', poi.unit_price)), '{}')
-  INTO v_old_items FROM public.purchase_order_items poi WHERE poi.purchase_order_id = p_purchase_order_id;
-  v_old_orders := public.api_purchase_order_numbers(p_purchase_order_id);
-  SELECT name INTO v_old_factory FROM public.factories WHERE id = v_old.factory_id;
-  v_title := format('修改採購單 %s', v_old.po_number);
+  v_old_rolls := public.api_roll_snapshot(p_inventory_id);
+  v_title := format('修改進貨單 %s', v_old.receipt_number);
 
   BEGIN
-    IF p_changes ? 'items' THEN
-      PERFORM public.save_purchase_order_items(p_purchase_order_id, public.api_order_items_payload(p_changes->'items', true));
-    END IF;
-    IF p_changes ? 'order_ids' THEN
-      PERFORM public.api_link_purchase_orders(p_purchase_order_id, v_order_ids);
+    IF p_changes ? 'rolls' THEN
+      PERFORM public.save_inventory_rolls(p_inventory_id, public.api_order_items_payload(p_changes->'rolls', true));
     END IF;
 
-    -- The item save recalculates the status; an explicit status overrides it
-    UPDATE public.purchase_orders
-    SET status = CASE WHEN p_changes ? 'status' THEN (p_changes->>'status')::purchase_order_status ELSE status END,
-        factory_id = v_factory_id,
-        order_date = v_order_date,
-        expected_arrival_date = v_arrival,
-        note = public.api_changed(p_changes, 'note', note)
-    WHERE id = p_purchase_order_id
+    UPDATE public.inventories
+    SET arrival_date = v_arrival, note = public.api_changed(p_changes, 'note', note)
+    WHERE id = p_inventory_id
     RETURNING * INTO v_new;
 
-    v_fields := public.api_changed_fields(
-        '狀態', public.api_purchase_status_label(v_old.status::text), public.api_purchase_status_label(v_new.status::text),
-        '工廠', v_old_factory, (SELECT name FROM public.factories WHERE id = v_new.factory_id),
-        '關聯訂單', v_old_orders, public.api_purchase_order_numbers(p_purchase_order_id),
-        '下單日期', v_old.order_date::text, v_new.order_date::text,
-        '預計到貨日期', v_old.expected_arrival_date::text, v_new.expected_arrival_date::text,
-        '備註', v_old.note, v_new.note)
-      || coalesce((
-           SELECT jsonb_agg(jsonb_build_object('label', '移除品項', 'value',
-                    public.api_order_line_label((old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric, (old.value->>'unit_price')::numeric)))
-           FROM jsonb_each(v_old_items) AS old
-           WHERE NOT EXISTS (SELECT 1 FROM public.purchase_order_items WHERE id = old.key::uuid)
-         ), '[]'::jsonb)
-      || coalesce((
-           SELECT jsonb_agg(jsonb_build_object('label', '修改品項', 'value',
-                    public.api_order_line_label((old.value->>'product_id')::uuid, (old.value->>'quantity')::numeric, (old.value->>'unit_price')::numeric)
-                    || ' → ' || public.api_order_line_label(poi.product_id, poi.ordered_quantity, poi.unit_price)) ORDER BY poi.created_at)
-           FROM jsonb_each(v_old_items) AS old JOIN public.purchase_order_items poi ON poi.id = old.key::uuid
-           WHERE poi.product_id <> (old.value->>'product_id')::uuid
-              OR poi.ordered_quantity <> (old.value->>'quantity')::numeric
-              OR poi.unit_price <> (old.value->>'unit_price')::numeric
-         ), '[]'::jsonb)
-      || coalesce((
-           SELECT jsonb_agg(jsonb_build_object('label', '新增品項', 'value', public.api_order_line_label(poi.product_id, poi.ordered_quantity, poi.unit_price)) ORDER BY poi.created_at)
-           FROM public.purchase_order_items poi
-           WHERE poi.purchase_order_id = p_purchase_order_id AND NOT v_old_items ? poi.id::text
-         ), '[]'::jsonb);
+    v_fields := public.api_changed_fields('到貨日期', v_old.arrival_date::text, v_new.arrival_date::text, '備註', v_old.note, v_new.note)
+      || public.api_roll_changes(p_inventory_id, v_old_rolls);
 
     IF p_dry_run THEN
       RAISE EXCEPTION USING ERRCODE = 'DRYRN';
     END IF;
   EXCEPTION WHEN SQLSTATE 'DRYRN' THEN
-    RETURN public.api_result(true, p_purchase_order_id, v_old.po_number, v_title, v_fields);
+    RETURN public.api_result(true, p_inventory_id, v_old.receipt_number, v_title, v_fields);
   END;
 
-  RETURN public.api_result(false, p_purchase_order_id, v_old.po_number, v_title, v_fields);
+  RETURN public.api_result(false, p_inventory_id, v_old.receipt_number, v_title, v_fields);
 END;
 $function$;
 
--- Cancelling is refused once goods have been received against the purchase order
-CREATE FUNCTION public.cancel_purchase_order(
+-- One roll: p_changes may hold quantity (received weight), quality, warehouse_id, shelf
+CREATE FUNCTION public.update_inventory_roll(
   p_organization_id uuid,
-  p_purchase_order_id uuid,
-  p_reason text DEFAULT NULL,
+  p_roll_id uuid,
+  p_changes jsonb,
   p_dry_run boolean DEFAULT false
 )
 RETURNS jsonb
@@ -504,59 +392,70 @@ SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_old public.purchase_orders%ROWTYPE;
-  v_order_ids uuid[];
-  v_title text;
+  v_roll public.inventory_rolls%ROWTYPE;
+  v_receipt text;
+  v_old_rolls jsonb;
+  v_rolls jsonb;
   v_fields jsonb;
+  v_title text;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditPurchases');
+  PERFORM public.api_require_permission(p_organization_id, 'canEditInventory');
+  PERFORM public.api_check_change_keys(p_changes, ARRAY['quantity', 'quality', 'warehouse_id', 'shelf']);
 
-  SELECT * INTO v_old FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
+  SELECT ir.* INTO v_roll
+  FROM public.inventory_rolls ir JOIN public.inventories i ON i.id = ir.inventory_id
+  WHERE ir.id = p_roll_id AND i.organization_id = p_organization_id;
   IF NOT FOUND THEN
-    RAISE EXCEPTION '找不到此採購單' USING ERRCODE = 'P0002', HINT = 'purchase_order_not_found';
+    RAISE EXCEPTION '找不到此布卷' USING ERRCODE = 'P0002', HINT = 'roll_not_found';
   END IF;
-  IF v_old.status = 'cancelled' THEN
-    RAISE EXCEPTION '採購單 % 已取消', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_already_cancelled';
+  IF p_changes ? 'quality' AND coalesce(p_changes->>'quality', '') NOT IN ('A', 'B', 'C', 'D', 'defective') THEN
+    RAISE EXCEPTION '品質等級不正確' USING ERRCODE = '22023', HINT = 'invalid_quality';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.inventories WHERE purchase_order_id = p_purchase_order_id) THEN
-    RAISE EXCEPTION '採購單 % 已有入庫紀錄，不能取消', v_old.po_number USING ERRCODE = '55000', HINT = 'purchase_order_received';
-  END IF;
+  SELECT receipt_number INTO v_receipt FROM public.inventories WHERE id = v_roll.inventory_id;
 
-  v_title := format('取消採購單 %s', v_old.po_number);
-  v_fields := public.api_changed_fields('狀態', public.api_purchase_status_label(v_old.status::text), '已取消')
-    || public.api_fields('取消原因', public.api_clean(p_reason));
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_purchase_order_id, v_old.po_number, v_title, v_fields);
-  END IF;
+  -- The batch's complete roll list with this roll changed, so save_inventory_rolls applies the usual rules
+  SELECT jsonb_agg(jsonb_build_object(
+           'id', ir.id, 'product_id', ir.product_id, 'specifications', ir.specifications,
+           'warehouse_id', CASE WHEN ir.id = p_roll_id AND p_changes ? 'warehouse_id' THEN p_changes->>'warehouse_id' ELSE ir.warehouse_id::text END,
+           'shelf', CASE WHEN ir.id = p_roll_id AND p_changes ? 'shelf' THEN p_changes->>'shelf' ELSE ir.shelf END,
+           'quality', CASE WHEN ir.id = p_roll_id AND p_changes ? 'quality' THEN p_changes->>'quality' ELSE ir.quality::text END,
+           'quantity', CASE WHEN ir.id = p_roll_id AND p_changes ? 'quantity' THEN p_changes->'quantity' ELSE to_jsonb(ir.quantity) END)
+         ORDER BY ir.created_at)
+  INTO v_rolls FROM public.inventory_rolls ir WHERE ir.inventory_id = v_roll.inventory_id;
 
-  UPDATE public.purchase_orders
-  SET status = 'cancelled', cancelled_at = now(), cancel_reason = public.api_clean(p_reason)
-  WHERE id = p_purchase_order_id;
+  v_old_rolls := public.api_roll_snapshot(v_roll.inventory_id);
+  v_title := format('修改布卷 %s', v_roll.roll_number);
 
-  -- Linked orders stay linked (for the record) but no longer count this purchase order as placed
-  SELECT coalesce(array_agg(order_id), '{}') INTO v_order_ids FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id;
-  PERFORM public.api_release_orders(array_append(v_order_ids, v_old.order_id));
+  BEGIN
+    PERFORM public.save_inventory_rolls(v_roll.inventory_id, v_rolls);
+    v_fields := public.api_fields('進貨單', v_receipt) || public.api_roll_changes(v_roll.inventory_id, v_old_rolls);
+    IF p_dry_run THEN
+      RAISE EXCEPTION USING ERRCODE = 'DRYRN';
+    END IF;
+  EXCEPTION WHEN SQLSTATE 'DRYRN' THEN
+    RETURN public.api_result(true, p_roll_id, v_roll.roll_number, v_title, v_fields);
+  END;
 
-  RETURN public.api_result(false, p_purchase_order_id, v_old.po_number, v_title, v_fields);
+  RETURN public.api_result(false, p_roll_id, v_roll.roll_number, v_title, v_fields);
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.api_purchase_status_label(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_date(text) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_purchase_order_numbers(uuid) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_purchase_order_fields(uuid) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_check_purchase_products(uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_check_purchase_factory(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_check_purchase_orders(uuid, uuid, uuid[]) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_release_orders(uuid[]) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.api_link_purchase_orders(uuid, uuid[]) FROM PUBLIC, anon, authenticated;
+-- save_inventory_rolls runs as its caller, so members need the roll number generator too
+REVOKE ALL ON FUNCTION public.api_new_roll_number() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.api_new_roll_number() TO authenticated;
+REVOKE ALL ON FUNCTION public.api_quality_label(text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_roll_label(text, uuid, numeric, text, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_inventory_fields(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_check_inventory_products(uuid, uuid, uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_roll_changes(uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_roll_snapshot(uuid) FROM PUBLIC, anon, authenticated;
 
-REVOKE ALL ON FUNCTION public.create_purchase_order(uuid, uuid, jsonb, uuid[], date, text, date, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.update_purchase_order(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.cancel_purchase_order(uuid, uuid, text, boolean) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.create_purchase_order(uuid, uuid, jsonb, uuid[], date, text, date, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.update_purchase_order(uuid, uuid, jsonb, boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.cancel_purchase_order(uuid, uuid, text, boolean) TO authenticated;
+REVOKE ALL ON FUNCTION public.receive_inventory(uuid, uuid, jsonb, date, text, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.update_inventory(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.update_inventory_roll(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.receive_inventory(uuid, uuid, jsonb, date, text, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_inventory(uuid, uuid, jsonb, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_inventory_roll(uuid, uuid, jsonb, boolean) TO authenticated;
 
 -- ===== _helpers.sql
 -- SQL 測試共用工具。
@@ -1469,6 +1368,230 @@ begin
   -- The order itself can now be cancelled
   perform pg_temp.call_as(v_editor, format('select public.cancel_order(%L, %L)', v_org, v_order));
   perform pg_temp.check((select status from public.orders where id = v_order) = 'cancelled', 'an order whose purchase orders are all cancelled can be cancelled');
+end $$;
+
+
+-- ===== test: api_a4_receiving.test.sql
+-- 業務 API A4：入庫（進貨單）（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- Fixture: purchase order (product 1, 100kg ordered, fully received) with one receiving batch holding one roll
+-- (100kg received, 40kg shipped); product 2 is not on the purchase order.
+
+-- receive_inventory writes the batch and its rolls, numbers both and updates the purchase order's progress
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_date text := to_char(now() at time zone 'Asia/Taipei', 'YYYYMMDD');
+  v_po uuid;
+  v_rolls jsonb;
+  v_result jsonb;
+  v_inventory public.inventories%rowtype;
+begin
+  v_po := (pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L)', v_org, fx->>'factory_id',
+    jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 100, 'unit_price', 5),
+                      jsonb_build_object('product_id', fx->>'product2_id', 'ordered_quantity', 50, 'unit_price', 5))))->>'id')::uuid;
+
+  v_rolls := jsonb_build_array(
+    jsonb_build_object('product_id', fx->>'product_id', 'quantity', 40, 'warehouse_id', fx->>'warehouse_id', 'shelf', ' B-03 '),
+    jsonb_build_object('product_id', fx->>'product_id', 'quantity', 35.5, 'warehouse_id', fx->>'warehouse_id', 'quality', 'B'),
+    jsonb_build_object('product_id', fx->>'product2_id', 'quantity', 60, 'warehouse_id', fx->>'warehouse_id', 'roll_number', 'MY-ROLL-' || v_org));
+
+  v_result := pg_temp.call_as(v_editor, format('select public.receive_inventory(%L, %L, %L, %L, %L)', v_org, v_po, v_rolls, '2026-10-01', '第一批'));
+  select * into v_inventory from public.inventories where id = (v_result->>'id')::uuid;
+
+  -- seed_fixture already created today's first receiving batch for this organization
+  perform pg_temp.check(v_result->>'number' = 'I' || v_date || '0002', 'the batch is numbered I<date>, got ' || coalesce(v_result->>'number', 'none'));
+  perform pg_temp.check(v_inventory.receipt_number = v_result->>'number' and v_inventory.purchase_order_id = v_po
+    and v_inventory.factory_id = (fx->>'factory_id')::uuid and v_inventory.user_id = v_editor and v_inventory.arrival_date = '2026-10-01'
+    and v_inventory.note = '第一批', 'the batch keeps the purchase order''s factory, its date and note');
+  perform pg_temp.check((select count(*) from public.inventory_rolls where inventory_id = v_inventory.id) = 3, 'all rolls are stored');
+  perform pg_temp.check(exists (select 1 from public.inventory_rolls where inventory_id = v_inventory.id and quantity = 40 and current_quantity = 40
+      and quality = 'A' and shelf = 'B-03' and roll_number ~ '^R\d{15}$'), 'a roll without a number gets one, with grade A and a trimmed shelf');
+  perform pg_temp.check(exists (select 1 from public.inventory_rolls where inventory_id = v_inventory.id and roll_number = 'MY-ROLL-' || v_org),
+    'a roll number given by the caller is kept');
+
+  perform pg_temp.check((select received_quantity from public.purchase_order_items where purchase_order_id = v_po and product_id = (fx->>'product_id')::uuid) = 75.5,
+    'the purchase order item counts what was received');
+  perform pg_temp.check((select status from public.purchase_orders where id = v_po) = 'partial_received', 'the purchase order is partly received');
+
+  perform pg_temp.check(v_result->'summary'->>'title' = '入庫', 'the summary has a title');
+  perform pg_temp.check(v_result->'summary'->'fields' @> jsonb_build_array(
+      jsonb_build_object('label', '工廠', 'value', '測試工廠'),
+      jsonb_build_object('label', '到貨日期', 'value', '2026-10-01'),
+      jsonb_build_object('label', '產品 1', 'value', public.api_product_label((fx->>'product_id')::uuid) || ' × 2 卷，共 75.5 公斤'),
+      jsonb_build_object('label', '產品 2', 'value', public.api_product_label((fx->>'product2_id')::uuid) || ' × 1 卷，共 60 公斤'),
+      jsonb_build_object('label', '合計', 'value', '3 卷，135.5 公斤'),
+      jsonb_build_object('label', '超過採購量', 'value', public.api_product_label((fx->>'product2_id')::uuid) || ' 已入庫 60 公斤，採購 50 公斤')),
+    'the summary describes the batch and flags over-receipt, got ' || (v_result->'summary'->'fields')::text);
+
+  perform pg_temp.check((pg_temp.call_as((other->>'user_id')::uuid, format('select public.receive_inventory(%L, %L, %L)', other->>'org_id', other->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', other->>'product_id', 'quantity', 1, 'warehouse_id', other->>'warehouse_id')))))->>'number'
+    = 'I' || v_date || '0002', 'another organization counts its own numbers');
+end $$;
+
+-- A dry run stores nothing, leaves the purchase order alone and shows the same summary
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_rolls jsonb := jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 10, 'warehouse_id', fx->>'warehouse_id', 'roll_number', 'DRY-1'));
+  v_batches int;
+  v_logs int;
+  v_received numeric;
+  v_preview jsonb;
+  v_real jsonb;
+begin
+  select count(*) into v_batches from public.inventories where organization_id = v_org;
+  select count(*) into v_logs from public.record_audit_logs where organization_id = v_org;
+  select received_quantity into v_received from public.purchase_order_items where id = (fx->>'po_item_id')::uuid;
+
+  v_preview := pg_temp.call_as(v_editor, format('select public.receive_inventory(%L, %L, %L, p_dry_run => true)', v_org, fx->>'po_id', v_rolls));
+  perform pg_temp.check((v_preview->>'dry_run')::boolean and v_preview->>'id' is null and v_preview->>'number' is null, 'a dry run has no id or number');
+  perform pg_temp.check((select count(*) from public.inventories where organization_id = v_org) = v_batches, 'a dry run stores no batch');
+  perform pg_temp.check((select count(*) from public.record_audit_logs where organization_id = v_org) = v_logs, 'a dry run leaves no audit trail');
+  perform pg_temp.check((select received_quantity from public.purchase_order_items where id = (fx->>'po_item_id')::uuid) = v_received,
+    'a dry run leaves the purchase order''s progress alone');
+
+  v_real := pg_temp.call_as(v_editor, format('select public.receive_inventory(%L, %L, %L)', v_org, fx->>'po_id', v_rolls));
+  perform pg_temp.check(v_preview->'summary' = v_real->'summary', 'the dry run shows the same summary as the real call');
+end $$;
+
+-- receive_inventory refuses bad input and needs canCreateInventory
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_good jsonb := jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 10, 'warehouse_id', fx->>'warehouse_id'));
+  v_po uuid;
+  v_call text := 'select public.receive_inventory(%L, %L, %L)';
+begin
+  perform pg_temp.check_api_error_as(v_viewer, format(v_call, v_org, fx->>'po_id', v_good), '42501', 'forbidden', 'a viewer cannot receive goods');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, other->>'po_id', v_good), 'P0002', 'purchase_order_not_found',
+    'another organization''s purchase order is not found');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id', '[]'), '22023', 'rolls_required', 'a batch needs a roll');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product2_id', 'quantity', 10, 'warehouse_id', fx->>'warehouse_id'))),
+    '22023', 'product_not_on_purchase_order', 'only products on the purchase order can be received');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', other->>'product_id', 'quantity', 10, 'warehouse_id', fx->>'warehouse_id'))),
+    'P0002', 'product_not_found', 'another organization''s product is not found');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 10, 'warehouse_id', other->>'warehouse_id'))),
+    'P0002', 'warehouse_not_found', 'another organization''s warehouse is not found');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 0, 'warehouse_id', fx->>'warehouse_id'))),
+    '22023', 'invalid_quantity', 'a roll must weigh something');
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 1, 'warehouse_id', fx->>'warehouse_id',
+        'roll_number', (select roll_number from public.inventory_rolls where id = (fx->>'roll_id')::uuid)))),
+    '23505', 'roll_number_taken', 'roll numbers are unique');
+
+  v_po := (pg_temp.call_as(v_editor, format('select public.create_purchase_order(%L, %L, %L)', v_org, fx->>'factory_id',
+    jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'ordered_quantity', 10, 'unit_price', 5))))->>'id')::uuid;
+  perform pg_temp.call_as(v_editor, format('select public.cancel_purchase_order(%L, %L)', v_org, v_po));
+  perform pg_temp.check_api_error_as(v_editor, format(v_call, v_org, v_po, v_good), '55000', 'purchase_order_cancelled',
+    'a cancelled purchase order cannot be received');
+end $$;
+
+-- update_inventory changes the date, note and rolls; shipped rolls keep their lock rules
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_inventory uuid := (fx->>'inventory_id')::uuid;
+  v_receipt text := (select receipt_number from public.inventories where id = (fx->>'inventory_id')::uuid);
+  v_roll public.inventory_rolls%rowtype;
+  v_changes jsonb;
+  v_preview jsonb;
+  v_result jsonb;
+begin
+  select * into v_roll from public.inventory_rolls where id = (fx->>'roll_id')::uuid;
+  v_changes := jsonb_build_object(
+    'arrival_date', '2026-10-02',
+    'note', '補登',
+    'rolls', jsonb_build_array(
+      jsonb_build_object('id', v_roll.id, 'product_id', v_roll.product_id, 'quantity', 110, 'warehouse_id', v_roll.warehouse_id, 'quality', 'B'),
+      jsonb_build_object('product_id', fx->>'product_id', 'quantity', 20, 'warehouse_id', fx->>'warehouse_id', 'roll_number', 'ADD-' || v_org)));
+
+  v_preview := pg_temp.call_as(v_editor, format('select public.update_inventory(%L, %L, %L, true)', v_org, v_inventory, v_changes));
+  perform pg_temp.check((select quantity from public.inventory_rolls where id = v_roll.id) = 100, 'a dry run changes nothing');
+
+  v_result := pg_temp.call_as(v_editor, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory, v_changes));
+  perform pg_temp.check(v_preview->'summary' = v_result->'summary', 'the dry run shows the same summary');
+  perform pg_temp.check(v_result->'summary'->>'title' = '修改進貨單 ' || v_receipt and v_result->>'number' = v_receipt, 'the summary names the batch');
+  perform pg_temp.check(v_result->'summary'->'fields' @> jsonb_build_array(
+      jsonb_build_object('label', '備註', 'value', '（空白） → 補登'),
+      jsonb_build_object('label', '修改布卷', 'value',
+        public.api_roll_label(v_roll.roll_number, v_roll.product_id, 100, 'A', v_roll.warehouse_id, null) || ' → '
+        || public.api_roll_label(v_roll.roll_number, v_roll.product_id, 110, 'B', v_roll.warehouse_id, null)),
+      jsonb_build_object('label', '新增布卷', 'value', public.api_roll_label('ADD-' || v_org, (fx->>'product_id')::uuid, 20, 'A', (fx->>'warehouse_id')::uuid, null))),
+    'the summary lists the changes, got ' || (v_result->'summary'->'fields')::text);
+  perform pg_temp.check((select quantity = 110 and current_quantity = 70 and quality = 'B' from public.inventory_rolls where id = v_roll.id),
+    'the roll keeps its shipped weight when its received weight changes');
+  perform pg_temp.check((select arrival_date = '2026-10-02' and note = '補登' from public.inventories where id = v_inventory), 'the batch is updated');
+
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory, '{"note":"x"}'),
+    '42501', 'forbidden', 'a viewer cannot edit batches');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory, '{"factory_id":"x"}'),
+    '22023', 'unknown_field', 'the factory follows the purchase order');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory,
+      jsonb_build_object('rolls', jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 1, 'warehouse_id', fx->>'warehouse_id')))),
+    '55000', 'roll_shipped', 'a shipped roll cannot be removed');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory,
+      jsonb_build_object('rolls', jsonb_build_array(jsonb_build_object('id', v_roll.id, 'product_id', v_roll.product_id, 'quantity', 30, 'warehouse_id', v_roll.warehouse_id)))),
+    '55000', 'quantity_below_shipped', 'a roll cannot weigh less than what was shipped from it');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory(%L, %L, %L)', v_org, v_inventory,
+      jsonb_build_object('rolls', jsonb_build_array(
+        jsonb_build_object('id', v_roll.id, 'product_id', v_roll.product_id, 'quantity', 110, 'warehouse_id', v_roll.warehouse_id),
+        jsonb_build_object('product_id', fx->>'product2_id', 'quantity', 1, 'warehouse_id', fx->>'warehouse_id')))),
+    '22023', 'product_not_on_purchase_order', 'an added roll must be for a product on the purchase order');
+end $$;
+
+-- update_inventory_roll changes one roll and shows it on the card
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_roll public.inventory_rolls%rowtype;
+  v_shelf uuid;
+  v_result jsonb;
+begin
+  select * into v_roll from public.inventory_rolls where id = (fx->>'roll_id')::uuid;
+  insert into public.warehouses (name, organization_id) values ('二號倉', v_org) returning id into v_shelf;
+
+  v_result := pg_temp.call_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id,
+    jsonb_build_object('warehouse_id', v_shelf, 'shelf', 'C-01', 'quality', 'C')));
+  perform pg_temp.check((select warehouse_id = v_shelf and shelf = 'C-01' and quality = 'C' and quantity = 100 and current_quantity = 60
+      from public.inventory_rolls where id = v_roll.id), 'the roll moves and is regraded, its weights unchanged');
+  perform pg_temp.check(v_result->>'number' = v_roll.roll_number and v_result->'summary'->>'title' = '修改布卷 ' || v_roll.roll_number, 'the card names the roll');
+  perform pg_temp.check(v_result->'summary'->'fields' @> jsonb_build_array(jsonb_build_object('label', '修改布卷', 'value',
+      public.api_roll_label(v_roll.roll_number, v_roll.product_id, 100, 'A', v_roll.warehouse_id, null) || ' → '
+      || public.api_roll_label(v_roll.roll_number, v_roll.product_id, 100, 'C', v_shelf, 'C-01'))),
+    'the card shows the roll before and after, got ' || (v_result->'summary'->'fields')::text);
+  perform pg_temp.check(public.api_roll_label(v_roll.roll_number, v_roll.product_id, 100, 'C', v_shelf, 'C-01') like '%（C 級，倉庫 二號倉 C-01）',
+    'the roll label shows grade, warehouse and shelf');
+
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, '{"shelf":"x"}'),
+    '42501', 'forbidden', 'a viewer cannot edit rolls');
+  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select public.update_inventory_roll(%L, %L, %L)', other->>'org_id', v_roll.id, '{"shelf":"x"}'),
+    'P0002', 'roll_not_found', 'another organization''s roll is not found');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, '{"quantity":10}'),
+    '55000', 'quantity_below_shipped', 'a roll cannot weigh less than what was shipped');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, '{"quality":"E"}'),
+    '22023', 'invalid_quality', 'grades are A, B, C, D or defective');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, '{"product_id":"x"}'),
+    '22023', 'unknown_field', 'a single roll''s product is not changed here');
 end $$;
 
 

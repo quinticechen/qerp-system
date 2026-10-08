@@ -70,8 +70,9 @@ export const EditRollDialog = ({ roll, organizationId, onOpenChange }: EditRollD
       return;
     }
 
+    if (!organizationId) return;
     updateRoll.mutate(
-      { roll, edits },
+      { organizationId, roll, edits },
       {
         onSuccess: () => {
           toast({ title: '已更新布卷', description: roll.roll_number });

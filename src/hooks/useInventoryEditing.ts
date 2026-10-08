@@ -1,11 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
-import {
-  InventoryRollPayload,
-  newLineItemKey,
-  saveInventoryRolls,
-} from '@/lib/documentItemsService';
+import { InventoryRollPayload, newLineItemKey } from '@/lib/documentItemsService';
+import { updateInventory } from '@/lib/api/inventory';
 import { generateRollNumber } from '@/lib/rollNumber';
 import type { Json } from '@/integrations/supabase/types';
 import {
@@ -74,8 +71,8 @@ const useInvalidateInventory = () => {
 export const useUpdateInventoryBatch = () => {
   const invalidate = useInvalidateInventory();
   return useMutation({
-    mutationFn: ({ inventoryId, edits }: { inventoryId: string; edits: BatchEdits }) =>
-      updateInventoryBatch(supabase, inventoryId, edits),
+    mutationFn: ({ organizationId, inventoryId, edits }: { organizationId: string; inventoryId: string; edits: BatchEdits }) =>
+      updateInventoryBatch(organizationId, inventoryId, edits),
     onSuccess: invalidate,
   });
 };
@@ -83,8 +80,8 @@ export const useUpdateInventoryBatch = () => {
 export const useUpdateInventoryRoll = () => {
   const invalidate = useInvalidateInventory();
   return useMutation({
-    mutationFn: ({ roll, edits }: { roll: RollSnapshot; edits: RollEdits }) =>
-      updateInventoryRoll(supabase, roll, edits),
+    mutationFn: ({ organizationId, roll, edits }: { organizationId: string; roll: RollSnapshot; edits: RollEdits }) =>
+      updateInventoryRoll(organizationId, roll, edits),
     onSuccess: invalidate,
   });
 };
@@ -191,8 +188,9 @@ export const toInventoryRollsPayload = (rolls: EditableInventoryRoll[]): Invento
 export const useSaveInventoryRolls = () => {
   const invalidate = useInvalidateInventory();
   return useMutation({
-    mutationFn: ({ inventoryId, rolls }: { inventoryId: string; rolls: EditableInventoryRoll[] }) =>
-      saveInventoryRolls(supabase, inventoryId, toInventoryRollsPayload(rolls)),
+    // One call saves the complete roll list; the database checks the lock rules
+    mutationFn: ({ organizationId, inventoryId, rolls }: { organizationId: string; inventoryId: string; rolls: EditableInventoryRoll[] }) =>
+      updateInventory(organizationId, inventoryId, { rolls: toInventoryRollsPayload(rolls) }),
     onSuccess: invalidate,
   });
 };

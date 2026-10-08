@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Pencil } from 'lucide-react';
 import { InventoryBatchForm } from './InventoryBatchForm';
 import { EditableRoll, EditRollDialog } from './EditRollDialog';
+import { apiErrorMessage } from '@/lib/api/client';
 import { InventoryRollsEditor } from './InventoryRollsEditor';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 import {
@@ -110,12 +111,13 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange, readOnly = 
       setRollsError('新增的布卷需要布卷編號');
       return;
     }
+    if (!inventory.organization_id) return;
     setRollsError(null);
     saveRolls.mutate(
-      { inventoryId: inventory.id, rolls: rollDrafts },
+      { organizationId: inventory.organization_id, inventoryId: inventory.id, rolls: rollDrafts },
       {
         onSuccess: () => setRollDrafts(null),
-        onError: (error: Error) => setRollsError(error.message),
+        onError: (error: Error) => setRollsError(apiErrorMessage(error)),
       },
     );
   };

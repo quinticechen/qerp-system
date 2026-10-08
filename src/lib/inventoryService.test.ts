@@ -1,104 +1,83 @@
-import { describe, expect, it } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
+import { describe, expect, it, vi } from "vitest";
+import { createFakeSupabase } from "@/test/fakeSupabase";
 import { updateInventoryBatch, updateInventoryRoll } from "./inventoryService";
 
-interface RecordedUpdate {
-  table: string;
-  payload: Record<string, unknown>;
-  filter: [string, unknown];
-}
+const fake = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeSupabase> | null }));
 
-const createFakeClient = (error: { message: string } | null = null) => {
-  const updates: RecordedUpdate[] = [];
-  const client = {
-    from: (table: string) => ({
-      update: (payload: Record<string, unknown>) => ({
-        eq: async (column: string, value: unknown) => {
-          updates.push({ table, payload, filter: [column, value] });
-          return { error };
-        },
-      }),
-    }),
-  } as unknown as SupabaseClient<Database>;
-  return { client, updates };
+vi.mock("@/integrations/supabase/client", () => ({
+  get supabase() {
+    return fake.current!.client;
+  },
+}));
+
+const setup = (rpcError?: string) => {
+  fake.current = createFakeSupabase({}, { rpcError });
+  return fake.current;
 };
 
 describe("updateInventoryRoll", () => {
-  it("keeps the shipped amount when the received weight changes", async () => {
-    const { client, updates } = createFakeClient();
+  it("sends the new received weight to update_inventory_roll", async () => {
+    const { rpcCalls } = setup();
     const roll = { id: "roll-1", quantity: 100, current_quantity: 60 };
 
-    await updateInventoryRoll(client, roll, { quantity: 90 });
+    await updateInventoryRoll("org-1", roll, { quantity: 90 });
 
-    expect(updates).toEqual([
+    expect(rpcCalls).toEqual([
       {
-        table: "inventory_rolls",
-        payload: { quantity: 90, current_quantity: 50, is_allocated: false },
-        filter: ["id", "roll-1"],
+        fn: "update_inventory_roll",
+        args: { p_organization_id: "org-1", p_roll_id: "roll-1", p_changes: { quantity: 90 }, p_dry_run: false },
       },
     ]);
   });
 
   it("rejects a received weight below what has already been shipped", async () => {
-    const { client, updates } = createFakeClient();
+    const { rpcCalls } = setup();
     const roll = { id: "roll-1", quantity: 100, current_quantity: 60 };
 
-    await expect(updateInventoryRoll(client, roll, { quantity: 30 })).rejects.toThrow(
+    await expect(updateInventoryRoll("org-1", roll, { quantity: 30 })).rejects.toThrow(
       "入庫重量不可低於已出貨重量 40.00 公斤",
     );
-    expect(updates).toEqual([]);
+    expect(rpcCalls).toEqual([]);
   });
 
-  it("updates quality, warehouse and shelf without touching weights", async () => {
-    const { client, updates } = createFakeClient();
+  it("sends quality, warehouse and shelf changes", async () => {
+    const { rpcCalls } = setup();
     const roll = { id: "roll-2", quantity: 50, current_quantity: 50 };
 
-    await updateInventoryRoll(client, roll, { quality: "B", warehouse_id: "wh-2", shelf: "A-03" });
+    await updateInventoryRoll("org-1", roll, { quality: "B", warehouse_id: "wh-2", shelf: "A-03" });
 
-    expect(updates).toEqual([
-      {
-        table: "inventory_rolls",
-        payload: { quality: "B", warehouse_id: "wh-2", shelf: "A-03" },
-        filter: ["id", "roll-2"],
-      },
-    ]);
+    expect(rpcCalls[0].args.p_changes).toEqual({ quality: "B", warehouse_id: "wh-2", shelf: "A-03" });
   });
 
   it("surfaces the database error when the update fails", async () => {
-    const { client } = createFakeClient({ message: "permission denied" });
+    setup("permission denied");
     const roll = { id: "roll-2", quantity: 50, current_quantity: 50 };
 
-    await expect(updateInventoryRoll(client, roll, { quality: "C" })).rejects.toMatchObject({
+    await expect(updateInventoryRoll("org-1", roll, { quality: "C" })).rejects.toMatchObject({
       message: "permission denied",
     });
   });
 });
 
 describe("updateInventoryBatch", () => {
-  it("saves the arrival date, factory and note of a batch", async () => {
-    const { client, updates } = createFakeClient();
+  it("saves the arrival date and note of a batch", async () => {
+    const { rpcCalls } = setup();
 
-    await updateInventoryBatch(client, "inv-1", {
-      arrival_date: "2026-10-01",
-      factory_id: "factory-9",
-      note: "第二批",
-    });
+    await updateInventoryBatch("org-1", "inv-1", { arrival_date: "2026-10-01", note: "第二批" });
 
-    expect(updates).toEqual([
+    expect(rpcCalls).toEqual([
       {
-        table: "inventories",
-        payload: { arrival_date: "2026-10-01", factory_id: "factory-9", note: "第二批" },
-        filter: ["id", "inv-1"],
+        fn: "update_inventory",
+        args: { p_organization_id: "org-1", p_inventory_id: "inv-1", p_changes: { arrival_date: "2026-10-01", note: "第二批" }, p_dry_run: false },
       },
     ]);
   });
 
-  it("stores an empty note as null", async () => {
-    const { client, updates } = createFakeClient();
+  it("sends an empty note to clear it", async () => {
+    const { rpcCalls } = setup();
 
-    await updateInventoryBatch(client, "inv-1", { note: "  " });
+    await updateInventoryBatch("org-1", "inv-1", { note: "  " });
 
-    expect(updates[0].payload).toEqual({ note: null });
+    expect(rpcCalls[0].args.p_changes).toEqual({ note: "" });
   });
 });

@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useFactoryOptions, useUpdateInventoryBatch } from '@/hooks/useInventoryEditing';
+import { useUpdateInventoryBatch } from '@/hooks/useInventoryEditing';
+import { apiErrorMessage } from '@/lib/api/client';
 
 export interface EditableInventoryBatch {
   id: string;
@@ -22,10 +22,8 @@ interface InventoryBatchFormProps {
 
 export const InventoryBatchForm = ({ inventory, onDone }: InventoryBatchFormProps) => {
   const { toast } = useToast();
-  const { data: factories } = useFactoryOptions(inventory.organization_id);
   const updateBatch = useUpdateInventoryBatch();
   const [arrivalDate, setArrivalDate] = useState(inventory.arrival_date.slice(0, 10));
-  const [factoryId, setFactoryId] = useState(inventory.factory_id);
   const [note, setNote] = useState(inventory.note ?? '');
 
   const handleSave = () => {
@@ -33,15 +31,17 @@ export const InventoryBatchForm = ({ inventory, onDone }: InventoryBatchFormProp
       toast({ title: '請填寫到貨日期', variant: 'destructive' });
       return;
     }
+    if (!inventory.organization_id) return;
+    // The factory follows the purchase order, so only the date and note are edited here
     updateBatch.mutate(
-      { inventoryId: inventory.id, edits: { arrival_date: arrivalDate, factory_id: factoryId, note } },
+      { organizationId: inventory.organization_id, inventoryId: inventory.id, edits: { arrival_date: arrivalDate, note } },
       {
         onSuccess: () => {
           toast({ title: '已更新入庫資料' });
           onDone();
         },
         onError: (error: Error) => {
-          toast({ title: '更新失敗', description: error.message, variant: 'destructive' });
+          toast({ title: '更新失敗', description: apiErrorMessage(error), variant: 'destructive' });
         },
       },
     );
@@ -58,21 +58,6 @@ export const InventoryBatchForm = ({ inventory, onDone }: InventoryBatchFormProp
             value={arrivalDate}
             onChange={(e) => setArrivalDate(e.target.value)}
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="batch-factory" className="text-gray-700">工廠</Label>
-          <Select value={factoryId} onValueChange={setFactoryId}>
-            <SelectTrigger id="batch-factory">
-              <SelectValue placeholder="選擇工廠" />
-            </SelectTrigger>
-            <SelectContent>
-              {factories?.map((factory) => (
-                <SelectItem key={factory.id} value={factory.id}>
-                  {factory.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
       <div className="space-y-2">

@@ -103,8 +103,9 @@
 | A3 採購 | `create_purchase_order` | `canCreatePurchases` | 工廠、關聯訂單、品項、下單日、預計到貨日；關聯訂單改為「已向工廠下單」 | ✅ |
 | | `update_purchase_order` | `canEditPurchases` | 沿用 `save_purchase_order_items` 的鎖定規則 | ✅ |
 | | `cancel_purchase_order` | `canEditPurchases` | 已入庫時不可取消；關聯訂單沒有其他進行中的採購單時改回「已確認」 | ✅ |
-| A4 入庫 | `receive_inventory` | `canCreateInventory` | 採購單、到貨日、布卷（產品、貨架、品質、重量、捲號）；更新採購單收貨進度 | ⏳ |
-| | `update_inventory` | `canEditInventory` | 批次資料與布卷（沿用 `save_inventory_rolls`） | ⏳ |
+| A4 入庫 | `receive_inventory` | `canCreateInventory` | 採購單、到貨日、布卷（產品、貨架、品質、重量、捲號）；更新採購單收貨進度 | ✅ |
+| | `update_inventory` | `canEditInventory` | 到貨日、備註、布卷（沿用 `save_inventory_rolls` 的鎖定規則） | ✅ |
+| | `update_inventory_roll` | `canEditInventory` | 單一布卷的重量、品質、倉庫、貨架 | ✅ |
 | A5 出貨 | `create_shipping` | `canCreateShipping` | 訂單、出貨日、布卷與重量；扣庫存、更新訂單出貨進度 | ⏳ |
 | | `update_shipping` | `canEditShipping` | 沿用 `save_shipping_items` | ⏳ |
 | | `cancel_shipping` | `canEditShipping` | 待確認（決策 B3） | ⏳ |
@@ -283,6 +284,32 @@ Migration：`supabase/migrations/20261008193554_api_a3_purchase_orders.sql`；�
 | `22023` | `use_cancel_purchase_order`、`invalid_status`、`invalid_order_ids`、`unknown_field` | 請使用取消採購單、採購單狀態不正確… |
 | `55000` | `item_received`、`quantity_below_received` | 產品「…」已入庫，不可刪除或更換；採購數量不可低於已入庫 … 公斤 |
 | `55000` | `order_cancelled`、`purchase_order_cancelled`、`purchase_order_already_cancelled`、`purchase_order_received` | 訂單 … 已取消；採購單 … 已取消，不能修改；已有入庫紀錄，不能取消或更換工廠 |
+
+### A4 入庫（進貨單）
+
+Migration：`supabase/migrations/20261008233705_api_a4_receiving.sql`；測試：`supabase/tests/api_a4_receiving.test.sql`；前端：`src/lib/api/inventory.ts`。
+
+**`receive_inventory`**（`canCreateInventory`）
+
+| 參數 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| `p_purchase_order_id` | uuid | ✅ | 同組織、未取消的採購單；工廠沿用採購單 |
+| `p_rolls` | jsonb | ✅ | 至少一卷：`[{ product_id, quantity, warehouse_id, shelf?, quality?, roll_number?, specifications? }]`；產品必須在採購單上；重量 > 0；品質 `A`／`B`／`C`／`D`／`defective`，預設 `A`；不給 `roll_number` 時由系統產生（R＋YYMMDD＋九位數） |
+| `p_arrival_date` | date | | 預設為台灣今天 |
+| `p_note` | text | | |
+
+回傳：`id`、`number`（進貨單編號 I＋YYYYMMDD＋四位流水號；試算時皆為 `null`）。入庫後採購單的已入庫量與狀態自動重算。超過採購量仍可入庫。`summary.title` 為「入庫」，`fields` 依序為採購單、工廠、到貨日期、產品 1…n（「產品 - 顏色 × N 卷，共 X 公斤」）、備註、合計，以及「超過採購量」（有超收時）。
+
+**`update_inventory`**（`canEditInventory`）：`p_changes` 可含 `rolls`（完整的布卷清單：有 `id` 的更新、沒有的新增、沒列出的刪除；已出貨的布卷不可刪除或更換產品，重量不可低於已出貨量；新增或更換的產品必須在採購單上）、`arrival_date`、`note`。`summary` 只列有變的欄位，布卷以「移除布卷／修改布卷（舊 → 新）／新增布卷」表示，例如「R261008123456789 棉布 - 白 100 公斤（A 級，倉庫 一號倉 B-03）」。
+
+**`update_inventory_roll`**（`canEditInventory`）：`p_roll_id`、`p_changes` 可含 `quantity`（入庫重量；已出貨量不變，庫存隨之調整）、`quality`、`warehouse_id`、`shelf`。回傳的 `number` 為布卷編號。
+
+| SQLSTATE | 代碼 | 訊息 |
+|----------|------|------|
+| `P0002` | `purchase_order_not_found`、`inventory_not_found`、`roll_not_found`、`product_not_found`、`warehouse_not_found` | 找不到此採購單／入庫紀錄／布卷／產品／倉庫 |
+| `22023` | `rolls_required`、`invalid_quantity`、`invalid_quality`、`invalid_date`、`product_not_on_purchase_order`、`unknown_field` | 入庫紀錄至少需要一卷布、布卷重量必須大於 0、產品「…」不在採購單上… |
+| `23505` | `roll_number_taken` | 布卷編號「…」已被使用 |
+| `55000` | `purchase_order_cancelled`、`roll_shipped`、`quantity_below_shipped` | 採購單 … 已取消，不能入庫；布卷「…」已出貨，不可刪除或更換產品；入庫重量不可低於已出貨 … 公斤 |
 
 ### A6 產品與顏色
 

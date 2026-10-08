@@ -1570,6 +1570,35 @@ export type Database = {
       }
     }
     Functions: {
+      receive_inventory: {
+        Args: {
+          p_arrival_date?: string
+          p_dry_run?: boolean
+          p_note?: string
+          p_organization_id: string
+          p_purchase_order_id: string
+          p_rolls: Json
+        }
+        Returns: Json
+      }
+      update_inventory: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_inventory_id: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      update_inventory_roll: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_roll_id: string
+        }
+        Returns: Json
+      }
       cancel_purchase_order: {
         Args: {
           p_dry_run?: boolean

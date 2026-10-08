@@ -17,6 +17,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { receiveInventory } from '@/lib/api/inventory';
+import { apiErrorMessage } from '@/lib/api/client';
 
 interface CreateInventoryDialogProps {
   open: boolean;
@@ -142,30 +144,6 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
   const selectedPurchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
 
-  const generateRollNumber = async () => {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const timestamp = now.getTime().toString();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    
-    let rollNumber = `R${year}${month}${day}${timestamp.slice(-6)}${random}`;
-    
-    const { data: existingRoll } = await supabase
-      .from('inventory_rolls')
-      .select('id')
-      .eq('roll_number', rollNumber)
-      .single();
-    
-    if (existingRoll) {
-      const extraRandom = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      rollNumber = `R${year}${month}${day}${timestamp.slice(-4)}${extraRandom}`;
-    }
-    
-    return rollNumber;
-  };
-
   const checkWeightExceedsOrdered = () => {
     const purchaseOrder = purchaseOrders?.find(po => po.id === selectedPurchaseOrderId);
     if (!purchaseOrder) return false;
@@ -260,70 +238,46 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         throw new Error('請確保所有布卷都有完整的資訊（倉庫、重量）');
       }
 
-      const { data: inventory, error: inventoryError } = await supabase
-        .from('inventories')
-        .insert({
-          purchase_order_id: selectedPurchaseOrderId,
-          factory_id: purchaseOrder.factory_id,
-          arrival_date: arrivalDate,
-          note,
-          user_id: (await supabase.auth.getUser()).data.user?.id || '',
-          organization_id: organizationId
-        })
-        .select()
-        .single();
+      if (!organizationId) throw new Error('請先選擇組織');
 
-      if (inventoryError) {
-        throw inventoryError;
-      }
-
-      const allRolls = [];
-      for (const product of selectedProducts) {
-        for (const roll of product.rolls) {
-          const rollNumber = await generateRollNumber();
-          allRolls.push({
-            inventory_id: inventory.id,
+      // One call writes the batch and all its rolls; the database numbers them and updates the purchase order
+      const result = await receiveInventory(organizationId, {
+        purchaseOrderId: selectedPurchaseOrderId,
+        arrivalDate,
+        note,
+        rolls: selectedProducts.flatMap((product) =>
+          product.rolls.map((roll) => ({
             product_id: roll.productId,
-            roll_number: rollNumber,
             quantity: roll.quantity,
-            current_quantity: roll.quantity,
             quality: roll.quality,
             warehouse_id: roll.warehouseId,
-            shelf: roll.shelf || null
-          });
-        }
-      }
+            shelf: roll.shelf || null,
+          })),
+        ),
+      });
 
-      for (const rollData of allRolls) {
-        const { error: rollError } = await supabase
-          .from('inventory_rolls')
-          .insert(rollData);
-
-        if (rollError) {
-          throw rollError;
-        }
-      }
-
-      return inventory;
+      return { id: result.id as string, number: result.number };
     },
     onSuccess: (inventory) => {
       toast({
         title: "入庫成功",
-        description: "庫存記錄已成功建立",
+        description: `進貨單 ${inventory.number} 已建立`,
       });
       queryClient.invalidateQueries({ queryKey: ['inventories'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-summary'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-orders-for-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['shelves'] });
       queryClient.invalidateQueries({ queryKey: ['shelf-products'] });
       onOpenChange(false);
       resetForm();
       onInventoryCreated?.(inventory.id);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "入庫失敗",
-        description: error.message,
+        description: apiErrorMessage(error),
         variant: "destructive",
       });
     }

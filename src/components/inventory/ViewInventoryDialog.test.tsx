@@ -96,11 +96,12 @@ describe("ViewInventoryDialog editing", () => {
     await user.click(screen.getByRole("button", { name: "儲存" }));
 
     await waitFor(() =>
-      expect(fake.current!.updates).toContainEqual({
-        table: "inventories",
-        payload: { arrival_date: "2026-09-15", factory_id: "factory-1", note: "已補齊" },
-        filter: ["id", "inv-1"],
-      }),
+      expect(fake.current!.rpcCalls).toEqual([
+        {
+          fn: "update_inventory",
+          args: { p_organization_id: "org-1", p_inventory_id: "inv-1", p_changes: { arrival_date: "2026-09-15", note: "已補齊" }, p_dry_run: false },
+        },
+      ]),
     );
   });
 
@@ -124,19 +125,19 @@ describe("ViewInventoryDialog editing", () => {
     await user.type(quantity, "90");
     await user.click(within(rollDialog).getByRole("button", { name: "儲存" }));
 
+    // Only the changed fields go to update_inventory_roll; the database keeps the shipped weight fixed
     await waitFor(() =>
-      expect(fake.current!.updates).toContainEqual({
-        table: "inventory_rolls",
-        payload: {
-          warehouse_id: "wh-2",
-          shelf: "B-02",
-          quality: "B",
-          quantity: 90,
-          current_quantity: 50,
-          is_allocated: false,
+      expect(fake.current!.rpcCalls).toEqual([
+        {
+          fn: "update_inventory_roll",
+          args: {
+            p_organization_id: "org-1",
+            p_roll_id: "roll-1",
+            p_changes: { warehouse_id: "wh-2", shelf: "B-02", quality: "B", quantity: 90 },
+            p_dry_run: false,
+          },
         },
-        filter: ["id", "roll-1"],
-      }),
+      ]),
     );
   });
 
@@ -155,7 +156,7 @@ describe("ViewInventoryDialog editing", () => {
     expect(await within(rollDialog).findByRole("alert")).toHaveTextContent(
       "入庫重量不可低於已出貨重量 40.00 公斤",
     );
-    expect(fake.current!.updates).toEqual([]);
+    expect(fake.current!.rpcCalls).toEqual([]);
   });
 
   it("saves changed, added and removed rolls of the batch in one call", async () => {
@@ -184,13 +185,17 @@ describe("ViewInventoryDialog editing", () => {
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
         {
-          fn: "save_inventory_rolls",
+          fn: "update_inventory",
           args: {
+            p_organization_id: "org-1",
             p_inventory_id: "inv-1",
-            p_rolls: [
-              { id: "roll-1", product_id: "p-1", warehouse_id: "wh-1", shelf: "A-01", quality: "A", quantity: 90, specifications: { width: 60 } },
-              { roll_number: "R-NEW-1", product_id: "p-2", warehouse_id: "wh-2", shelf: null, quality: "A", quantity: 25, specifications: null },
-            ],
+            p_changes: {
+              rolls: [
+                { id: "roll-1", product_id: "p-1", warehouse_id: "wh-1", shelf: "A-01", quality: "A", quantity: 90, specifications: { width: 60 } },
+                { roll_number: "R-NEW-1", product_id: "p-2", warehouse_id: "wh-2", shelf: null, quality: "A", quantity: 25, specifications: null },
+              ],
+            },
+            p_dry_run: false,
           },
         },
       ]),
