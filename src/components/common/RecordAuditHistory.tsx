@@ -9,6 +9,7 @@ import {
   formatAuditValue,
 } from '@/lib/auditLabels';
 import { PERMISSION_LABELS } from '@/lib/permissionLabels';
+import { ROLE_LABELS } from '@/lib/roles';
 
 interface RecordAuditHistoryProps {
   recordId: string | null | undefined;
@@ -17,8 +18,10 @@ interface RecordAuditHistoryProps {
 
 type Names = Record<string, string>;
 
-const formatFieldValue = (field: string, value: Json | undefined, names: Names) =>
-  field in REFERENCE_FIELDS && typeof value === 'string' && names[value] ? names[value] : formatAuditValue(value);
+const formatFieldValue = (field: string, value: Json | undefined, names: Names) => {
+  if (field === 'role' && typeof value === 'string' && value in ROLE_LABELS) return ROLE_LABELS[value as keyof typeof ROLE_LABELS];
+  return field in REFERENCE_FIELDS && typeof value === 'string' && names[value] ? names[value] : formatAuditValue(value);
+};
 
 type PermissionMap = Record<string, boolean>;
 

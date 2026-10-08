@@ -1,172 +1,184 @@
-# Query Agent 架構評估（P0-7）
+# Query Agent Architecture Evaluation (P0-7)
 
-> 日期：2026-10-07
-> 決策：**維持 Router × gemini-2.5-flash-lite**（使用者決定）
-> 相關文件：[QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md)（D6、§4.7）
+> Date: 2026-10-07
+> Decision: **Maintain Router × gemini-2.5-flash-lite** (User decision)
+> Related Documents: [QUERY_AGENT_PHASE0.md](https://www.google.com/search?q=./QUERY_AGENT_PHASE0.md) (D6, §4.7)
 
-## 1. 目的與決策標準
+## 1. Objectives & Decision Criteria
 
-比較 Query 的 Agent 架構與主模型，選出正式環境的設定。標準由使用者訂定：
+Compare Query's agent architectures and primary models to select the production configuration. The criteria were set by the user:
 
-| 標準 | 門檻 |
-|------|------|
-| 成本 | 越便宜越好 |
-| 準確率（eval 任務完成率） | 高於 85% |
-| 延遲 | 10 秒內可接受 |
+| Criterion | Threshold |
+| --- | --- |
+| Cost | As cheap as possible |
+| Accuracy (Eval task completion rate) | Greater than 85% |
+| Latency | Acceptable within 10 seconds |
 
-## 2. 結論
+---
 
-| 設定 | 準確率 > 85% | 平均延遲 < 10 秒 | 每次請求都 < 10 秒 | 成本 |
-|------|:---:|:---:|:---:|------|
-| **Router × flash-lite（採用）** | ✅ 86% | ✅ 6.0 秒 | ⚠️ 10% 的請求超過 10 秒 | 最低，約 US$0.4／千次 |
-| 單一 Agent × flash-lite | ❌ 82% | ✅ | ✅ | 約 US$1.5／千次 |
-| Router × flash | ✅ 89% | ✅ | ✅ 最長 5.7 秒 | 約 US$1.4／千次 |
-| 單一 Agent × flash | ✅ 92% | ✅ | ⚠️ 1% 略超過（最長 10.5 秒） | 約 US$2.3／千次 |
+## 2. Conclusion
 
-**採用 Router × flash-lite**：在準確率門檻之上（86%）且成本最低。
+| Configuration | Accuracy > 85% | Average Latency < 10s | Every Request < 10s | Cost |
+| --- | --- | --- | --- | --- |
+| **Router × flash-lite (Selected)** | ✅ 86% | ✅ 6.0s | ⚠️ 10% of requests > 10s | Lowest, approx. US$0.4 / 1k requests |
+| Single Agent × flash-lite | ❌ 82% | ✅ | ✅ | Approx. US$1.5 / 1k requests |
+| Router × flash | ✅ 89% | ✅ | ✅ Max 5.7s | Approx. US$1.4 / 1k requests |
+| Single Agent × flash | ✅ 92% | ✅ | ⚠️ 1% slightly over (Max 10.5s) | Approx. US$2.3 / 1k requests |
 
-**需要留意的兩點：**
+**Selected: Router × flash-lite** — It meets the accuracy threshold (86%) while maintaining the lowest cost.
 
-1. **準確率餘裕很小**：86% 只比門檻高 1 個百分點。eval 每案跑 3 次且輸出幾乎相同（F9），一個案例由通過變失敗就會掉到 83%。
-2. **延遲標準若是「每一次請求」都要在 10 秒內，flash-lite 不符合**：約 10% 的請求需要 15–28 秒（見 §5.3）。若標準指的是平均延遲則符合。若需要每次請求都在 10 秒內，符合三項標準中最便宜的是 **Router × flash**（89%、最長 5.7 秒、約 US$1.4／千次）。切換方式見 §7。
+**Two points to note:**
 
-## 3. 比較的設定
+1. **Very narrow accuracy margin**: 86% is only 1 percentage point above the threshold. Each eval case runs 3 times with nearly identical outputs (F9); a single case shifting from pass to fail would drop the score to 83%.
+2. **If the latency standard means "every single request" must be under 10 seconds, flash-lite does not qualify**: About 10% of requests take 15–28 seconds (see §5.3). If the standard refers to average latency, it qualifies. If every request must be under 10 seconds, the cheapest qualifying option is **Router × flash** (89%, max 5.7s, approx. US$1.4 / 1k requests). See §7 for switching instructions.
 
-| 維度 | 選項 |
-|------|------|
-| 架構 | **Router**：Router 以 LLM 分類意圖並改寫 task，交給 commercial／supply_chain 子 Agent（可同時呼叫兩個）<br>**單一 Agent**：一個 Agent 持有使用者被授權的全部工具（目前 17 個），直接處理原始訊息 |
-| 主模型 | `google/gemini-2.5-flash-lite`（現行）、`google/gemini-2.5-flash` |
-| 降級順序 | 主模型 → 清單中其餘模型（flash-lite → flash → claude-haiku-4.5 的順序，主模型移到最前） |
+---
 
-兩種架構使用相同的工具、權限、草稿確認、輸出防護與 gateway 降級規則；Router 架構的子 Agent prompt 與比較前逐字相同。單一 Agent 的 prompt 由兩個子 Agent 的 prompt 合併而成。
+## 3. Compared Configurations
 
-## 4. 測試方式
+| Dimension | Options |
+| --- | --- |
+| **Architecture** | • **Router**: Router uses an LLM to classify intent and rewrite tasks, handing them off to commercial / supply_chain sub-agents (can call both concurrently)<br>
 
-### 4.1 Eval harness
+<br>• **Single Agent**: A single agent holds all authorized tools (currently 17), directly processing the raw message |
+| **Primary Model** | `google/gemini-2.5-flash-lite` (Current), `google/gemini-2.5-flash` |
+| **Fallback Order** | Primary model → remaining models in list (flash-lite → flash → claude-haiku-4.5 order, with primary moved to front) |
 
-- **真模型＋假資料層**：模型經 OpenRouter 實際呼叫；資料庫為記憶體中的假資料（`mcp-server/evals/fake-supabase.ts`），套用真實的篩選與欄位選取，不連 Supabase、不會寫入
-- **與正式環境相同的路徑**：權限經真實的 `authGuard`（角色權限取自資料庫系統角色）；對話紀錄經 `toModelHistory`；寫入只產生草稿
-- **資料**：`evals/fixtures/basic.json`，兩個組織（第二個組織的資料都是「最新」或「最低庫存」，用於偵測跨組織洩漏）
-- **案例**：29 個，每個設定每案 3 次（共 87 次）
+Both architectures share the same tools, permissions, draft confirmations, output guards, and gateway fallback rules. The Router architecture's sub-agent prompts remain identical to pre-comparison wording. The Single Agent's prompt is formed by merging the two sub-agent prompts.
 
-| 類別 | 數量 | 內容 |
-|------|------|------|
-| 查詢 | 9 | 客戶、最新採購單、低庫存、庫存、未付款訂單、工廠、出貨、不洩漏 ID |
-| 寫入 | 4 | 建單、找不到客戶、建採購單、跨領域建單（🚧 已知限制，不計分） |
-| 權限 | 3 | 會計不能建單、倉管看不到客戶、業務不能建採購單 |
-| 回歸 | 4 | 過去事故：重複訊息的歷史、多輪建單、實體記憶、確認卡片後的下一個要求 |
-| 改寫 | 9 | 本次新增：與既有案例意圖相同但措辭不同，降低 F9（同設定輸出幾乎相同）造成的偏差 |
+---
 
-### 4.2 每次執行的檢查
+## 4. Testing Methodology
 
-- 一律檢查：請求不拋出例外、回覆不含 UUID、**AI 流程中沒有寫入任何業務資料**
-- 依案例檢查：呼叫／不呼叫哪些工具、工具參數、Router 路由（單一 Agent 不適用）、建立的草稿數量、回覆內容須包含／不可包含的文字
+### 4.1 Eval Harness
 
-### 4.3 指標
+* **Real Model + Fake Data Layer**: Models are actually called via OpenRouter; the database is an in-memory mock (`mcp-server/evals/fake-supabase.ts`) applying real filters and field selection without connecting to Supabase or writing data.
+* **Production-identical Path**: Permissions go through the real `authGuard` (roles taken from database system roles); chat history passes through `toModelHistory`; writes generate drafts only.
+* **Data**: `evals/fixtures/basic.json`, two organizations (the second organization's data consists exclusively of "latest" or "low stock" items to detect cross-organization data leaks).
+* **Cases**: 29 cases, 3 runs per case per configuration (87 total runs per config).
 
-| 指標 | 定義 |
-|------|------|
-| 任務完成率（準確率） | 全部檢查都通過的執行比例（不含已知限制案例） |
-| Tool 選擇正確率 | 工具相關檢查都通過的比例 |
-| 錯誤率 | 請求拋出例外的比例 |
-| 降級率 | 至少一個模型嘗試失敗、改用下一個模型的比例 |
-| 延遲 | 整個請求的時間（含 Router 與所有模型呼叫；資料層在記憶體中，幾乎不佔時間） |
-| Token | 子 Agent 的 prompt＋completion token；Router 自身的呼叫未計入 |
+| Category | Count | Content |
+| --- | --- | --- |
+| Query | 9 | Customers, latest PO, low stock, inventory, unpaid orders, factories, shipping, ID non-leakage |
+| Write | 4 | Create order, customer not found, create PO, cross-domain order (🚧 Known limitation, unscored) |
+| Permission | 3 | Accounting cannot create orders, warehouse cannot view customers, sales cannot create POs |
+| Regression | 4 | Past incidents: duplicate message history, multi-turn orders, entity memory, post-confirmation next requests |
+| Paraphrase | 9 | Newly added: same intent as existing cases but different wording, mitigating F9 (identical output per config) skew |
 
-### 4.4 成本估算方式
+### 4.2 Per-Run Checks
 
-每千次請求成本 = 平均 token × 單價。單價取自 OpenRouter（2026-10-07）：
+* **Universal checks**: Request does not throw exceptions, responses do not contain UUIDs, **no business data writes occur during AI flows**.
+* **Case-specific checks**: Tools called/not called, tool arguments, router routing (N/A for Single Agent), number of drafts created, mandatory/forbidden text in responses.
 
-| 模型 | 輸入（每百萬 token） | 輸出（每百萬 token） |
-|------|------|------|
+### 4.3 Metrics
+
+* **Task Completion Rate (Accuracy)**: Percentage of runs passing all checks (excluding known limitation cases).
+* **Tool Selection Accuracy**: Percentage of runs passing tool-related checks.
+* **Error Rate**: Percentage of requests throwing exceptions.
+* **Fallback Rate**: Percentage of runs where at least one model attempt failed and fell back to the next model.
+* **Latency**: Total request time (including Router and all model calls; data layer resides in-memory, incurring negligible overhead).
+* **Token Count**: Sub-agent prompt + completion tokens; Router's own calls are excluded.
+
+### 4.4 Cost Estimation Method
+
+Cost per 1,000 requests = Average tokens × Unit price. Unit prices from OpenRouter (2026-10-07):
+
+| Model | Input (per million tokens) | Output (per million tokens) |
+| --- | --- | --- |
 | gemini-2.5-flash-lite | US$0.10 | US$0.40 |
 | gemini-2.5-flash | US$0.30 | US$2.50 |
 | claude-haiku-4.5 | US$1.00 | US$5.00 |
 
-假設：輸入：輸出約 92：8；Router 架構每次另加 Router 呼叫約 600 輸入／50 輸出 token；降級時加計降級模型的成本。**數字為估計值**，用於比較量級；正式環境的實際用量可由 `query_traces` 的 token 欄位統計。
+*Assumptions*: Input to output ratio approx. 92:8; Router architecture adds approx. 600 input / 50 output tokens per Router call; fallback models add fallback-tier costs. **Figures are estimates** used for order-of-magnitude comparison; actual production usage can be tracked via `query_traces` token columns.
 
-## 5. 結果
+---
 
-報告檔：`mcp-server/evals/reports/` 下的 `*-p0-7-router-lite`、`*-p0-7-single-lite`、`*-p0-7-router-flash`、`*-p0-7-single-flash`（`.md` 為可讀報告，`.json` 含每次執行的細節）。
+## 5. Results
 
-### 5.1 總表
+Report files located in `mcp-server/evals/reports/` (`*-p0-7-router-lite`, `*-p0-7-single-lite`, `*-p0-7-router-flash`, `*-p0-7-single-flash`; `.md` for human-readable reports, `.json` containing run-level details).
 
-| 設定 | 任務完成率 | Tool 選擇 | 錯誤率 | 降級率 | 平均延遲 | P90 延遲 | 最長 | 超過 10 秒 | 平均 token | 每千次成本 |
-|------|------|------|------|------|------|------|------|------|------|------|
-| Router × flash-lite（現行） | 86% | 89% | 0% | 4% | 6.0 秒 | 15.0 秒 | 27.9 秒 | 9/84（10%） | 2,421 | ≈ US$0.4 |
-| 單一 Agent × flash-lite | 82% | 86% | 4% | 43% | 3.4 秒 | 6.0 秒 | 9.9 秒 | 0/84（0%） | 4,301 | ≈ US$1.5（含 43% 降級到 flash） |
-| Router × flash | 89% | 93% | 0% | 2% | 3.4 秒 | 5.0 秒 | 5.7 秒 | 0/84（0%） | 2,221 | ≈ US$1.4 |
-| 單一 Agent × flash | 92% | 93% | 0% | 8% | 2.9 秒 | 5.0 秒 | 10.5 秒 | 1/84（1%） | 4,788 | ≈ US$2.3 |
+### 5.1 Summary Table
 
-### 5.2 各案例（通過次數／3）
+| Configuration | Accuracy | Tool Selection | Error Rate | Fallback Rate | Avg Latency | P90 Latency | Max Latency | > 10s Count | Avg Tokens | Cost / 1k Req |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Router × flash-lite (Current)** | **86%** | **89%** | **0%** | **4%** | **6.0s** | **15.0s** | **27.9s** | **9/84 (10%)** | **2,421** | **≈ US$0.4** |
+| Single Agent × flash-lite | 82% | 86% | 4% | 43% | 3.4s | 6.0s | 9.9s | 0/84 (0%) | 4,301 | ≈ US$1.5 (incl. 43% fallback to flash) |
+| Router × flash | 89% | 93% | 0% | 2% | 3.4s | 5.0s | 5.7s | 0/84 (0%) | 2,221 | ≈ US$1.4 |
+| Single Agent × flash | 92% | 93% | 0% | 8% | 2.9s | 5.0s | 10.5s | 1/84 (1%) | 4,788 | ≈ US$2.3 |
 
-| 案例 | Router × flash-lite | 單一 × flash-lite | Router × flash | 單一 × flash |
-|------|------|------|------|------|
-| `p-accounting-cannot-create-order` 會計角色不能建立訂單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `p-sales-cannot-create-po` 業務角色不能建立採購單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `p-warehouse-no-customers` 倉管角色看不到客戶資料 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-create-order` 改寫：開一張新訂單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-create-po` 改寫：跟工廠訂布 | 0/3 | 0/3 | 0/3 | 0/3 |
-| `pp-customers` 改寫：客戶名單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-inventory` 改寫：庫存剩多少（顏色在前） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-latest-po` 改寫：最近一張採購單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-low-stock` 改寫：快缺貨的布 | 3/3 | 0/3 | 3/3 | 3/3 |
-| `pp-multi-turn-answer` 多輪：上一輪問客戶，本輪只回名稱（F1 型） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `pp-order-with-product` 跨領域：客戶要訂某產品（只能建立訂單本身） | 0/3 | 0/3 | 0/3 | 2/3 |
-| `pp-unpaid` 改寫：還沒付錢的訂單 | 3/3 | 3/3 | 2/3 | 3/3 |
-| `q-customer-contact` 依名稱查客戶聯絡方式 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-factories` 合作工廠列表 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-inventory-search` 查詢特定產品庫存 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-latest-po` 最新的採購單（不反問篩選條件） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-list-customers` 查詢所有客戶 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-low-stock` 庫存低於門檻的產品 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-no-id-leak` 使用者要求顯示 ID 也不可洩漏 UUID | 3/3 | 0/3 | 3/3 | 3/3 |
-| `q-recent-shipping` 最近的出貨紀錄 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `q-unpaid-orders` 未付款訂單（帶篩選參數） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `r-after-confirmation` 確認卡片完成後的下一個新增要求，必須真的建立草稿（2026-10-07 實測事故） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `r-duplicate-history` history 中有重複訊息（2026-10-07 事故）仍可正常回應 | 0/3 | 3/3 | 2/3 | 3/3 |
-| `r-entity-memory` 實體記憶：上一輪已找到客戶，本輪用代名詞建單（P0-4） | 3/3 | 3/3 | 3/3 | 3/3 |
-| `r-multi-turn-order` 多輪建單：上一輪已詢問客戶名稱，本輪只回答名稱 | 0/3 | 0/3 | 2/3 | 0/3 |
-| `w-create-order` 為既有客戶建立訂單 | 3/3 | 3/3 | 3/3 | 3/3 |
-| `w-create-po` 建立採購單（工廠＋產品＋數量＋單價） | 3/3 | 3/3 | 3/3 | 3/3 |
-| 🚧 `w-cross-domain-order` 跨領域建單：客戶＋工廠＋產品（2026-10-07 事故原句） | 0/3 | 3/3 | 3/3 | 0/3 |
-| `w-order-unknown-customer` 找不到客戶時詢問是否新增，不可直接建單 | 3/3 | 3/3 | 3/3 | 3/3 |
+### 5.2 Case Breakdown (Passes / 3)
 
-### 5.3 觀察
+| Case | Router × flash-lite | Single × flash-lite | Router × flash | Single × flash |
+| --- | --- | --- | --- | --- |
+| `p-accounting-cannot-create-order` Accounting role cannot create orders | 3/3 | 3/3 | 3/3 | 3/3 |
+| `p-sales-cannot-create-po` Sales role cannot create POs | 3/3 | 3/3 | 3/3 | 3/3 |
+| `p-warehouse-no-customers` Warehouse role cannot view customer data | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-create-order` Paraphrase: Open a new order | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-create-po` Paraphrase: Order fabric from factory | 0/3 | 0/3 | 0/3 | 0/3 |
+| `pp-customers` Paraphrase: Customer list | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-inventory` Paraphrase: Inventory stock left (color first) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-latest-po` Paraphrase: Most recent PO | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-low-stock` Paraphrase: Fabrics running low | 3/3 | 0/3 | 3/3 | 3/3 |
+| `pp-multi-turn-answer` Multi-turn: Asked for customer last turn, reply name only (F1 type) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `pp-order-with-product` Cross-domain: Customer wants to order specific product (only order creation itself) | 0/3 | 0/3 | 0/3 | 2/3 |
+| `pp-unpaid` Paraphrase: Unpaid orders | 3/3 | 3/3 | 2/3 | 3/3 |
+| `q-customer-contact` Query customer contact info by name | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-factories` Partner factories list | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-inventory-search` Query specific product inventory | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-latest-po` Latest PO (do not counter-question filter criteria) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-list-customers` List all customers | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-low-stock` Products below inventory threshold | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-no-id-leak` User asks for ID, must not leak UUID | 3/3 | 0/3 | 3/3 | 3/3 |
+| `q-recent-shipping` Recent shipping records | 3/3 | 3/3 | 3/3 | 3/3 |
+| `q-unpaid-orders` Unpaid orders (with filter parameters) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `r-after-confirmation` Post-confirmation next add request must actually create draft (2026-10-07 incident) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `r-duplicate-history` Duplicate messages in history (2026-10-07 incident) still respond properly | 0/3 | 3/3 | 2/3 | 3/3 |
+| `r-entity-memory` Entity memory: Found customer last turn, create order using pronoun this turn (P0-4) | 3/3 | 3/3 | 3/3 | 3/3 |
+| `r-multi-turn-order` Multi-turn order: Asked for customer name last turn, provide name only this turn | 0/3 | 0/3 | 2/3 | 0/3 |
+| `w-create-order` Create order for existing customer | 3/3 | 3/3 | 3/3 | 3/3 |
+| `w-create-po` Create PO (factory + product + quantity + unit price) | 3/3 | 3/3 | 3/3 | 3/3 |
+| 🚧 `w-cross-domain-order` Cross-domain order: customer + factory + product (2026-10-07 incident raw prompt) | 0/3 | 3/3 | 3/3 | 0/3 |
+| `w-order-unknown-customer` Ask whether to add when customer not found, do not create directly | 3/3 | 3/3 | 3/3 | 3/3 |
 
-- **單一 Agent × flash-lite 不合格**：一次給 flash-lite 全部 17 個工具時，有 30 次回傳格式錯誤的工具呼叫（MALFORMED_FUNCTION_CALL）、3 次呼叫不存在的工具，43% 的請求需要降級，且有 4% 的請求失敗。工具數量越多，flash-lite 越不穩定
-- **flash-lite 的延遲尾端**（Router × flash-lite）：84 次中有 9 次超過 10 秒，集中在 3 個案例（`q-latest-po`、`pp-inventory`、`pp-unpaid`），每次都約 15–28 秒。逐步計時顯示時間花在子 Agent **決定呼叫工具的第一步**（輸出約 20 個 token 卻等待 12–25 秒），Router 本身約 1 秒，沒有降級、輸出也不長，屬於 provider 端的等待；同樣的問題在 flash 上不會發生（最長 5.7 秒）。確切原因無法從 OpenRouter 取得
-- **F1（Router 改寫 task 遺失資訊）是架構問題**：`r-duplicate-history` 在兩種單一 Agent 設定皆 3/3，Router × flash-lite 為 0/3。單一 Agent 直接處理原始訊息，不會發生
-- **四種設定共同失敗的 `pp-create-po`**：使用者輸入「棉麻平織米白」（名稱與顏色之間沒有空白），搜尋只依空白分詞，因此找不到產品。屬於搜尋功能問題（F15），與架構無關
-- **`r-multi-turn-order`**：找到客戶後，模型詢問產品與數量才肯建單。`create_order` 目前無法帶入品項（Phase 1），模型的追問有其道理
-- 四種設定在 AI 流程中皆 **0 筆業務資料寫入、0 筆 UUID 洩漏**
+### 5.3 Observations
 
-## 6. 決策
+* **Single Agent × flash-lite falls short**: Providing all 17 tools simultaneously to flash-lite resulted in 30 MALFORMED_FUNCTION_CALL tool invocation errors, 3 calls to non-existent tools, 43% fallback rates, and 4% request failure rates. As tool counts grow, flash-lite becomes increasingly unstable.
+* **flash-lite latency tail** (Router × flash-lite): 9 out of 84 runs exceeded 10 seconds, concentrated in 3 cases (`q-latest-po`, `pp-inventory`, `pp-unpaid`), taking ~15–28 seconds each. Step-by-step profiling shows time is spent in the sub-agent's **first step deciding to call tools** (emitting ~20 tokens while waiting 12–25 seconds). The Router itself takes ~1 second; there were no fallbacks and outputs were short, indicating provider-side waiting. The same issue does not occur with flash (max 5.7s). Exact root causes cannot be pulled from OpenRouter.
+* **F1 (Router task rewriting loses info) is an architectural issue**: `r-duplicate-history` scored 3/3 across both Single Agent configurations while scoring 0/3 on Router × flash-lite. Single agents process raw messages directly, avoiding this issue.
+* **Shared failure case `pp-create-po` across all configs**: User input "棉麻平织米白" (cotton-linen plain weave ecru with no spaces between name and color). Search relies on whitespace tokenization, failing to find the product. This is a search functionality issue (F15), unrelated to architecture.
+* **`r-multi-turn-order`**: After finding the customer, the model asks for products and quantities before proceeding. `create_order` currently cannot take line items (Phase 1), making the model's follow-up questions logical.
+* All four configurations maintained **0 business data writes and 0 UUID leaks** during AI workflows.
 
-| 項目 | 內容 |
-|------|------|
-| 採用 | Router × gemini-2.5-flash-lite（與現行相同，不需變更設定） |
-| 依據 | 在準確率門檻之上且成本最低 |
-| 已知取捨 | 準確率餘裕 1 個百分點；約 10% 的請求延遲 15–28 秒；F1 仍存在 |
-| 保留 | 單一 Agent 的實作保留，可隨時以設定切換（§7），不需改程式 |
+---
 
-## 7. 後續與重新評估的時機
+## 6. Decision
 
-| 時機 | 動作 |
-|------|------|
-| 正式環境準確率或延遲不符標準 | 由 `query_traces` 統計實際延遲與降級；若延遲尾端影響使用者，改用 Router × flash（約 US$1.4／千次） |
-| 修正 F15（無空白的中文產品搜尋） | 重跑 eval；預期四種設定的準確率都會提高 |
-| Phase 1 新增工具後 | 每完成一條流程重跑 eval；工具數量增加時 flash-lite 的穩定性可能下降（單一 Agent × flash-lite 已顯示此趨勢） |
-| 需要解決 F1 | 單一 Agent 從架構上消除 F1，但需搭配 flash（約 US$2.3／千次） |
+| Item | Content |
+| --- | --- |
+| **Selection** | Router × gemini-2.5-flash-lite (Same as current, no settings change required) |
+| **Rationale** | Meets accuracy threshold at lowest cost |
+| **Known Trade-offs** | 1 percentage point accuracy margin; ~10% of requests have 15–28s latency; F1 persists |
+| **Preservation** | Single Agent implementation is retained and can be switched via configuration at any time (§7) without code modifications |
 
-**切換方式**（不需改程式）：
+---
 
-- 架構：mcp-server 環境變數 `QUERY_AGENT_MODE=single`（預設 `router`）
-- 主模型：調整 `mcp-server/src/agent/ai-gateway.ts` 的 `MODEL_PRIORITY` 順序
+## 7. Next Steps & Re-evaluation Triggers
 
-**重現評估**（在 `mcp-server/`）：
+| Trigger | Action |
+| --- | --- |
+| Production accuracy or latency misses targets | Analyze actual latency and fallbacks via `query_traces`. If latency tails impact users, switch to Router × flash (approx. US$1.4 / 1k req) |
+| Fixing F15 (space-less Chinese product searches) | Re-run evals; accuracy expected to rise across all configs |
+| Adding tools in Phase 1 | Re-run evals upon completing each workflow; flash-lite stability may decline as tool counts increase (Single Agent × flash-lite already demonstrated this trend) |
+| Requirement to resolve F1 | Single Agent structurally eliminates F1 but requires pairing with flash (approx. US$2.3 / 1k req) |
+
+**Switching Methods** (No code changes required):
+
+* **Architecture**: Set mcp-server environment variable `QUERY_AGENT_MODE=single` (default is `router`)
+* **Primary Model**: Adjust `MODEL_PRIORITY` order in `mcp-server/src/agent/ai-gateway.ts`
+
+**Re-running Evaluations** (Inside `mcp-server/`):
 
 ```bash
-bun run eval -- --arch router --label <名稱>
-bun run eval -- --arch single --primary google/gemini-2.5-flash --label <名稱>
+bun run eval -- --arch router --label <name>
+bun run eval -- --arch single --primary google/gemini-2.5-flash --label <name>
 ```

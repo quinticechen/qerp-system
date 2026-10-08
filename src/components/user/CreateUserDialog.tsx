@@ -11,8 +11,8 @@ import { createInviteClient } from '@/integrations/supabase/inviteClient';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { useQuery } from '@tanstack/react-query';
 import { getInvitationRedirectUrl, sendExistingUserInvitationEmail } from '@/hooks/useInvitations';
+import { MEMBER_ROLES, type MemberRole } from '@/lib/roles';
 
 interface CreateUserDialogProps {
   open: boolean;
@@ -23,35 +23,18 @@ interface CreateUserForm {
   email: string;
   full_name: string;
   phone: string;
-  role_id: string;
+  role: MemberRole;
 }
 
+// New members start with the least access; the inviter can pick a higher role
+const DEFAULT_VALUES: CreateUserForm = { email: '', full_name: '', phone: '', role: 'viewer' };
+
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
-  const { register, handleSubmit, reset, setValue, watch } = useForm<CreateUserForm>();
+  const { register, handleSubmit, reset, setValue, watch } = useForm<CreateUserForm>({ defaultValues: DEFAULT_VALUES });
   const queryClient = useQueryClient();
-  const { organizationId, hasOrganization } = useCurrentOrganization();
-  
-  const selectedRoleId = watch('role_id');
+  const { organizationId } = useCurrentOrganization();
 
-  // 獲取組織角色列表，排除組織擁有者角色
-  const { data: roles = [] } = useQuery({
-    queryKey: ['organization-roles', organizationId],
-    queryFn: async () => {
-      if (!organizationId) return [];
-
-      const { data, error } = await supabase
-        .from('organization_roles')
-        .select('id, name, display_name')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .neq('name', 'owner') // 排除組織擁有者角色
-        .order('display_name');
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: hasOrganization,
-  });
+  const selectedRole = watch('role');
 
   const onSubmit = async (data: CreateUserForm) => {
     if (!organizationId) {
@@ -69,7 +52,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
         {
           _email: data.email,
           _organization_id: organizationId,
-          _role_id: data.role_id,
+          _role: data.role,
         }
       );
 
@@ -88,7 +71,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             `邀請已建立，但邀請郵件發送失敗：${(emailError as { message?: string }).message ?? '未知錯誤'}。可稍後在使用者列表點「重新發送邀請」`
           );
         }
-        reset();
+        reset(DEFAULT_VALUES);
         onOpenChange(false);
         return;
       }
@@ -104,7 +87,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
             full_name: data.full_name,
             phone: data.phone,
             organization_id: organizationId,
-            role_id: data.role_id
+            role: data.role
           },
           // 使用者確認信箱後進入接受邀請頁面，接受後才成為組織成員
           emailRedirectTo: getInvitationRedirectUrl()
@@ -131,7 +114,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
       const { error: completeError } = await supabase.rpc('complete_user_invitation', {
         _user_id: signUpData.user.id,
         _organization_id: organizationId,
-        _role_id: data.role_id,
+        _role: data.role,
         _full_name: data.full_name || null,
         _phone: data.phone || null,
       });
@@ -142,7 +125,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
 
       queryClient.invalidateQueries({ queryKey: ['organization_users'] });
       toast.success('邀請郵件已發送，對方完成註冊並接受邀請後才會成為組織成員');
-      reset();
+      reset(DEFAULT_VALUES);
       onOpenChange(false);
     } catch (error) {
       console.error('Error creating user:', error);
@@ -190,19 +173,22 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role_id">角色 *</Label>
-            <Select onValueChange={(value) => setValue('role_id', value)} value={selectedRoleId}>
-              <SelectTrigger>
+            <Label htmlFor="role">角色 *</Label>
+            <Select onValueChange={(value) => setValue('role', value as MemberRole)} value={selectedRole}>
+              <SelectTrigger id="role">
                 <SelectValue placeholder="選擇角色" />
               </SelectTrigger>
               <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.id}>
-                    {role.display_name}
+                {MEMBER_ROLES.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    {role.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-sm text-gray-500">
+              {MEMBER_ROLES.find((role) => role.value === selectedRole)?.description}
+            </p>
           </div>
 
           <div className="flex justify-end space-x-2">

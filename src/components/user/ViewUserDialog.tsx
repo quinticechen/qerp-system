@@ -5,38 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
+import { MEMBER_ROLES, ROLE_BADGE_CLASSES, ROLE_LABELS } from '@/lib/roles';
+import type { OrganizationMember } from '@/types/organizationMember';
 
 interface ViewUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: any;
+  user: OrganizationMember;
   onEdit?: () => void;
 }
 
 export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDialogProps) => {
-  const getRoleBadge = (role: string) => {
-    const roleMap = {
-      admin: 'bg-red-100 text-red-800 border-red-200',
-      sales: 'bg-blue-100 text-blue-800 border-blue-200',
-      assistant: 'bg-green-100 text-green-800 border-green-200',
-      accounting: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      warehouse: 'bg-purple-100 text-purple-800 border-purple-200'
-    };
-    return roleMap[role as keyof typeof roleMap] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const getRoleText = (role: string) => {
-    const roleTextMap = {
-      admin: '管理員',
-      sales: '業務',
-      assistant: '助理',
-      accounting: '會計',
-      warehouse: '倉管'
-    };
-    return roleTextMap[role as keyof typeof roleTextMap] || role;
-  };
-
-  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  const roleDescription = user.is_owner
+    ? '擁有組織的所有權限，並可以轉移擁有權'
+    : MEMBER_ROLES.find((role) => role.value === user.role)?.description;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,26 +71,15 @@ export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDia
           {/* 角色資訊 */}
           <div>
             <h3 className="text-lg font-medium mb-3">角色權限</h3>
-            <div className="space-y-3">
-              {roles.length > 0 ? (
-                roles.map((roleInfo: any, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Badge variant="outline" className={getRoleBadge(roleInfo.role)}>
-                        {getRoleText(roleInfo.role)}
-                      </Badge>
-                      <div>
-                        <p className="text-sm text-gray-600">
-                          授予時間：{new Date(roleInfo.granted_at).toLocaleString('zh-TW')}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-gray-500">此使用者尚未分配任何角色</p>
-              )}
+            <div className="flex items-center gap-3 p-3 border rounded-lg">
+              <Badge variant="outline" className={ROLE_BADGE_CLASSES[user.role]}>
+                {ROLE_LABELS[user.role]}
+              </Badge>
+              <p className="text-sm text-gray-600">{roleDescription}</p>
             </div>
+            {user.is_pending && (
+              <p className="mt-2 text-sm text-gray-500">接受邀請後才會取得此角色的權限</p>
+            )}
           </div>
 
           <Separator />
@@ -120,13 +91,13 @@ export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDia
               <div>
                 <label className="text-sm font-medium text-gray-500">建立時間</label>
                 <p className="text-gray-900">
-                  {new Date(user?.created_at).toLocaleString('zh-TW')}
+                  {new Date(user.created_at).toLocaleString('zh-TW')}
                 </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">最後更新</label>
                 <p className="text-gray-900">
-                  {new Date(user?.updated_at).toLocaleString('zh-TW')}
+                  {user.updated_at ? new Date(user.updated_at).toLocaleString('zh-TW') : '-'}
                 </p>
               </div>
             </div>

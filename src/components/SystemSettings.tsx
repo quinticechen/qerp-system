@@ -14,7 +14,8 @@ import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistory
 
 const SystemSettings = () => {
   const { organization, hasOrganization } = useCurrentOrganization();
-  const { isOwner } = useOrganizationPermissions();
+  const { isOwner, hasPermission } = useOrganizationPermissions();
+  const canEdit = hasPermission('canEditSystemSettings');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   if (!hasOrganization) {
@@ -41,7 +42,8 @@ const SystemSettings = () => {
         <RecordAuditHistoryButton recordId={organization?.id} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* 沒有編輯權限時只能查看 */}
+      <fieldset disabled={!canEdit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 通知設定 */}
         <Card>
           <CardHeader>
@@ -101,10 +103,8 @@ const SystemSettings = () => {
             <div className="space-y-2">
               <Label>預設新使用者角色</Label>
               <select className="w-full p-2 border border-input rounded-md">
-                <option value="sales">業務</option>
-                <option value="assistant">助理</option>
-                <option value="accounting">會計</option>
-                <option value="warehouse">倉庫管理員</option>
+                <option value="viewer">訪客</option>
+                <option value="editor">編輯者</option>
               </select>
             </div>
             <Separator />
@@ -261,7 +261,7 @@ const SystemSettings = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </fieldset>
 
       {/* 危險區域：僅組織擁有者可見 */}
       {isOwner && (
@@ -292,14 +292,16 @@ const SystemSettings = () => {
       )}
 
       {/* 保存設定按鈕 */}
-      <div className="flex justify-end space-x-4">
-        <Button variant="outline">
-          重設為預設值
-        </Button>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          保存設定
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex justify-end space-x-4">
+          <Button variant="outline">
+            重設為預設值
+          </Button>
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            保存設定
+          </Button>
+        </div>
+      )}
 
       <DeleteOrganizationDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} />
     </div>

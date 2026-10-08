@@ -78,6 +78,7 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   full_name: '姓名',
   display_name: '顯示名稱',
   permissions: '權限',
+  role: '角色',
   role_id: '角色',
   invited_role_id: '邀請角色',
   user_id: '用戶',

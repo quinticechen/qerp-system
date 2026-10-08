@@ -17,6 +17,8 @@ interface ProductRollsDialogProps {
   product: ProductRollsTarget | null;
   organizationId: string | null | undefined;
   onOpenChange: (open: boolean) => void;
+  // Show the data without edit buttons (members without canEditInventory)
+  readOnly?: boolean;
 }
 
 const QUALITY_LABELS: Record<string, string> = {
@@ -27,7 +29,7 @@ const QUALITY_LABELS: Record<string, string> = {
   defective: '瑕疵',
 };
 
-export const ProductRollsDialog = ({ product, organizationId, onOpenChange }: ProductRollsDialogProps) => {
+export const ProductRollsDialog = ({ product, organizationId, onOpenChange, readOnly = false }: ProductRollsDialogProps) => {
   const { data: rolls, isLoading } = useProductRolls(product?.productId ?? null);
   const [editingRoll, setEditingRoll] = useState<EditableRoll | null>(null);
 
@@ -78,9 +80,11 @@ export const ProductRollsDialog = ({ product, organizationId, onOpenChange }: Pr
                   <TableCell className="text-right text-gray-900">{roll.quantity.toFixed(2)}</TableCell>
                   <TableCell className="text-right text-gray-900">{roll.current_quantity.toFixed(2)}</TableCell>
                   <TableCell className="text-center">
-                    <Button variant="ghost" size="sm" aria-label="編輯布卷" onClick={() => setEditingRoll(roll)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {!readOnly && (
+                      <Button variant="ghost" size="sm" aria-label="編輯布卷" onClick={() => setEditingRoll(roll)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

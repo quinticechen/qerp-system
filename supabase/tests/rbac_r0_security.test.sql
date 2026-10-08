@@ -1,19 +1,5 @@
 -- RBAC R0 安全修補測試（docs/MULTI_TENANT_RBAC.md §2.1）。先載入 _helpers.sql 再執行本檔。
 
--- Add a user to an organization with the named system role, bypassing RLS (test setup only)
-create or replace function pg_temp.add_member(org_id uuid, role_name text)
-returns uuid language plpgsql as $$
-declare
-  v_user uuid := gen_random_uuid();
-begin
-  insert into auth.users (id, aud, role, email)
-  values (v_user, 'authenticated', 'authenticated', 'sql-test-' || v_user || '@example.test');
-  insert into public.user_organizations (user_id, organization_id, is_active, accepted_at) values (v_user, org_id, true, now());
-  insert into public.user_organization_roles (user_id, organization_id, role_id)
-  select v_user, org_id, id from public.organization_roles where organization_id = org_id and name = role_name;
-  return v_user;
-end $$;
-
 -- S1–S3: an outsider cannot join an organization, grant itself a role, or create roles there
 do $$
 declare
@@ -27,7 +13,7 @@ begin
 
   perform pg_temp.check_raises_as(v_out,
     format('insert into public.user_organizations (user_id, organization_id, is_active) values (%L, %L, true)', v_out, v_org),
-    'row-level security', 'S1: an outsider cannot add itself to another organization');
+    '成員只能經由邀請加入組織', 'S1: an outsider cannot add itself to another organization');
   perform pg_temp.check_raises_as(v_out,
     format('insert into public.user_organization_roles (user_id, organization_id, role_id, granted_by) values (%L, %L, %L, %L)', v_out, v_org, v_admin_role, v_out),
     'row-level security', 'S2: an outsider cannot grant itself a role in another organization');
@@ -39,72 +25,21 @@ begin
     'the outsider has no permission in the organization');
 end $$;
 
--- S2: a member without canEditUsers cannot add roles, to itself or others
+-- S2: a member without canEditUsers cannot change roles, its own or others'
 do $$
 declare
   fx jsonb := pg_temp.seed_fixture();
   v_org uuid := (fx->>'org_id')::uuid;
-  v_sales uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'sales');
-  v_admin_role uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
 begin
-  select id into v_admin_role from public.organization_roles where organization_id = v_org and name = 'admin';
-
-  perform pg_temp.check_raises_as(v_sales,
-    format('insert into public.user_organization_roles (user_id, organization_id, role_id, granted_by) values (%L, %L, %L, %L)', v_sales, v_org, v_admin_role, v_sales),
-    'row-level security', 'S2: a sales member cannot grant itself the admin role');
-  perform pg_temp.check_raises_as(v_sales,
-    format('select public.set_member_role(%L, %L, %L)', v_org, v_sales, v_admin_role),
-    '權限不足', 'S2: a sales member cannot use set_member_role');
-  perform pg_temp.check(not public.user_has_organization_permission(v_sales, v_org, 'canEditUsers'),
-    'the sales member still lacks canEditUsers');
+  perform pg_temp.check_raises_as(v_editor,
+    format('select public.set_member_role(%L, %L, %L)', v_org, v_editor, 'admin'),
+    '權限不足', 'S2: an editor cannot use set_member_role');
+  perform pg_temp.check(not public.user_has_organization_permission(v_editor, v_org, 'canEditUsers'),
+    'the editor still lacks canEditUsers');
 end $$;
 
--- S7: set_member_role replaces the member's role and enforces the anti-escalation rules
-do $$
-declare
-  fx jsonb := pg_temp.seed_fixture();
-  other jsonb := pg_temp.seed_fixture();
-  v_org uuid := (fx->>'org_id')::uuid;
-  v_owner uuid := (fx->>'user_id')::uuid;
-  v_admin uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'admin');
-  v_member uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'sales');
-  v_assistant_role uuid;
-  v_admin_role uuid;
-  v_owner_role uuid;
-  v_foreign_role uuid;
-  v_roles uuid[];
-begin
-  select id into v_assistant_role from public.organization_roles where organization_id = v_org and name = 'assistant';
-  select id into v_admin_role from public.organization_roles where organization_id = v_org and name = 'admin';
-  select id into v_owner_role from public.organization_roles where organization_id = v_org and name = 'owner';
-  select id into v_foreign_role from public.organization_roles where organization_id = (other->>'org_id')::uuid and name = 'admin';
-
-  -- A non-owner admin changes a member's role: the old role is gone, not kept alongside the new one
-  perform pg_temp.act_as(v_admin);
-  perform public.set_member_role(v_org, v_member, v_assistant_role);
-  execute 'reset role';
-  select array_agg(role_id) into v_roles from public.user_organization_roles where organization_id = v_org and user_id = v_member;
-  perform pg_temp.check(v_roles = array[v_assistant_role], 'S7: the member holds exactly the new role, got ' || coalesce(v_roles::text, 'none'));
-
-  -- An admin can make another member an admin
-  perform pg_temp.act_as(v_admin);
-  perform public.set_member_role(v_org, v_member, v_admin_role);
-  execute 'reset role';
-  perform pg_temp.check(public.user_has_organization_permission(v_member, v_org, 'canEditUsers'), 'an admin can promote a member to admin');
-
-  perform pg_temp.check_raises_as(v_admin, format('select public.set_member_role(%L, %L, %L)', v_org, v_admin, v_assistant_role),
-    '不能修改自己的角色', 'nobody can change their own role');
-  perform pg_temp.check_raises_as(v_admin, format('select public.set_member_role(%L, %L, %L)', v_org, v_owner, v_assistant_role),
-    '不能修改擁有者的角色', 'an admin cannot change the owner''s role');
-  perform pg_temp.check_raises_as(v_admin, format('select public.set_member_role(%L, %L, %L)', v_org, v_member, v_owner_role),
-    '擁有者角色只能經由轉移擁有權取得', 'the owner role cannot be assigned');
-  perform pg_temp.check_raises_as(v_admin, format('select public.set_member_role(%L, %L, %L)', v_org, v_member, v_foreign_role),
-    '角色不存在', 'a role from another organization cannot be assigned');
-  perform pg_temp.check_raises_as(v_admin, format('select public.set_member_role(%L, %L, %L)', v_org, (other->>'user_id')::uuid, v_assistant_role),
-    '此使用者不是組織成員', 'a non-member cannot be given a role');
-  perform pg_temp.check_raises_as((other->>'user_id')::uuid, format('select public.set_member_role(%L, %L, %L)', v_org, v_member, v_assistant_role),
-    '權限不足', 'an outsider cannot change roles in another organization');
-end $$;
+-- S7 (role changes) is covered by rbac_r1_roles.test.sql
 
 -- S4: order_factories and purchase_order_relations are only visible and writable inside the organization
 do $$
@@ -231,7 +166,6 @@ begin
   into v_member;
   perform pg_temp.check(v_member, 'the creator is an active member of the new organization');
   perform pg_temp.check(public.user_has_organization_permission(v_user, v_org, 'canEditUsers'), 'the creator has full permissions');
-  perform pg_temp.check((select count(*) from public.organization_roles where organization_id = v_org) = 6, 'default roles are created');
 end $$;
 
 do $$ begin raise exception 'ALL TESTS PASSED'; end $$;

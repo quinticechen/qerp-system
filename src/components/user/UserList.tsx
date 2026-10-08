@@ -13,12 +13,14 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganizationPermissions } from '@/hooks/useOrganizationPermissions';
 import { getInvitationRedirectUrl, sendExistingUserInvitationEmail } from '@/hooks/useInvitations';
+import { ROLE_BADGE_CLASSES, ROLE_LABELS, isMemberRole } from '@/lib/roles';
+import type { OrganizationMember } from '@/types/organizationMember';
 
 // 邀請啟用有效期限：7 天，超過後邀請視為已過期，需由有新增使用者權限的角色重新發送
 const INVITATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const UserList = () => {
-  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [selectedUser, setSelectedUser] = useState<OrganizationMember | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -27,10 +29,11 @@ export const UserList = () => {
   const currentUserId = currentUser?.id;
   const { hasPermission } = useOrganizationPermissions();
   const canResendInvitation = hasPermission('canCreateUsers');
+  const canEditUsers = hasPermission('canEditUsers');
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['organization_users', organizationId],
-    queryFn: async () => {
+    queryFn: async (): Promise<OrganizationMember[]> => {
       if (!organizationId) {
         console.log('No organization ID available');
         return [];
@@ -42,7 +45,7 @@ export const UserList = () => {
       // re-enabled) and invitations that haven't been accepted yet
       const { data: userOrgs, error: userOrgsError } = await supabase
         .from('user_organizations')
-        .select('user_id, is_active, joined_at, accepted_at, invited_role:organization_roles!invited_role_id (name, display_name)')
+        .select('user_id, is_active, joined_at, accepted_at, role')
         .eq('organization_id', organizationId);
 
       if (userOrgsError) {
@@ -68,25 +71,6 @@ export const UserList = () => {
         throw profilesError;
       }
 
-      // Get roles for these users
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_organization_roles')
-        .select(`
-          user_id,
-          organization_roles (
-            name,
-            display_name
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .in('user_id', userIds)
-        .eq('is_active', true);
-
-      if (rolesError) {
-        console.error('Error fetching user roles:', rolesError);
-        throw rolesError;
-      }
-
       // Get invitation status (not yet accepted) for these users
       const { data: memberStatus, error: memberStatusError } = await supabase
         .rpc('get_organization_member_status', { _organization_id: organizationId });
@@ -96,14 +80,16 @@ export const UserList = () => {
       }
 
       // Combine the data
-      const processedData = profiles?.map(profile => {
+      const processedData = profiles?.map((profile): OrganizationMember => {
         const userOrg = userOrgs.find(uo => uo.user_id === profile.id);
-        const roles = userRoles?.filter(ur => ur.user_id === profile.id) || [];
         const status = memberStatus?.find(ms => ms.user_id === profile.id);
         const isPending = status?.is_pending ?? userOrg?.accepted_at == null;
         const invitedAt = status?.invited_at;
         const isExpired = isPending && !!invitedAt
           && (Date.now() - new Date(invitedAt).getTime() > INVITATION_EXPIRY_MS);
+
+        const isOwner = profile.id === organization?.owner_id;
+        const memberRole = isMemberRole(userOrg?.role) ? userOrg.role : 'viewer';
 
         return {
           id: profile.id,
@@ -112,20 +98,15 @@ export const UserList = () => {
           phone: profile.phone,
           // Membership status is per organization; profiles.is_active is per person
           is_active: userOrg?.is_active ?? false,
-          is_owner: profile.id === organization?.owner_id,
+          is_owner: isOwner,
           is_pending: isPending,
           is_expired: isExpired,
           invited_at: invitedAt,
           created_at: profile.created_at,
           joined_at: isPending ? null : userOrg?.joined_at,
           email_confirmed: status?.email_confirmed ?? true,
-          // Invitees have no active role yet; show the role they'll get on acceptance
-          roles: isPending && userOrg?.invited_role
-            ? [{ role: userOrg.invited_role.name, display_name: userOrg.invited_role.display_name }]
-            : roles.map(role => ({
-                role: role.organization_roles?.name,
-                display_name: role.organization_roles?.display_name
-              }))
+          // Invitees already hold the role they were invited with; it takes effect once they accept
+          role: isOwner ? 'owner' : memberRole,
         };
       }) || [];
 
@@ -139,18 +120,14 @@ export const UserList = () => {
     if (!organizationId || !currentUserId) return;
 
     try {
-      // 只停用／啟用在目前組織的成員資格，不影響此人在其他組織的狀態
-      const { data: updatedRows, error } = await supabase
-        .from('user_organizations')
-        .update({ is_active: !currentStatus })
-        .eq('user_id', userId)
-        .eq('organization_id', organizationId)
-        .select('id');
+      // 只停用／啟用在目前組織的成員資格，不影響此人在其他組織的狀態；由資料庫檢查權限
+      const { error } = await supabase.rpc('set_member_active', {
+        _organization_id: organizationId,
+        _user_id: userId,
+        _is_active: !currentStatus,
+      });
 
       if (error) throw error;
-      if (!updatedRows || updatedRows.length === 0) {
-        throw new Error('權限不足，無法變更此成員狀態');
-      }
 
       // 記錄操作日誌
       await supabase
@@ -174,7 +151,7 @@ export const UserList = () => {
     }
   };
 
-  const handleView = (user: any) => {
+  const handleView = (user: OrganizationMember) => {
     setSelectedUser(user);
     setViewDialogOpen(true);
   };
@@ -206,32 +183,10 @@ export const UserList = () => {
 
       queryClient.invalidateQueries({ queryKey: ['organization_users'] });
       toast.success('邀請信已重新發送');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error resending invitation:', error);
-      toast.error(`重新發送邀請失敗: ${error.message}`);
+      toast.error(`重新發送邀請失敗: ${(error as { message?: string }).message ?? '未知錯誤'}`);
     }
-  };
-
-  const getRoleBadge = (role: string) => {
-    const roleMap = {
-      admin: 'bg-red-100 text-red-800 border-red-200',
-      sales: 'bg-blue-100 text-blue-800 border-blue-200',
-      assistant: 'bg-green-100 text-green-800 border-green-200',
-      accounting: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      warehouse: 'bg-purple-100 text-purple-800 border-purple-200'
-    };
-    return roleMap[role as keyof typeof roleMap] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
-
-  const getRoleText = (role: string) => {
-    const roleTextMap = {
-      admin: '管理員',
-      sales: '業務',
-      assistant: '助理',
-      accounting: '會計',
-      warehouse: '倉管'
-    };
-    return roleTextMap[role as keyof typeof roleTextMap] || role;
   };
 
   const columns: TableColumn[] = [
@@ -257,24 +212,21 @@ export const UserList = () => {
       render: (value) => <span className="text-gray-700">{value || '-'}</span>
     },
     {
-      key: 'roles',
+      key: 'role',
       title: '角色',
-      sortable: false,
-      filterable: false,
-      render: (value, row) => {
-        const roles = Array.isArray(row.roles) ? row.roles : [];
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.length > 0 ? roles.map((roleInfo: any, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                {roleInfo.display_name || roleInfo.role}
-              </Badge>
-            )) : (
-              <span className="text-gray-500">無角色</span>
-            )}
-          </div>
-        );
-      }
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'owner', label: ROLE_LABELS.owner },
+        { value: 'admin', label: ROLE_LABELS.admin },
+        { value: 'editor', label: ROLE_LABELS.editor },
+        { value: 'viewer', label: ROLE_LABELS.viewer },
+      ],
+      render: (value: OrganizationMember['role']) => (
+        <Badge variant="outline" className={`text-xs ${ROLE_BADGE_CLASSES[value]}`}>
+          {ROLE_LABELS[value]}
+        </Badge>
+      )
     },
     {
       key: 'is_active',
@@ -336,7 +288,7 @@ export const UserList = () => {
             </Button>
           )}
           {/* 組織擁有者與自己不能被停用 */}
-          {!row.is_pending && !row.is_owner && row.id !== currentUserId && (
+          {canEditUsers && !row.is_pending && !row.is_owner && row.id !== currentUserId && (
             <Button
               variant="outline"
               size="sm"
@@ -396,10 +348,11 @@ export const UserList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             user={selectedUser}
-            onEdit={() => {
+            // Anyone can edit their own name and phone; editing others needs canEditUsers
+            onEdit={canEditUsers || selectedUser.id === currentUserId ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
-            }}
+            } : undefined}
           />
           <EditUserDialog
             open={editDialogOpen}

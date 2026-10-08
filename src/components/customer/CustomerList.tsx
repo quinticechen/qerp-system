@@ -7,8 +7,11 @@ import { EditCustomerDialog } from './EditCustomerDialog';
 import { ViewCustomerDialog } from './ViewCustomerDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const CustomerList = () => {
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditCustomers');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -157,10 +160,10 @@ export const CustomerList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             customer={selectedCustomer}
-            onEdit={() => {
+            onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
-            }}
+            } : undefined}
           />
           <EditCustomerDialog
             open={editDialogOpen}

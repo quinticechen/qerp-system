@@ -26,6 +26,8 @@ interface EditOrderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOrderUpdated: () => void;
+  // View the order without being able to change it (members without canEditOrders)
+  readOnly?: boolean;
 }
 
 export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
@@ -33,6 +35,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   open,
   onOpenChange,
   onOrderUpdated,
+  readOnly = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -228,13 +231,13 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             creation={{ tableName: 'orders', createdBy: order.user_id ?? null, createdAt: order.created_at }}
             className="absolute right-10 top-2"
           />
-          <DialogTitle className="text-gray-900">編輯訂單</DialogTitle>
+          <DialogTitle className="text-gray-900">{readOnly ? '訂單詳情' : '編輯訂單'}</DialogTitle>
           <DialogDescription className="text-gray-700">
             訂單編號: {order.order_number}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <fieldset disabled={readOnly} className="space-y-6">
           {/* Order Information */}
           <div className="bg-gray-50 p-4 rounded-lg space-y-2">
             <div className="text-sm text-gray-700">
@@ -372,7 +375,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
               className="border-gray-200 text-gray-900"
             />
           </div>
-        </div>
+        </fieldset>
 
         {saveError && (
           <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -382,14 +385,16 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
+            {readOnly ? '關閉' : '取消'}
           </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={updateOrderMutation.isPending}
-          >
-            {updateOrderMutation.isPending ? '更新中...' : '更新訂單'}
-          </Button>
+          {!readOnly && (
+            <Button
+              onClick={handleSubmit}
+              disabled={updateOrderMutation.isPending}
+            >
+              {updateOrderMutation.isPending ? '更新中...' : '更新訂單'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

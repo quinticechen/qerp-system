@@ -7,10 +7,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { EditProductDialog } from './EditProductDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const ProductList = () => {
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditProducts');
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: products, isLoading, refetch } = useQuery({
@@ -185,6 +188,7 @@ const ProductList = () => {
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           product={selectedProduct}
+          readOnly={!canEdit}
           onSubmit={async (id, data) => {
             try {
               const { error } = await supabase

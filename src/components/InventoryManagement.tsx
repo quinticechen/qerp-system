@@ -9,8 +9,12 @@ import { InventorySummary } from './inventory/InventorySummary';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
+import { PermissionGate } from '@/components/PermissionGate';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const InventoryManagement = () => {
+  const { hasPermission } = usePermissions();
+  const canEditInventory = hasPermission('canEditInventory');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
@@ -19,13 +23,15 @@ const InventoryManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">庫存管理</h2>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          新增入庫
-        </Button>
+        <PermissionGate permission="canCreateInventory">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新增入庫
+          </Button>
+        </PermissionGate>
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -37,7 +43,7 @@ const InventoryManagement = () => {
         </TabsList>
         
         <TabsContent value="summary">
-          <InventorySummary />
+          <InventorySummary readOnly={!canEditInventory} />
         </TabsContent>
         
         <TabsContent value="pending-inventory">
@@ -49,7 +55,7 @@ const InventoryManagement = () => {
         </TabsContent>
         
         <TabsContent value="records">
-          <InventoryList selectedInventoryId={selectedInventoryId} onInventorySelected={setSelectedInventoryId} />
+          <InventoryList selectedInventoryId={selectedInventoryId} onInventorySelected={setSelectedInventoryId} readOnly={!canEditInventory} />
         </TabsContent>
       </Tabs>
       

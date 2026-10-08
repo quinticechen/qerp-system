@@ -38,7 +38,12 @@ interface InventorySummaryItem {
   pending_out_quantity: number;
 }
 
-export const EnhancedInventorySummary = () => {
+interface EnhancedInventorySummaryProps {
+  // Show the data without edit buttons (members without canEditInventory)
+  readOnly?: boolean;
+}
+
+export const EnhancedInventorySummary = ({ readOnly = false }: EnhancedInventorySummaryProps) => {
   const { organizationId, hasOrganization } = useCurrentOrganization();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<ProductRollsTarget | null>(null);
@@ -432,6 +437,7 @@ export const EnhancedInventorySummary = () => {
         product={selectedProduct}
         organizationId={organizationId}
         onOpenChange={(isOpen) => !isOpen && setSelectedProduct(null)}
+        readOnly={readOnly}
       />
     </div>
   );

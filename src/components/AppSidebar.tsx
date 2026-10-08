@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ROUTE_PERMISSIONS } from '@/lib/routePermissions';
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +32,7 @@ import {
 export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission, loading } = usePermissions();
 
   const menuItems = [
     { id: 'dashboard', label: '儀表板', icon: BarChart3, path: '/dashboard' },
@@ -46,6 +49,12 @@ export function AppSidebar() {
     { id: 'system', label: '組織設定', icon: Settings, path: '/system' }
   ];
 
+  // Only list pages the member can open; protected pages appear once permissions have loaded
+  const visibleItems = menuItems.filter((item) => {
+    const permission = ROUTE_PERMISSIONS[item.path];
+    return !permission || (!loading && hasPermission(permission));
+  });
+
   return (
     <Sidebar className="border-r border-slate-200 dark:border-slate-700">
       <SidebarHeader className="p-4 border-b border-slate-200 dark:border-slate-700">
@@ -56,7 +65,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-slate-600 dark:text-slate-400 font-medium">主要功能</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => navigate(item.path)}

@@ -19,6 +19,8 @@ interface EditProductDialogProps {
   onOpenChange: (open: boolean) => void;
   product: Product | null;
   onSubmit: (id: string, data: Partial<ProductFormData>) => Promise<boolean>;
+  // View the product without being able to change it (members without canEditProducts)
+  readOnly?: boolean;
 }
 
 const CATEGORIES = ['布料', '胚布', '紗線', '輔料'];
@@ -28,6 +30,7 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
   onOpenChange,
   product,
   onSubmit,
+  readOnly = false,
 }) => {
   const [formData, setFormData] = useState<ProductFormData>({
     name: '',
@@ -80,103 +83,107 @@ export const EditProductDialog: React.FC<EditProductDialogProps> = ({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <RecordAuditHistoryButton recordId={product.id} creation={{ tableName: 'products_new', createdBy: product.user_id, createdAt: product.created_at }} className="absolute right-10 top-2" />
-          <DialogTitle>編輯產品</DialogTitle>
+          <DialogTitle>{readOnly ? '產品詳情' : '編輯產品'}</DialogTitle>
           <DialogDescription>
-            編輯產品資訊
+            {readOnly ? '您的角色只能查看產品資訊' : '編輯產品資訊'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">產品名稱 *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category">類別</Label>
-            <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          <fieldset disabled={readOnly} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="color">顏色</Label>
+              <Label htmlFor="name">產品名稱 *</Label>
               <Input
-                id="color"
-                value={formData.color || ''}
-                onChange={(e) => handleInputChange('color', e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="color_code">色碼</Label>
-              <Input
-                id="color_code"
-                value={formData.color_code || ''}
-                onChange={(e) => handleInputChange('color_code', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stock_thresholds">庫存閾值 (公斤)</Label>
-            <Input
-              id="stock_thresholds"
-              type="number"
-              min="0"
-              step="0.1"
-              value={formData.stock_thresholds || ''}
-              onChange={(e) => handleInputChange('stock_thresholds', e.target.value ? parseFloat(e.target.value) : undefined)}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="unit_of_measure">計量單位</Label>
-              <Input
-                id="unit_of_measure"
-                value={formData.unit_of_measure}
-                onChange={(e) => handleInputChange('unit_of_measure', e.target.value)}
+                id="name"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">產品狀態</Label>
-              <Select value={formData.status} onValueChange={(value: 'Available' | 'Unavailable') => handleInputChange('status', value)}>
+              <Label htmlFor="category">類別</Label>
+              <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Available">可用</SelectItem>
-                  <SelectItem value="Unavailable">不可用</SelectItem>
+                  {CATEGORIES.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="color">顏色</Label>
+                <Input
+                  id="color"
+                  value={formData.color || ''}
+                  onChange={(e) => handleInputChange('color', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="color_code">色碼</Label>
+                <Input
+                  id="color_code"
+                  value={formData.color_code || ''}
+                  onChange={(e) => handleInputChange('color_code', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stock_thresholds">庫存閾值 (公斤)</Label>
+              <Input
+                id="stock_thresholds"
+                type="number"
+                min="0"
+                step="0.1"
+                value={formData.stock_thresholds || ''}
+                onChange={(e) => handleInputChange('stock_thresholds', e.target.value ? parseFloat(e.target.value) : undefined)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="unit_of_measure">計量單位</Label>
+                <Input
+                  id="unit_of_measure"
+                  value={formData.unit_of_measure}
+                  onChange={(e) => handleInputChange('unit_of_measure', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">產品狀態</Label>
+                <Select value={formData.status} onValueChange={(value: 'Available' | 'Unavailable') => handleInputChange('status', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Available">可用</SelectItem>
+                    <SelectItem value="Unavailable">不可用</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </fieldset>
 
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              取消
+              {readOnly ? '關閉' : '取消'}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? '更新中...' : '更新產品'}
-            </Button>
+            {!readOnly && (
+              <Button type="submit" disabled={loading}>
+                {loading ? '更新中...' : '更新產品'}
+              </Button>
+            )}
           </div>
         </form>
       </DialogContent>

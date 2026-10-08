@@ -1,134 +1,58 @@
 
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { isMemberRole, type OrganizationRole } from '@/lib/roles';
 
-export interface OrganizationRole {
-  id: string;
-  organization_id: string;
-  name: string;
-  display_name: string;
-  description?: string;
+interface OrganizationAccess {
+  role: OrganizationRole | null;
   permissions: Record<string, boolean>;
-  is_system_role: boolean;
-  is_active: boolean;
 }
 
-export interface UserOrganizationRole {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  role_id: string;
-  granted_at: string;
-  is_active: boolean;
-  role: OrganizationRole;
-}
+const NO_ACCESS: OrganizationAccess = { role: null, permissions: {} };
 
+// The current user's role and permissions in the selected organization.
+// Mirrors the database function user_has_organization_permission(): active members get their role's
+// permissions from role_permissions, and the owner gets the admin set.
+// Every component shares one cached copy, so menus, guards and buttons can all call this freely.
 export const useOrganizationPermissions = () => {
   const { user } = useAuth();
   const { currentOrganization } = useOrganizationContext();
-  const [userRoles, setUserRoles] = useState<UserOrganizationRole[]>([]);
-  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const [isOwner, setIsOwner] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const isOwner = !!user && !!currentOrganization && currentOrganization.owner_id === user.id;
 
-  useEffect(() => {
-    if (!user || !currentOrganization) {
-      setUserRoles([]);
-      setPermissions({});
-      setIsOwner(false);
-      setLoading(false);
-      return;
-    }
+  const { data = NO_ACCESS, isLoading, refetch } = useQuery({
+    queryKey: ['organization-permissions', user?.id, currentOrganization?.id, isOwner],
+    enabled: !!user && !!currentOrganization,
+    queryFn: async (): Promise<OrganizationAccess> => {
+      const { data: membership, error: membershipError } = await supabase
+        .from('user_organizations')
+        .select('role, is_active')
+        .eq('user_id', user!.id)
+        .eq('organization_id', currentOrganization!.id)
+        .maybeSingle();
 
-    fetchUserPermissions();
-  }, [user, currentOrganization]);
+      if (membershipError) throw membershipError;
 
-  const fetchUserPermissions = async () => {
-    if (!user || !currentOrganization) return;
+      const memberRole = membership?.is_active && isMemberRole(membership.role) ? membership.role : null;
+      const catalogRole = isOwner ? 'admin' : memberRole;
+      if (!catalogRole) return NO_ACCESS;
 
-    try {
-      setLoading(true);
+      const { data: rolePermissions, error: rolePermissionsError } = await supabase
+        .from('role_permissions')
+        .select('permission_key')
+        .eq('role', catalogRole);
 
-      // 檢查是否為組織擁有者
-      const isOrgOwner = currentOrganization.owner_id === user.id;
-      setIsOwner(isOrgOwner);
+      if (rolePermissionsError) throw rolePermissionsError;
 
-      // 獲取使用者在當前組織的角色
-      const { data: userRolesData, error } = await supabase
-        .from('user_organization_roles')
-        .select(`
-          id,
-          user_id,
-          organization_id,
-          role_id,
-          granted_at,
-          is_active,
-          role:organization_roles(
-            id,
-            organization_id,
-            name,
-            display_name,
-            description,
-            permissions,
-            is_system_role,
-            is_active
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('organization_id', currentOrganization.id)
-        .eq('is_active', true);
+      return {
+        role: isOwner ? 'owner' : memberRole,
+        permissions: Object.fromEntries((rolePermissions ?? []).map(({ permission_key }) => [permission_key, true])),
+      };
+    },
+  });
 
-      if (error) throw error;
-
-      const roles = userRolesData as UserOrganizationRole[];
-      setUserRoles(roles);
-
-      // 合併所有角色的權限
-      const mergedPermissions: Record<string, boolean> = {};
-      
-      if (isOrgOwner) {
-        // 組織擁有者擁有所有權限
-        mergedPermissions.canManageOrganization = true;
-        mergedPermissions.canManageUsers = true;
-        mergedPermissions.canManageRoles = true;
-        mergedPermissions.canViewAll = true;
-        mergedPermissions.canEditAll = true;
-        mergedPermissions.canDeleteAll = true;
-        // 設定所有基本權限為 true
-        const allPermissions = [
-          'canViewProducts', 'canCreateProducts', 'canEditProducts', 'canDeleteProducts',
-          'canViewInventory', 'canCreateInventory', 'canEditInventory',
-          'canViewOrders', 'canCreateOrders', 'canEditOrders',
-          'canViewPurchases', 'canCreatePurchases', 'canEditPurchases',
-          'canViewShipping', 'canCreateShipping', 'canEditShipping',
-          'canViewCustomers', 'canCreateCustomers', 'canEditCustomers',
-          'canViewFactories', 'canCreateFactories', 'canEditFactories',
-          'canViewUsers', 'canCreateUsers', 'canEditUsers',
-          'canViewPermissions', 'canEditPermissions',
-          'canViewSystemSettings', 'canEditSystemSettings'
-        ];
-        allPermissions.forEach(permission => {
-          mergedPermissions[permission] = true;
-        });
-      } else {
-        // 合併所有角色的權限
-        roles.forEach(userRole => {
-          const rolePermissions = userRole.role.permissions;
-          Object.keys(rolePermissions).forEach(permission => {
-            mergedPermissions[permission] = mergedPermissions[permission] || rolePermissions[permission];
-          });
-        });
-      }
-
-      setPermissions(mergedPermissions);
-    } catch (error) {
-      console.error('Error fetching user permissions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { role, permissions } = data;
 
   const hasPermission = (permission: string): boolean => {
     return permissions[permission] || false;
@@ -139,12 +63,13 @@ export const useOrganizationPermissions = () => {
   };
 
   return {
-    userRoles,
+    role,
     permissions,
     isOwner,
-    loading,
+    // Without a user or organization there is nothing to load
+    loading: !!user && !!currentOrganization && isLoading,
     hasPermission,
     hasAnyPermission,
-    refreshPermissions: fetchUserPermissions
+    refreshPermissions: refetch
   };
 };

@@ -24,6 +24,16 @@ import { CreateCustomerDialog } from '@/components/common/CreateCustomerDialog';
 import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog';
 import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '@/hooks/usePermissions';
+import type { PermissionKey } from '@/lib/permissionLabels';
+import type { LucideIcon } from 'lucide-react';
+
+interface QuickAction {
+  permission: PermissionKey;
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}
 
 const Dashboard = () => {
   const { organization, organizationId, hasOrganization } = useCurrentOrganization();
@@ -32,6 +42,16 @@ const Dashboard = () => {
   const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
   const [createPurchaseOpen, setCreatePurchaseOpen] = useState(false);
   const [createShippingOpen, setCreateShippingOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+
+  // Shortcuts only for what the member's role may create
+  const allQuickActions: QuickAction[] = [
+    { permission: 'canCreateProducts', label: '新增產品', icon: Package, onClick: () => setCreateProductOpen(true) },
+    { permission: 'canCreateCustomers', label: '新增客戶', icon: Users, onClick: () => setCreateCustomerOpen(true) },
+    { permission: 'canCreatePurchases', label: '建立採購單', icon: ShoppingCart, onClick: () => setCreatePurchaseOpen(true) },
+    { permission: 'canCreateShipping', label: '安排出貨', icon: Truck, onClick: () => setCreateShippingOpen(true) },
+  ];
+  const quickActions = allQuickActions.filter((action) => hasPermission(action.permission));
 
   // 獲取組織統計資料
   const { data: stats } = useQuery({
@@ -250,38 +270,19 @@ const Dashboard = () => {
                       </div>
                       <h3 className="text-sm text-slate-600 mb-4">常用功能快速入口</h3>
                       <div className="space-y-3">
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start"
-                          onClick={() => setCreateProductOpen(true)}
-                        >
-                          <Package size={16} className="mr-2" />
-                          新增產品
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start"
-                          onClick={() => setCreateCustomerOpen(true)}
-                        >
-                          <Users size={16} className="mr-2" />
-                          新增客戶
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start"
-                          onClick={() => setCreatePurchaseOpen(true)}
-                        >
-                          <ShoppingCart size={16} className="mr-2" />
-                          建立採購單
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          className="w-full justify-start"
-                          onClick={() => setCreateShippingOpen(true)}
-                        >
-                          <Truck size={16} className="mr-2" />
-                          安排出貨
-                        </Button>
+                        {quickActions.length > 0 ? quickActions.map(({ label, icon: Icon, onClick }) => (
+                          <Button
+                            key={label}
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={onClick}
+                          >
+                            <Icon size={16} className="mr-2" />
+                            {label}
+                          </Button>
+                        )) : (
+                          <p className="text-sm text-slate-500">您的角色只能查看資料</p>
+                        )}
                       </div>
                     </div>
                   </Card>
