@@ -106,9 +106,9 @@
 | A4 入庫 | `receive_inventory` | `canCreateInventory` | 採購單、到貨日、布卷（產品、貨架、品質、重量、捲號）；更新採購單收貨進度 | ✅ |
 | | `update_inventory` | `canEditInventory` | 到貨日、備註、布卷（沿用 `save_inventory_rolls` 的鎖定規則） | ✅ |
 | | `update_inventory_roll` | `canEditInventory` | 單一布卷的重量、品質、倉庫、貨架 | ✅ |
-| A5 出貨 | `create_shipping` | `canCreateShipping` | 訂單、出貨日、布卷與重量；扣庫存、更新訂單出貨進度 | ⏳ |
-| | `update_shipping` | `canEditShipping` | 沿用 `save_shipping_items` | ⏳ |
-| | `cancel_shipping` | `canEditShipping` | 待確認（決策 B3） | ⏳ |
+| A5 出貨 | `create_shipping` | `canCreateShipping` | 訂單、出貨日、布卷與重量；扣庫存、更新訂單出貨進度 | ✅ |
+| | `update_shipping` | `canEditShipping` | 沿用 `save_shipping_items` | ✅ |
+| | `cancel_shipping` | `canEditShipping` | 歸還布卷庫存、重算訂單出貨進度（決策 B3） | ✅ |
 
 ### 流程 2：主檔維護
 
@@ -310,6 +310,33 @@ Migration：`supabase/migrations/20261008233705_api_a4_receiving.sql`；測試�
 | `22023` | `rolls_required`、`invalid_quantity`、`invalid_quality`、`invalid_date`、`product_not_on_purchase_order`、`unknown_field` | 入庫紀錄至少需要一卷布、布卷重量必須大於 0、產品「…」不在採購單上… |
 | `23505` | `roll_number_taken` | 布卷編號「…」已被使用 |
 | `55000` | `purchase_order_cancelled`、`roll_shipped`、`quantity_below_shipped` | 採購單 … 已取消，不能入庫；布卷「…」已出貨，不可刪除或更換產品；入庫重量不可低於已出貨 … 公斤 |
+
+### A5 出貨單
+
+Migration：`supabase/migrations/20261009000604_api_a5_shipping.sql`；測試：`supabase/tests/api_a5_shipping.test.sql`；前端：`src/lib/api/shipping.ts`。
+
+出貨單新增 `status`（`shipped`／`cancelled`）、`cancelled_at`、`cancel_reason`。訂單的出貨量與出貨狀態只計算未取消的出貨單。
+
+**`create_shipping`**（`canCreateShipping`）
+
+| 參數 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| `p_order_id` | uuid | ✅ | 同組織、未取消的訂單；客戶沿用訂單 |
+| `p_items` | jsonb | ✅ | 至少一卷：`[{ inventory_roll_id, shipped_quantity }]`；布卷須屬同組織，其產品須在訂單上；重量 > 0 且不可超過布卷剩餘庫存 |
+| `p_shipping_date` | date | | 預設為台灣今天 |
+| `p_note` | text | | |
+
+回傳：`id`、`number`（出貨單編號 O＋YYYYMMDD＋四位流水號；試算時皆為 `null`）。同一個交易內扣除布卷庫存、更新訂單出貨進度。超過訂單量仍可出貨。`summary.title` 為「建立出貨單」，`fields` 依序為訂單、客戶、出貨日期、產品 1…n（「產品 - 顏色 × N 卷，共 X 公斤」）、備註、合計，以及「超過訂單量」（有超出時）。
+
+**`update_shipping`**（`canEditShipping`）：`p_changes` 可含 `items`（完整的布卷清單：有 `id` 的更新、沒有的新增、沒列出的刪除；只把差額計入庫存）、`shipping_date`、`note`。已取消的出貨單不能修改。`summary` 以「移除布卷／修改布卷（舊 → 新）／新增布卷」表示，例如「R261008123456789 棉布 - 白 40 公斤」。
+
+**`cancel_shipping`**（`canEditShipping`，決策 B3）：`p_shipping_id`、`p_reason?`。出貨的重量加回各布卷、訂單出貨進度重算；出貨項目保留作為紀錄。訂單的出貨單都取消後，訂單就可以取消（若沒有進行中的採購單）。
+
+| SQLSTATE | 代碼 | 訊息 |
+|----------|------|------|
+| `P0002` | `order_not_found`、`shipping_not_found`、`roll_not_found`、`item_not_found` | 找不到此訂單／出貨單／布卷，出貨項目不屬於此出貨單 |
+| `22023` | `items_required`、`invalid_quantity`、`roll_not_in_order`、`invalid_date`、`unknown_field` | 出貨單至少需要一卷布、出貨重量必須大於 0、布卷「…」的產品不在此訂單中… |
+| `55000` | `order_cancelled`、`shipping_cancelled`、`shipping_already_cancelled`、`insufficient_stock` | 訂單 … 已取消，不能出貨；出貨單 … 已取消；布卷「…」庫存不足，最多可再出貨 … 公斤 |
 
 ### A6 產品與顏色
 

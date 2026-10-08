@@ -1228,6 +1228,8 @@ export type Database = {
       }
       shippings: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           customer_id: string
           id: string
@@ -1236,12 +1238,15 @@ export type Database = {
           organization_id: string | null
           shipping_date: string
           shipping_number: string
+          status: string
           total_shipped_quantity: number
           total_shipped_rolls: number
           updated_at: string
           user_id: string
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           customer_id: string
           id?: string
@@ -1250,12 +1255,15 @@ export type Database = {
           organization_id?: string | null
           shipping_date?: string
           shipping_number: string
+          status?: string
           total_shipped_quantity: number
           total_shipped_rolls: number
           updated_at?: string
           user_id: string
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           customer_id?: string
           id?: string
@@ -1264,6 +1272,7 @@ export type Database = {
           organization_id?: string | null
           shipping_date?: string
           shipping_number?: string
+          status?: string
           total_shipped_quantity?: number
           total_shipped_rolls?: number
           updated_at?: string
@@ -1570,6 +1579,35 @@ export type Database = {
       }
     }
     Functions: {
+      cancel_shipping: {
+        Args: {
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_reason?: string
+          p_shipping_id: string
+        }
+        Returns: Json
+      }
+      create_shipping: {
+        Args: {
+          p_dry_run?: boolean
+          p_items: Json
+          p_note?: string
+          p_order_id: string
+          p_organization_id: string
+          p_shipping_date?: string
+        }
+        Returns: Json
+      }
+      update_shipping: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_shipping_id: string
+        }
+        Returns: Json
+      }
       receive_inventory: {
         Args: {
           p_arrival_date?: string

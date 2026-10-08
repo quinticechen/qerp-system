@@ -68,18 +68,24 @@ describe("EditShippingDialog roll editing", () => {
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
         {
-          fn: "save_shipping_items",
+          fn: "update_shipping",
           args: {
+            p_organization_id: "org-1",
             p_shipping_id: "ship-1",
-            p_items: [
-              { id: "si-1", inventory_roll_id: "roll-1", shipped_quantity: 50 },
-              { inventory_roll_id: "roll-2", shipped_quantity: 10 },
-            ],
+            p_changes: {
+              shipping_date: "2026-10-07",
+              note: "",
+              items: [
+                { id: "si-1", inventory_roll_id: "roll-1", shipped_quantity: 50 },
+                { inventory_roll_id: "roll-2", shipped_quantity: 10 },
+              ],
+            },
+            p_dry_run: false,
           },
         },
       ]),
     );
-    await waitFor(() => expect(fake.current!.updates.some((u) => u.table === "shippings")).toBe(true));
+    expect(fake.current!.updates.some((u) => u.table === "shippings")).toBe(false);
   });
 
   it("shows how much each roll can ship and blocks more than that", async () => {
@@ -109,5 +115,20 @@ describe("EditShippingDialog roll editing", () => {
 
     expect(await screen.findByRole("option", { name: /R-002/ })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /R-003/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a cancelled shipping read-only, without save or cancel buttons", async () => {
+    fake.current = createFakeSupabase(seedTables());
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditShippingDialog shipping={{ ...shipping, status: "cancelled", cancel_reason: "客戶退回" }} open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("此出貨單已取消，原因：客戶退回，不能再修改。")).toBeInTheDocument();
+    expect(await screen.findByLabelText("第 1 卷出貨重量（公斤）")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "更新出貨單" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "取消出貨單" })).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { EditShippingDialog } from './EditShippingDialog';
 import { ViewShippingDialog } from './ViewShippingDialog';
@@ -94,6 +95,24 @@ export const ShippingList = () => {
       )
     },
     {
+      key: 'status',
+      title: '狀態',
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'shipped', label: '已出貨' },
+        { value: 'cancelled', label: '已取消' }
+      ],
+      render: (value) => (
+        <Badge
+          variant="outline"
+          className={value === 'cancelled' ? 'border-red-200 bg-red-100 text-red-800' : 'border-green-200 bg-green-100 text-green-800'}
+        >
+          {value === 'cancelled' ? '已取消' : '已出貨'}
+        </Badge>
+      )
+    },
+    {
       key: 'total_shipped_quantity',
       title: '總出貨量',
       sortable: true,
@@ -161,7 +180,7 @@ export const ShippingList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             shipping={selectedShipping}
-            onEdit={canEdit ? () => {
+            onEdit={canEdit && selectedShipping.status !== 'cancelled' ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
             } : undefined}

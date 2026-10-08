@@ -66,6 +66,12 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
                 </div>
               </div>
               
+              {shipping.status === 'cancelled' && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  此出貨單已取消{shipping.cancel_reason ? `，原因：${shipping.cancel_reason}` : ''}；出貨的重量已歸還庫存。
+                </div>
+              )}
+
               {shipping.note && (
                 <div>
                   <span className="text-sm text-gray-500">備註</span>
