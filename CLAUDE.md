@@ -116,6 +116,19 @@ If your change is to:
 - **Database objects stay inside the organization too:** views are created `WITH (security_invoker = true)` and expose `organization_id` so the UI can filter by the current organization (a view without it runs as its owner and bypasses RLS). A `SECURITY DEFINER` function that takes a user or organization id must answer only about the caller or the caller's organizations — call `can_inspect_organization()` (see `supabase/migrations/20261007130000_org_boundary_hardening.sql`). Run the Supabase security advisor after any such migration.
 - **The AI never writes directly:** in the agent loop, `write` tools only create drafts (`query_pending_actions`); the write runs when the user confirms the card (`POST /query/actions/:id/confirm`, `mcp-server/src/agent/actions.ts`), which re-checks membership and permission and claims the action atomically. A new write tool needs `summarize()` (card text with names, never IDs); the registry refuses one without it. The eval fails any case where the agent loop writes.
 
+## Unfinished Features
+
+Users must never meet a control that does nothing. Any UI whose feature is not implemented yet (a setting that is not saved, a button with no handler, a card of placeholders) is wrapped in `UnfinishedFeature` (`src/components/common/UnfinishedFeature.tsx`):
+
+- **Production**: not rendered at all (the production build drops it).
+- **Local and staging**: shown with a grey background, a dashed border and a「尚未實作」label, with its inputs disabled, so it can still be reviewed.
+
+The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINISHED_FEATURES`). `vite.config.ts` sets it at build time from Vercel's `VERCEL_ENV`: `production` → production, `preview` → staging; the dev server is development. Set `VITE_APP_ENV` to override.
+
+- Wrap whole cards or sections, not single inputs; pass a grid span such as `lg:col-span-2` as the wrapper's `className`.
+- Remove the wrapper in the same change that makes the feature work.
+- Do not ship a half-wired feature unwrapped: if saving, the permission check or the database part is missing, it is unfinished.
+
 ## Known Configuration
 
 | Item | Value |
