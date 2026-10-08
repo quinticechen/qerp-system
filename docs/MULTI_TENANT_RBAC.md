@@ -1,6 +1,6 @@
 # Multi-Tenant Roles and Permissions Planning
 
-> Status: Role model confirmed (2026-10-07); R0 applied and passed rollback testing (`20261007164641_rbac_r0_security_hardening.sql`); R1 applied (2026-10-08) and passed all SQL rollback tests; R2 frontend guarding completed (uncommitted) (`20261008132011_rbac_r1_fixed_roles.sql`, `supabase/tests/rbac_r1_roles.test.sql`)
+> Status: Role model confirmed (2026-10-07); R0 applied and passed rollback testing (`20261007164641_rbac_r0_security_hardening.sql`); R1 applied (2026-10-08) and passed all SQL rollback tests; R2 frontend guarding completed (uncommitted) (`20261008132011_rbac_r1_fixed_roles.sql`, `supabase/tests/rbac_r1_roles.test.sql`); R2 committed; R3/R4 applied (2026-10-09): business tables use key-based RLS (SELECT → view, INSERT → create, UPDATE → edit, no DELETE on master tables; child tables follow the parent's keys) (`20261009002334_rbac_r4_business_rls.sql`, `supabase/tests/rbac_r4_business_rls.test.sql`)
 > Scope: Roles, permission keys, database RLS/RPC, frontend guarding, and AI tools permissions within organizations (tenants)
 > Related Documents: [QUERY_AGENT_PHASE0.md](https://www.google.com/search?q=./QUERY_AGENT_PHASE0.md) (§4.2 Permissions and Organization, D1–D5), [SESSION_COORDINATION.md](https://www.google.com/search?q=./SESSION_COORDINATION.md)
 
@@ -168,7 +168,7 @@ Writes to members and roles **must go through RPCs**, removing direct client-sid
 | R1 Fixed Roles | `user_organizations.role`, `role_permissions`; migrate existing assignments (§4.2 mapping); rewrite implementation of `user_has_organization_permission` (interface unchanged); `set_member_role`, `set_member_active` RPCs; modify invitation workflow to specify roles. Frontend: update permission hooks to read `role`, change user management to a three-choice role dropdown, convert permissions page to read-only role descriptions (merging P4), remove role creation/editing dialogs. `organization_roles` and `user_organization_roles` will be removed once no longer read by frontend or AI | Permission matrix test (see below); frontend tests; login with each role to check user management and permissions pages |
 | R2 Frontend Guarding | `ROUTE_PERMISSIONS`, sidebar menu, page buttons, and read-only mode | Login with each role, check menus and buttons page-by-page (live browser testing) |
 | R3 Disabling and Cancellation | Remove DELETE from business master tables; products, factories, customers, and shelves get a "disabled" status; orders, purchases, and shipments get a "cancelled" status (missing columns added as corresponding workflows require) | Permission matrix test including "no role can delete business master tables" |
-| R4 Business Table RLS | Alongside Phase 1 workflows: tighten corresponding data tables after each workflow's RPC goes live (SESSION_COORDINATION.md §5) | Permission matrix test; eval has no regressions |
+| R4 Business Table RLS | Alongside Phase 1 workflows: tighten corresponding data tables after each workflow's RPC goes live (SESSION_COORDINATION.md §5) | Permission matrix test; eval has no regressions — ✅ applied 2026-10-09 together with R3 (no DELETE on master tables) |
 
 R0 has no dependencies and is recommended for **immediate implementation**. R1 and R2 can run parallel to Phase 1 Workflow 1.
 

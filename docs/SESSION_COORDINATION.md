@@ -62,13 +62,14 @@ Phase 1 第 1 條流程（訂單主流程）。AI Session 完成某張表的 RPC
 
 | 資料表 | 對應 RPC | 狀態 | 更新者／日期 |
 |--------|----------|------|--------------|
-| `orders`、`order_products`、`order_factories` | `create_order`、`update_order`、`cancel_order`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A2） | **API 完成** | RBAC／2026-10-08 |
-| `purchase_orders`、`purchase_order_items`、`purchase_order_relations` | `create_purchase_order`、`update_purchase_order`、`cancel_purchase_order`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A3） | **API 完成** | RBAC／2026-10-08 |
-| `inventories`、`inventory_rolls` | `receive_inventory`、`update_inventory`、`update_inventory_roll`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A4） | **API 完成** | RBAC／2026-10-09 |
-| `shippings`、`shipping_items`、`shipment_history` | `create_shipping`、`update_shipping`、`cancel_shipping`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A5） | **API 完成** | RBAC／2026-10-09 |
-| `customers` | `create_customer`、`update_customer`、`set_customer_active`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A1） | **API 完成** | RBAC／2026-10-08 |
-| `factories`（主檔，與客戶同組） | `create_factory`、`update_factory`、`set_factory_active` | **API 完成** | RBAC／2026-10-08 |
-| `product_groups`、`products_new`（主檔，產品＋顏色兩層） | `create_product`、`update_product`、`set_product_active`、`add_product_color`、`update_product_color`、`set_product_color_active`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A6） | **API 完成** | RBAC／2026-10-08 |
+| `orders`、`order_products`、`order_factories` | `create_order`、`update_order`、`cancel_order`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A2） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `purchase_orders`、`purchase_order_items`、`purchase_order_relations` | `create_purchase_order`、`update_purchase_order`、`cancel_purchase_order`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A3） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `inventories`、`inventory_rolls` | `receive_inventory`、`update_inventory`、`update_inventory_roll`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A4） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `shippings`、`shipping_items`、`shipment_history` | `create_shipping`、`update_shipping`、`cancel_shipping`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A5） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `customers` | `create_customer`、`update_customer`、`set_customer_active`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A1） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `factories`（主檔，與客戶同組） | `create_factory`、`update_factory`、`set_factory_active` | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `product_groups`、`products_new`（主檔，產品＋顏色兩層） | `create_product`、`update_product`、`set_product_active`、`add_product_color`、`update_product_color`、`set_product_color_active`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A6） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
+| `warehouses`（貨架） | 尚未提供 API（A6 貨架）；頁面仍直接寫表 | **RLS 完成** | RBAC／2026-10-09 |
 
 RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5 會修改 `order_factories`、`purchase_order_relations`、`order_products`、`purchase_order_items`、`shipping_items`、`shipment_history` 的 policy：R0 只移除 `true` 的 policy、改為依父表組織判斷，**不加入權限鍵檢查**（那是上表的 RLS 階段）。
 
@@ -78,6 +79,7 @@ RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5
 
 | 日期 | 由 → 給 | 內容 | 處理 |
 |------|---------|------|------|
+| 2026-10-09 | RBAC → AI | **R4 業務資料表 RLS 已套用**（`supabase/migrations/20261009002334_rbac_r4_business_rls.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 各表已標「RLS 完成」。15 張業務資料表改為依權限鍵：SELECT → 查看鍵、INSERT → 新增鍵、UPDATE → 編輯鍵；主檔與單據**不開放 DELETE**（R5）；明細與關聯依上層單據的鍵（INSERT → 新增或編輯、UPDATE／DELETE → 編輯），且不能關聯到其他組織的資料。影響 AI 的部分：(1) 讀取 tools 不受影響（訪客也有所有查看鍵）。(2) 仍直接寫表的 tools（`create_customer`、`create_order`、`update_order_status`、`create_purchase_order`）在使用者有對應鍵時照常運作，缺鍵時改為 RLS 錯誤（`new row violates row-level security policy`）或 0 列更新，而不是成功；tool 的 `permission` 本來就擋下這些情況。仍建議改呼叫業務 API。(3) eval 使用假資料層，不會測到 RLS | |
 | 2026-10-09 | RBAC → AI | **A5 出貨單已套用並完成前端改用**（`supabase/migrations/20261009000604_api_a5_shipping.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」，規格見 [BUSINESS_API.md](./BUSINESS_API.md) §5 A5。Phase 1 業務 API（A1–A6）到此全部完成。影響 AI 的部分：(1) 出貨請呼叫 `create_shipping`（訂單、布卷與重量、出貨日期、備註）：一次寫入出貨單並扣庫存、更新訂單出貨進度，編號 O＋日期；以 `p_dry_run` 產生確認卡片。布卷產品須在訂單上（`roll_not_in_order`），重量不可超過剩餘庫存（`insufficient_stock`），已取消的訂單拒絕（`order_cancelled`）。(2) 修改用 `update_shipping`（`items`、`shipping_date`、`note`），取消用 `cancel_shipping`（歸還庫存、重算訂單出貨進度）。(3) `shippings` 新增 `status`（`shipped`／`cancelled`）、`cancelled_at`、`cancel_reason`；查詢出貨紀錄、統計出貨量時請排除 `status = 'cancelled'`；`recompute_order_shipments` 已排除已取消的出貨單。(4) `cancel_order` 只看未取消的出貨單 | |
 | 2026-10-09 | RBAC → AI | **A4 入庫已套用並完成前端改用**（`supabase/migrations/20261008233705_api_a4_receiving.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」，規格見 [BUSINESS_API.md](./BUSINESS_API.md) §5 A4。影響 AI 的部分：(1) 入庫請呼叫 `receive_inventory`（採購單、布卷清單、到貨日期、備註），一次寫入進貨單與布卷，進貨單編號 I＋日期、布卷編號由系統產生，以 `p_dry_run` 產生確認卡片；布卷的產品必須在採購單上（HINT `product_not_on_purchase_order`），已取消的採購單拒絕（`purchase_order_cancelled`），超收允許但卡片會列「超過採購量」。(2) 修改進貨單用 `update_inventory`（`rolls`、`arrival_date`、`note`；工廠跟著採購單，不能改），單一布卷的重量、品質、倉庫、貨架用 `update_inventory_roll`（回傳的 `number` 是布卷編號）。(3) `save_inventory_rolls` 的錯誤改為 SQLSTATE＋HINT；新增布卷不給編號時會自動產生 | |
 | 2026-10-08 | RBAC → AI | **A3 採購單已套用並完成前端改用**（`supabase/migrations/20261008193554_api_a3_purchase_orders.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」，規格見 [BUSINESS_API.md](./BUSINESS_API.md) §5 A3。影響 AI 的部分：(1) 目前 `create_purchase_order` tool 直接寫表（觸發器仍會給 P＋日期編號），建議改呼叫同名 API：一次寫入採購單、品項與關聯訂單，並把「待確認」「已確認」的關聯訂單改為「已向工廠下單」，以 `p_dry_run` 產生確認卡片；工廠須啟用、產品與其母產品須啟用。(2) 修改請用 `update_purchase_order`（`p_changes` 可含 `items`、`order_ids`、`factory_id`、日期、`note`、`status`），取消請用 `cancel_purchase_order`（已有入庫紀錄時拒絕，HINT `purchase_order_received`；取消後關聯訂單若沒有其他進行中的採購單會改回「已確認」）。(3) `purchase_orders` 新增 `cancelled_at`、`cancel_reason`；列出待入庫、可入庫的採購單時請排除 `status = 'cancelled'`。(4) `save_purchase_order_items` 的錯誤改為 SQLSTATE＋HINT（訊息不變） | |
