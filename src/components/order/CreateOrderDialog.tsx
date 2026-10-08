@@ -108,19 +108,27 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     }
   });
 
-  // Fetch all products
+  // Colors that can be ordered: the color and its product are both enabled
   const { data: allProducts } = useQuery({
     queryKey: ['all-products', organizationId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('products_new')
-        .select('id, name, color, color_code')
+        .from('product_catalog')
+        .select('color_id, product_name, color, color_code')
         .eq('organization_id', organizationId)
-        .eq('status', 'Available')
-        .order('name, color, color_code');
+        .eq('product_is_active', true)
+        .eq('color_is_active', true)
+        .order('product_name')
+        .order('color')
+        .order('color_code');
       
       if (error) throw error;
-      return data as Product[];
+      return (data ?? []).map((row) => ({
+        id: row.color_id,
+        name: row.product_name,
+        color: row.color,
+        color_code: row.color_code,
+      })) as Product[];
     },
     enabled: !!organizationId
   });

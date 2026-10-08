@@ -6,16 +6,9 @@ import { Plus } from 'lucide-react';
 import { CreateProductDialog } from './product/CreateProductDialog';
 import ProductList from './product/ProductList';
 import { PermissionGuard } from './PermissionGuard';
-import { usePermissions } from '@/hooks/usePermissions';
 
 const ProductManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { permissions } = usePermissions();
-
-  const handleProductCreated = () => {
-    // 重新載入產品列表
-    window.location.reload();
-  };
 
   return (
     <PermissionGuard permission="canViewProducts">
@@ -39,7 +32,6 @@ const ProductManagement = () => {
           <CreateProductDialog
             open={isCreateDialogOpen}
             onOpenChange={setIsCreateDialogOpen}
-            onProductCreated={handleProductCreated}
           />
         </PermissionGuard>
       </div>

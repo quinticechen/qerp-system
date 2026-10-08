@@ -524,12 +524,58 @@ export type Database = {
         }
         Relationships: []
       }
+      product_groups: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          unit_of_measure: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          organization_id: string
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          organization_id?: string
+          unit_of_measure?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_groups_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products_new: {
         Row: {
           category: string
           color: string | null
           color_code: string | null
+          color_hex: string | null
           created_at: string
+          group_id: string
           id: string
           name: string
           organization_id: string | null
@@ -544,7 +590,9 @@ export type Database = {
           category?: string
           color?: string | null
           color_code?: string | null
+          color_hex?: string | null
           created_at?: string
+          group_id?: string
           id?: string
           name: string
           organization_id?: string | null
@@ -559,7 +607,9 @@ export type Database = {
           category?: string
           color?: string | null
           color_code?: string | null
+          color_hex?: string | null
           created_at?: string
+          group_id?: string
           id?: string
           name?: string
           organization_id?: string | null
@@ -571,6 +621,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "products_new_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "product_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "products_new_organization_id_fkey"
             columns: ["organization_id"]
@@ -1418,6 +1475,30 @@ export type Database = {
       }
     }
     Views: {
+      product_catalog: {
+        Row: {
+          category: string | null
+          color: string | null
+          color_code: string | null
+          color_created_at: string | null
+          color_created_by: string | null
+          color_hex: string | null
+          color_id: string | null
+          color_is_active: boolean | null
+          is_low_stock: boolean | null
+          organization_id: string | null
+          product_id: string | null
+          product_is_active: boolean | null
+          product_created_at: string | null
+          product_created_by: string | null
+          product_name: string | null
+          stock_quantity: number | null
+          stock_rolls: number | null
+          stock_threshold: number | null
+          unit_of_measure: string | null
+        }
+        Relationships: []
+      }
       inventory_summary: {
         Row: {
           a_grade_stock: number | null
@@ -1483,6 +1564,65 @@ export type Database = {
       }
     }
     Functions: {
+      add_product_color: {
+        Args: {
+          p_color: string
+          p_color_code?: string
+          p_color_hex?: string
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_product_id: string
+          p_stock_threshold?: number
+        }
+        Returns: Json
+      }
+      create_product: {
+        Args: {
+          p_category?: string
+          p_colors: Json
+          p_dry_run?: boolean
+          p_name: string
+          p_organization_id: string
+          p_unit_of_measure?: string
+        }
+        Returns: Json
+      }
+      set_product_active: {
+        Args: {
+          p_dry_run?: boolean
+          p_is_active: boolean
+          p_organization_id: string
+          p_product_id: string
+        }
+        Returns: Json
+      }
+      set_product_color_active: {
+        Args: {
+          p_color_id: string
+          p_dry_run?: boolean
+          p_is_active: boolean
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      update_product: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_product_id: string
+        }
+        Returns: Json
+      }
+      update_product_color: {
+        Args: {
+          p_changes: Json
+          p_color_id: string
+          p_dry_run?: boolean
+          p_organization_id: string
+        }
+        Returns: Json
+      }
       accept_organization_invitation: {
         Args: { _organization_id: string }
         Returns: undefined

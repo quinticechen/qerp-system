@@ -114,7 +114,7 @@
 | 組 | API | 權限鍵 | 狀態 |
 |----|-----|--------|------|
 | A1 工廠（與客戶同一組） | `create_factory`、`update_factory`、`set_factory_active` | `canCreateFactories`／`canEditFactories` | ✅ |
-| A6 產品 | `create_product`、`update_product`、`set_product_active` | `canCreateProducts`／`canEditProducts` | ⏳ |
+| A6 產品 | `create_product`、`update_product`、`set_product_active`、`add_product_color`、`update_product_color`、`set_product_color_active`（兩層，見 §7） | `canCreateProducts`／`canEditProducts` | ✅ |
 | A6 貨架 | `create_shelf`、`rename_shelf`、`set_shelf_active` | `canCreateShelves`／`canEditShelves` | ⏳ |
 
 客戶與工廠的欄位與規則相同，所以與 A1 一起完成。
@@ -243,6 +243,43 @@ Migration：`supabase/migrations/20261008181853_api_a2_orders.sql`；測試：`s
 | `55000` | `item_shipped`、`item_purchased`、`quantity_below_shipped` | 產品「…」已出貨／已採購，不可刪除或更換；數量不可低於已出貨 … 公斤 |
 | `55000` | `order_cancelled`、`order_already_cancelled`、`order_has_shipments`、`order_has_purchase_orders` | 訂單 … 已取消，不能修改；已有出貨紀錄／有進行中的採購單 …，不能取消 |
 
+### A6 產品與顏色
+
+Migration：`supabase/migrations/20261008185816_api_a6_products.sql`；測試：`supabase/tests/api_a6_products.test.sql`；前端：`src/lib/api/products.ts`、`src/hooks/useProductCatalog.ts`。資料結構見 §7。
+
+**`create_product`**（`canCreateProducts`）
+
+| 參數 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| `p_name` | text | ✅ | 組織內唯一（不分大小寫、去除前後空白） |
+| `p_colors` | jsonb | ✅ | 至少一個：`[{ color, color_code?, color_hex?, stock_threshold? }]`；同一產品下「顏色＋色號」不可重複 |
+| `p_category` | text | | 預設「布料」 |
+| `p_unit_of_measure` | text | | 預設 `KG` |
+
+回傳：`id`（產品 id）。`summary.title` 為「建立產品」，`fields` 依序為產品名稱、類別、單位、顏色 1…n（「米白（色號 W01），安全庫存 50 公斤」）。
+
+**`update_product`**（`canEditProducts`）：`p_product_id`、`p_changes` 可含 `name`、`category`、`unit_of_measure`；同步到所有顏色。`summary` 只列有變的欄位（「舊值 → 新值」）。
+
+**`set_product_active`**（`canEditProducts`）：`p_product_id`、`p_is_active`。停用後其下所有顏色都不能再加入訂單（既有品項可保留）。
+
+**`add_product_color`**（`canCreateProducts`）：`p_product_id`、`p_color`、`p_color_code?`、`p_color_hex?`、`p_stock_threshold?`；回傳新顏色的 `id`。
+
+**`update_product_color`**（`canEditProducts`）：`p_color_id`、`p_changes` 可含 `color`、`color_code`、`color_hex`、`stock_threshold`（空字串或 `null` 清除）。
+
+**`set_product_color_active`**（`canEditProducts`）：`p_color_id`、`p_is_active`（對應 `status` 的 `Available`／`Unavailable`）。
+
+**唯讀 view `product_catalog`**：每個顏色一列，含 `product_id`、`product_name`、`category`、`unit_of_measure`、`product_is_active`、`color_id`、`color`、`color_code`、`color_hex`、`stock_threshold`、`color_is_active`、`stock_quantity`、`stock_rolls`、`is_low_stock`。訂單等單據的 `product_id` 指的是 `color_id`。
+
+**舊的寫入方式**：直接 insert `products_new` 只給名稱時，會自動歸到同組織的同名產品（不存在就建立），並帶入產品的名稱、類別與單位。
+
+| SQLSTATE | 代碼 | 訊息 |
+|----------|------|------|
+| `P0002` | `product_not_found`、`product_color_not_found` | 找不到此產品／顏色 |
+| `22023` | `name_required`、`colors_required`、`color_required` | 請輸入產品名稱、產品至少需要一個顏色、請輸入顏色 |
+| `22023` | `invalid_color_hex`、`invalid_stock_threshold`、`is_active_required` | 色值格式不正確，請使用 #RRGGBB；安全庫存不可為負數 |
+| `22023` | `unknown_field`、`invalid_changes` | 不支援修改的欄位（例如在產品上改顏色） |
+| `23505` | `product_name_taken`、`product_color_taken` | 已有同名的產品「…」，請在該產品下新增顏色；此產品已有顏色「…」 |
+
 ## 6. 決策
 
 | # | 問題 | 建議 |
@@ -277,8 +314,8 @@ Migration：`supabase/migrations/20261008181853_api_a2_orders.sql`；測試：`s
 - 產品頁為可展開的兩層表格：產品列顯示顏色數、總庫存、低庫存顏色數；展開後列出各顏色的色號、庫存（重量／卷數）、安全庫存、狀態
 - 搜尋同時比對產品名稱、顏色與色號，符合的產品自動展開
 - 新增產品時可一次輸入多個顏色；展開後可「新增顏色」
-- **編輯分層**：點產品列編輯產品（名稱、類別、單位、狀態），編輯紀錄記在產品；點顏色列編輯顏色（顏色、色號、色值、安全庫存、狀態），編輯紀錄記在該顏色。改產品名稱時，同步到顏色列的名稱也會出現在各顏色的紀錄中
-- 訂單、採購、出貨的產品選單依產品分組（「1601鳥眼布 › 17大紅」），可用「鳥眼 大紅」搜尋
+- **編輯分層**：點產品列展開或收合；產品列的編輯按鈕編輯產品（名稱、類別、單位、狀態），編輯紀錄記在產品；點顏色列編輯顏色（顏色、色號、色值、安全庫存、狀態），編輯紀錄記在該顏色。改產品名稱時同步到顏色列的名稱只記在產品的紀錄，不會重複出現在每個顏色
+- 訂單、採購、出貨的產品選單依產品分組（「1601鳥眼布 › 17大紅」），可用「鳥眼 大紅」搜尋（尚未實作，隨 A3 採購一起做；A6 先讓建單選單排除已停用的產品）
 
 ### 7.3 API
 
