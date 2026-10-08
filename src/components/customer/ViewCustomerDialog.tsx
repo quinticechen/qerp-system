@@ -16,6 +16,8 @@ interface ViewCustomerDialogProps {
   onOpenChange: (open: boolean) => void;
   customer: any;
   onEdit?: () => void;
+  // Disable or re-enable; shown only to members who may edit
+  onToggleActive?: () => void;
 }
 
 export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
@@ -23,6 +25,7 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
   onOpenChange,
   customer,
   onEdit,
+  onToggleActive,
 }) => {
   if (!customer) return null;
 
@@ -104,6 +107,11 @@ export const ViewCustomerDialog: React.FC<ViewCustomerDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
+          {onToggleActive && (
+            <Button variant="outline" onClick={onToggleActive}>
+              {customer.is_active ? '停用' : '啟用'}
+            </Button>
+          )}
           {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>

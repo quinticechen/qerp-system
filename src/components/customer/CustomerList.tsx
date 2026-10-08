@@ -8,6 +8,10 @@ import { ViewCustomerDialog } from './ViewCustomerDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { setPartnerActive } from '@/lib/api/partners';
+import { apiErrorMessage } from '@/lib/api/client';
 
 export const CustomerList = () => {
   const { hasPermission } = usePermissions();
@@ -42,6 +46,20 @@ export const CustomerList = () => {
     },
     enabled: hasOrganization
   });
+
+  // Disabled customers stay on existing documents but are hidden from pickers for new ones
+  const handleToggleActive = async () => {
+    if (!organizationId || !selectedCustomer) return;
+    try {
+      const nextActive = !selectedCustomer.is_active;
+      await setPartnerActive('customer', organizationId, selectedCustomer.id, nextActive);
+      toast.success(nextActive ? '客戶已啟用' : '客戶已停用');
+      setSelectedCustomer({ ...selectedCustomer, is_active: nextActive });
+      refetch();
+    } catch (error) {
+      toast.error(`變更客戶狀態失敗：${apiErrorMessage(error)}`);
+    }
+  };
 
   const handleView = (customer: any) => {
     setSelectedCustomer(customer);
@@ -103,6 +121,21 @@ export const CustomerList = () => {
       )
     },
     {
+      key: 'is_active',
+      title: '狀態',
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'true', label: '啟用' },
+        { value: 'false', label: '停用' },
+      ],
+      render: (value) => (
+        <Badge variant="outline" className={value ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'}>
+          {value ? '啟用' : '停用'}
+        </Badge>
+      )
+    },
+    {
       key: 'note',
       title: '備註',
       sortable: false,
@@ -160,6 +193,7 @@ export const CustomerList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             customer={selectedCustomer}
+            onToggleActive={canEdit ? handleToggleActive : undefined}
             onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);

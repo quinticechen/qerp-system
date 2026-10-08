@@ -53,14 +53,15 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
     items?: { [index: number]: { product_id?: string; ordered_quantity?: string; unit_price?: string } };
   }>({});
 
-  // Fetch factories for selection (organization-specific)
+  // Fetch factories for selection (organization-specific); disabled ones cannot get new purchase orders
   const { data: factories } = useQuery({
-    queryKey: ['factories', organizationId],
+    queryKey: ['factories', organizationId, 'active'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('factories')
         .select('id, name')
         .eq('organization_id', organizationId)
+        .eq('is_active', true)
         .order('name');
       
       if (error) throw error;

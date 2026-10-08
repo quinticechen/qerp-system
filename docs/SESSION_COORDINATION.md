@@ -62,11 +62,12 @@ Phase 1 第 1 條流程（訂單主流程）。AI Session 完成某張表的 RPC
 
 | 資料表 | 對應 RPC | 狀態 | 更新者／日期 |
 |--------|----------|------|--------------|
-| `orders`、`order_products`、`order_factories` | 建單（含品項、工廠）、更新訂單 | 未開始 | — |
+| `orders`、`order_products`、`order_factories` | `create_order`、`update_order`、`cancel_order`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A2） | **API 完成** | RBAC／2026-10-08 |
 | `purchase_orders`、`purchase_order_items`、`purchase_order_relations` | 建立採購單、更新採購單 | 未開始 | — |
 | `inventories`、`inventory_rolls` | 入庫、調整捲號 | 未開始 | — |
 | `shippings`、`shipping_items`、`shipment_history` | 出貨 | 未開始 | — |
-| `customers` | 建立、編輯客戶 | 未開始 | — |
+| `customers` | `create_customer`、`update_customer`、`set_customer_active`（[BUSINESS_API.md](./BUSINESS_API.md) §5 A1） | **API 完成** | RBAC／2026-10-08 |
+| `factories`（主檔，與客戶同組） | `create_factory`、`update_factory`、`set_factory_active` | **API 完成** | RBAC／2026-10-08 |
 
 RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5 會修改 `order_factories`、`purchase_order_relations`、`order_products`、`purchase_order_items`、`shipping_items`、`shipment_history` 的 policy：R0 只移除 `true` 的 policy、改為依父表組織判斷，**不加入權限鍵檢查**（那是上表的 RLS 階段）。
 
@@ -76,6 +77,9 @@ RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5
 
 | 日期 | 由 → 給 | 內容 | 處理 |
 |------|---------|------|------|
+| 2026-10-08 | RBAC → AI | **A2 訂單已套用並完成前端改用**（`supabase/migrations/20261008181853_api_a2_orders.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」，規格見 [BUSINESS_API.md](./BUSINESS_API.md) §5 A2。影響 AI 的部分：(1) **單據編號改為「字母＋YYYYMMDD＋四位流水號」**（B 訂單、P 採購單、I 進貨單、O 出貨單，組織內唯一，§2.5）；既有單據保留舊編號，回覆與搜尋需同時接受兩種格式。(2) 目前 `create_order` tool 直接寫表並帶 `ORD-<時間戳>`：觸發器仍會換成系統編號（與以前相同），但建議改呼叫 `create_order` API（含品項與工廠，一次完成），以 `p_dry_run` 產生確認卡片。(3) `update_order_status` 建議改呼叫 `update_order`（`p_changes` 帶 `status`／`payment_status`）；取消訂單請用 `cancel_order`（`update_order` 拒絕 `status = cancelled`，HINT `use_cancel_order`）。(4) `orders` 新增 `cancelled_at`、`cancel_reason`；`inventories` 新增 `receipt_number` | |
+| 2026-10-08 | RBAC → AI | **A1 客戶與工廠已套用並完成前端改用**（`supabase/migrations/20261008170920_api_a1_customers_factories.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」。規格見 [BUSINESS_API.md](./BUSINESS_API.md) §5 A1：參數、回傳、錯誤代碼表。可包成 tools：`create_customer`／`create_factory`（`p_dry_run => true` 產生確認卡片，確認時同參數 `p_dry_run => false`）、`update_*`（`p_changes` 只傳要改的欄位）、`set_*_active`。`customers`、`factories` 已有 `is_active`：建單類工具挑選客戶／工廠時建議只列 `is_active = true` | |
+| 2026-10-08 | RBAC → AI | 已開始 Phase 1 業務 API，整體計畫與 API 說明在 [BUSINESS_API.md](./BUSINESS_API.md)（共用規則 §2：參數、回傳 `{ dry_run, id, number, summary: { title, fields } }`、錯誤為中文訊息＋SQLSTATE＋`HINT` 代碼）。第一組 A1 客戶與工廠（`create_customer`、`update_customer`、`set_customer_active` 及工廠的同名 API）已完成程式與回滾測試，**尚未套用**；套用並完成前端改用後會在 §5 標記「API 完成」。預告影響：`customers`、`factories` 新增 `is_active`（停用的不應出現在新單據的選項）；`create_customer` tool 可改呼叫 API 並以 `p_dry_run` 產生確認卡片，取代 `summarize()` | |
 | 2026-10-08 | RBAC → AI | R2 前端守門已完成，修改了下列業務元件（Phase 1 改用 RPC 時請保留這些權限判斷）：(1) 各管理頁的「新增」按鈕包在 `PermissionGate`（`OrderManagement`、`PurchaseManagement`、`InventoryManagement`、`ShippingManagement`、`FactoryManagement`、`CustomerManagement`、`inventory/ShelfManagement`，貨架改名按鈕需 `canEditShelves`）；(2) `EditProductDialog`、`EditOrderDialog` 新增 `readOnly` prop（以 `<fieldset disabled>` 停用欄位並隱藏儲存按鈕），由 `ProductList`、`OrderList` 依 `canEditProducts`／`canEditOrders` 傳入；(3) `PurchaseList`、`ShippingList`、`CustomerList`、`FactoryList` 只在有編輯鍵時傳 `onEdit`；(4) `ViewInventoryDialog`、`ProductRollsDialog`、`InventoryList`、`EnhancedInventorySummary`、`InventorySummary` 新增 `readOnly` prop，由 `InventoryManagement` 依 `canEditInventory` 傳入；(5) `Dashboard` 快捷按鈕依新增鍵顯示。新增的權限 UI 都是 R2 範圍，只決定畫面；真正的限制仍待業務表 RLS（§5） | |
 | 2026-10-08 | RBAC → AI | R1 固定角色已套用到正式資料庫（`supabase/migrations/20261008132011_rbac_r1_fixed_roles.sql`，2026-10-08 經 SQL Editor 套用，**不會出現在 `list_migrations`**）。影響 AI 的部分：(1) `user_has_organization_permission()` 介面不變，改讀 `user_organizations.role`（`admin`／`editor`／`viewer`）與全域表 `role_permissions`；擁有者取得管理員的權限。`evals/fixtures/roles.json` 與假資料層若模擬此函式，請改為管理員、編輯者、訪客三種角色的對照（§4.3）。(2) 目錄外的鍵（例如 `canDeleteProducts`、`canEditPermissions`）對所有人（含擁有者）回傳 false。(3) `organization_roles`、`user_organization_roles` 不再被讀寫，僅保留給編輯紀錄；新組織不再建立角色列。(4) 權限判斷函式不再開放給 `anon` 呼叫；`/query`、`/mcp` 以使用者 JWT（`authenticated`）呼叫不受影響 | |
 | 2026-10-07 | RBAC → AI | R0 安全修補已套用到正式資料庫：`supabase/migrations/20261007164641_rbac_r0_security_hardening.sql`（經 SQL Editor 套用，**不會出現在 `list_migrations`**）。影響 AI 的部分：`order_factories`、`purchase_order_relations` 改為依父單組織判斷，寫入時工廠／訂單必須與父單同一組織；`order_products`、`purchase_order_items`、`shipping_items`、`shipment_history` 只剩 `org_isolation_*` policy；成員與角色不能再由用戶端直接寫入，改用 RPC `set_member_role()`。tools 皆已依組織篩選，預期不受影響；若 eval 或 `/query` 出現 RLS 錯誤請在此回報 | |

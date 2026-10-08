@@ -16,6 +16,8 @@ interface ViewFactoryDialogProps {
   onOpenChange: (open: boolean) => void;
   factory: any;
   onEdit?: () => void;
+  // Disable or re-enable; shown only to members who may edit
+  onToggleActive?: () => void;
 }
 
 export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
@@ -23,6 +25,7 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
   onOpenChange,
   factory,
   onEdit,
+  onToggleActive,
 }) => {
   if (!factory) return null;
 
@@ -104,6 +107,11 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
+          {onToggleActive && (
+            <Button variant="outline" onClick={onToggleActive}>
+              {factory.is_active ? '停用' : '啟用'}
+            </Button>
+          )}
           {onEdit && <Button onClick={onEdit}>編輯</Button>}
         </div>
       </DialogContent>

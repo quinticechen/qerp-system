@@ -90,21 +90,29 @@ describe("EditOrderDialog product editing", () => {
 
     await user.click(screen.getByRole("button", { name: "更新訂單" }));
 
+    // One update_order call carries the lines together with the order's own fields; unchanged shipping status is left out
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
         {
-          fn: "save_order_items",
+          fn: "update_order",
           args: {
+            p_organization_id: "org-1",
             p_order_id: "order-1",
-            p_items: [
-              { id: "op-1", product_id: "p-1", quantity: 120, unit_price: 10, specifications: { width: 60 }, total_rolls: 5 },
-              { product_id: "p-3", quantity: 30, unit_price: 15, specifications: null, total_rolls: null },
-            ],
+            p_changes: {
+              status: "confirmed",
+              payment_status: "unpaid",
+              note: "",
+              items: [
+                { id: "op-1", product_id: "p-1", quantity: 120, unit_price: 10, specifications: { width: 60 }, total_rolls: 5 },
+                { product_id: "p-3", quantity: 30, unit_price: 15, specifications: null, total_rolls: null },
+              ],
+            },
+            p_dry_run: false,
           },
         },
       ]),
     );
-    await waitFor(() => expect(fake.current!.updates.some((u) => u.table === "orders")).toBe(true));
+    expect(fake.current!.updates.some((u) => u.table === "orders")).toBe(false);
   });
 
   it("locks the product and removal of an item that has been shipped", async () => {
@@ -114,6 +122,26 @@ describe("EditOrderDialog product editing", () => {
     expect(within(row).getByText("已出貨 40 公斤")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "刪除第 1 項" })).toBeDisabled();
     expect(within(row).getByLabelText("第 1 項產品")).toBeDisabled();
+  });
+
+  it("shows a cancelled order read-only, with its reason and no way to save or cancel again", async () => {
+    fake.current = createFakeSupabase(seedTables());
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditOrderDialog
+          order={{ ...order, status: "cancelled", cancel_reason: "客戶取消" }}
+          open
+          onOpenChange={() => {}}
+          onOrderUpdated={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText(/此訂單已取消，原因：客戶取消/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "訂單詳情" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "更新訂單" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "取消訂單" })).not.toBeInTheDocument();
   });
 
   it("shows why a save was rejected and keeps the dialog open", async () => {

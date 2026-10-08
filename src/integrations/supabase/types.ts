@@ -22,6 +22,7 @@ export type Database = {
           email: string | null
           fax: string | null
           id: string
+          is_active: boolean
           landline_phone: string | null
           name: string
           note: string | null
@@ -36,6 +37,7 @@ export type Database = {
           email?: string | null
           fax?: string | null
           id?: string
+          is_active?: boolean
           landline_phone?: string | null
           name: string
           note?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           email?: string | null
           fax?: string | null
           id?: string
+          is_active?: boolean
           landline_phone?: string | null
           name?: string
           note?: string | null
@@ -75,6 +78,7 @@ export type Database = {
           email: string | null
           fax: string | null
           id: string
+          is_active: boolean
           landline_phone: string | null
           name: string
           note: string | null
@@ -89,6 +93,7 @@ export type Database = {
           email?: string | null
           fax?: string | null
           id?: string
+          is_active?: boolean
           landline_phone?: string | null
           name: string
           note?: string | null
@@ -103,6 +108,7 @@ export type Database = {
           email?: string | null
           fax?: string | null
           id?: string
+          is_active?: boolean
           landline_phone?: string | null
           name?: string
           note?: string | null
@@ -129,6 +135,7 @@ export type Database = {
           note: string | null
           organization_id: string | null
           purchase_order_id: string
+          receipt_number: string
           updated_at: string
           user_id: string
         }
@@ -140,6 +147,7 @@ export type Database = {
           note?: string | null
           organization_id?: string | null
           purchase_order_id: string
+          receipt_number?: string
           updated_at?: string
           user_id: string
         }
@@ -151,6 +159,7 @@ export type Database = {
           note?: string | null
           organization_id?: string | null
           purchase_order_id?: string
+          receipt_number?: string
           updated_at?: string
           user_id?: string
         }
@@ -364,6 +373,8 @@ export type Database = {
       }
       orders: {
         Row: {
+          cancel_reason: string | null
+          cancelled_at: string | null
           created_at: string
           customer_id: string
           id: string
@@ -377,6 +388,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           customer_id: string
           id?: string
@@ -390,6 +403,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           customer_id?: string
           id?: string
@@ -1480,6 +1495,15 @@ export type Database = {
         Args: { _organization_id: string; _user_id: string }
         Returns: boolean
       }
+      cancel_order: {
+        Args: {
+          p_dry_run?: boolean
+          p_order_id: string
+          p_organization_id: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
       complete_user_invitation: {
         Args: {
           _full_name?: string
@@ -1490,9 +1514,50 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_customer: {
+        Args: {
+          p_address?: string
+          p_contact_person: string
+          p_dry_run?: boolean
+          p_email?: string
+          p_fax?: string
+          p_landline_phone?: string
+          p_name: string
+          p_note?: string
+          p_organization_id: string
+          p_phone?: string
+        }
+        Returns: Json
+      }
       create_default_organization_roles: {
         Args: { _organization_id: string }
         Returns: undefined
+      }
+      create_factory: {
+        Args: {
+          p_address?: string
+          p_contact_person: string
+          p_dry_run?: boolean
+          p_email?: string
+          p_fax?: string
+          p_landline_phone?: string
+          p_name: string
+          p_note?: string
+          p_organization_id: string
+          p_phone?: string
+        }
+        Returns: Json
+      }
+      create_order: {
+        Args: {
+          p_customer_id: string
+          p_dry_run?: boolean
+          p_factory_ids?: string[]
+          p_items: Json
+          p_note?: string
+          p_organization_id: string
+        }
+        Returns: Json
       }
       delete_organization: {
         Args: { _confirm_name: string; _organization_id: string }
@@ -1557,6 +1622,24 @@ export type Database = {
         Args: { p_items: Json; p_shipping_id: string }
         Returns: undefined
       }
+      set_customer_active: {
+        Args: {
+          p_customer_id: string
+          p_dry_run?: boolean
+          p_is_active: boolean
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      set_factory_active: {
+        Args: {
+          p_dry_run?: boolean
+          p_factory_id: string
+          p_is_active: boolean
+          p_organization_id: string
+        }
+        Returns: Json
+      }
       set_member_active: {
         Args: { _is_active: boolean; _organization_id: string; _user_id: string }
         Returns: undefined
@@ -1572,6 +1655,33 @@ export type Database = {
           _organization_id: string
         }
         Returns: undefined
+      }
+      update_customer: {
+        Args: {
+          p_changes: Json
+          p_customer_id: string
+          p_dry_run?: boolean
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      update_factory: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_factory_id: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      update_order: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_order_id: string
+          p_organization_id: string
+        }
+        Returns: Json
       }
       user_belongs_to_organization: {
         Args: { _organization_id: string; _user_id: string }

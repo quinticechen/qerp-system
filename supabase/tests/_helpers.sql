@@ -121,3 +121,43 @@ begin
   values (v_user, org_id, true, now(), member_role);
   return v_user;
 end $$;
+
+-- Run a statement as the given user and require it to fail with the business-API error contract
+-- (docs/BUSINESS_API.md §2.3): the given SQLSTATE and HINT code
+create or replace function pg_temp.check_api_error_as(user_id uuid, statement text, expected_state text, expected_hint text, description text)
+returns void language plpgsql as $$
+declare
+  v_state text;
+  v_hint text;
+  v_message text;
+begin
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub', user_id, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    execute statement;
+    execute 'reset role';
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_hint = pg_exception_hint, v_message = message_text;
+  end;
+  execute 'reset role';
+
+  if v_state is null then
+    raise exception 'FAIL: % (no error raised)', description;
+  end if;
+  if v_state <> expected_state or coalesce(v_hint, '') <> expected_hint then
+    raise exception 'FAIL: % (got % / % / %)', description, v_state, coalesce(v_hint, 'no hint'), v_message;
+  end if;
+end $$;
+
+-- Run a statement as the given user and return its single jsonb result
+create or replace function pg_temp.call_as(user_id uuid, statement text)
+returns jsonb language plpgsql as $$
+declare
+  v_result jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', user_id, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute statement into v_result;
+  execute 'reset role';
+  return v_result;
+end $$;

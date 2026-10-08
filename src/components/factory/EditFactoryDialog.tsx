@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { updatePartner } from '@/lib/api/partners';
+import { apiErrorMessage } from '@/lib/api/client';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface EditFactoryDialogProps {
   open: boolean;
@@ -28,6 +30,7 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
   onFactoryUpdated,
 }) => {
   const [loading, setLoading] = useState(false);
+  const { organizationId } = useCurrentOrganization();
   const [formData, setFormData] = useState({
     name: '',
     contact_person: '',
@@ -74,22 +77,16 @@ export const EditFactoryDialog: React.FC<EditFactoryDialogProps> = ({
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('factories')
-        .update(formData)
-        .eq('id', factory.id);
-
-      if (error) {
-        console.error('Error updating factory:', error);
-        throw error;
-      }
+      if (!organizationId) throw new Error('請先選擇組織');
+      // The API only changes fields that differ and checks the same rules again
+      await updatePartner('factory', organizationId, factory.id, formData);
 
       toast.success('工廠更新成功');
       onFactoryUpdated();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating factory:', error);
-      toast.error('更新工廠失敗');
+      toast.error(`更新工廠失敗：${apiErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }

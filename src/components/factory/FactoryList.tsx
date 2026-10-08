@@ -8,6 +8,10 @@ import { ViewFactoryDialog } from './ViewFactoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { setPartnerActive } from '@/lib/api/partners';
+import { apiErrorMessage } from '@/lib/api/client';
 
 export const FactoryList = () => {
   const { hasPermission } = usePermissions();
@@ -42,6 +46,20 @@ export const FactoryList = () => {
     },
     enabled: hasOrganization
   });
+
+  // Disabled factorys stay on existing documents but are hidden from pickers for new ones
+  const handleToggleActive = async () => {
+    if (!organizationId || !selectedFactory) return;
+    try {
+      const nextActive = !selectedFactory.is_active;
+      await setPartnerActive('factory', organizationId, selectedFactory.id, nextActive);
+      toast.success(nextActive ? '工廠已啟用' : '工廠已停用');
+      setSelectedFactory({ ...selectedFactory, is_active: nextActive });
+      refetch();
+    } catch (error) {
+      toast.error(`變更工廠狀態失敗：${apiErrorMessage(error)}`);
+    }
+  };
 
   const handleView = (factory: any) => {
     setSelectedFactory(factory);
@@ -103,6 +121,21 @@ export const FactoryList = () => {
       )
     },
     {
+      key: 'is_active',
+      title: '狀態',
+      sortable: true,
+      filterable: true,
+      filterOptions: [
+        { value: 'true', label: '啟用' },
+        { value: 'false', label: '停用' },
+      ],
+      render: (value) => (
+        <Badge variant="outline" className={value ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'}>
+          {value ? '啟用' : '停用'}
+        </Badge>
+      )
+    },
+    {
       key: 'note',
       title: '備註',
       sortable: false,
@@ -160,6 +193,7 @@ export const FactoryList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             factory={selectedFactory}
+            onToggleActive={canEdit ? handleToggleActive : undefined}
             onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);

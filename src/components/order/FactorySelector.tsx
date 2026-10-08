@@ -26,7 +26,8 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
   const { organizationId } = useCurrentOrganization();
   
   const { data: factories } = useQuery({
-    queryKey: ['factories', organizationId],
+    // Only active factories can be assigned to new orders
+    queryKey: ['factories', organizationId, 'active'],
     queryFn: async () => {
       if (!organizationId) return [];
       
@@ -34,6 +35,7 @@ export const FactorySelector: React.FC<FactorySelectorProps> = ({
         .from('factories')
         .select('id, name')
         .eq('organization_id', organizationId)
+        .eq('is_active', true)
         .order('name');
       
       if (error) throw error;

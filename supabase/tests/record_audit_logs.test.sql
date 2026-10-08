@@ -75,7 +75,7 @@ declare
   entry public.record_audit_logs;
 begin
   insert into public.orders (order_number, customer_id, user_id, organization_id)
-  values ('TEST', (fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, (fx->>'org_id')::uuid) returning id into v_order;
+  values ('temp', (fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, (fx->>'org_id')::uuid) returning id into v_order;
   insert into public.order_products (order_id, product_id, quantity, unit_price)
   values (v_order, (fx->>'product_id')::uuid, 10, 1) returning id into v_item;
 

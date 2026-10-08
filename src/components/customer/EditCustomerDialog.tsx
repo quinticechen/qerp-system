@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { updatePartner } from '@/lib/api/partners';
+import { apiErrorMessage } from '@/lib/api/client';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface EditCustomerDialogProps {
   open: boolean;
@@ -28,6 +30,7 @@ export const EditCustomerDialog: React.FC<EditCustomerDialogProps> = ({
   onCustomerUpdated,
 }) => {
   const [loading, setLoading] = useState(false);
+  const { organizationId } = useCurrentOrganization();
   const [formData, setFormData] = useState({
     name: '',
     contact_person: '',
@@ -74,22 +77,16 @@ export const EditCustomerDialog: React.FC<EditCustomerDialogProps> = ({
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('customers')
-        .update(formData)
-        .eq('id', customer.id);
-
-      if (error) {
-        console.error('Error updating customer:', error);
-        throw error;
-      }
+      if (!organizationId) throw new Error('請先選擇組織');
+      // The API only changes fields that differ and checks the same rules again
+      await updatePartner('customer', organizationId, customer.id, formData);
 
       toast.success('客戶更新成功');
       onCustomerUpdated();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating customer:', error);
-      toast.error('更新客戶失敗');
+      toast.error(`更新客戶失敗：${apiErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
