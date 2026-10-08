@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { CustomerList } from './customer/CustomerList';
 import { CreateCustomerDialog } from './common/CreateCustomerDialog';
+import { PermissionGate } from '@/components/PermissionGate';
 
 const CustomerManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -17,13 +18,15 @@ const CustomerManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">客戶管理</h2>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          新增客戶
-        </Button>
+        <PermissionGate permission="canCreateCustomers">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新增客戶
+          </Button>
+        </PermissionGate>
       </div>
       
       <CustomerList />

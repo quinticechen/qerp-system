@@ -6,8 +6,11 @@ import { EditShippingDialog } from './EditShippingDialog';
 import { ViewShippingDialog } from './ViewShippingDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const ShippingList = () => {
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditShipping');
   const [selectedShipping, setSelectedShipping] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -158,10 +161,10 @@ export const ShippingList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             shipping={selectedShipping}
-            onEdit={() => {
+            onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
-            }}
+            } : undefined}
           />
           <EditShippingDialog
             open={editDialogOpen}

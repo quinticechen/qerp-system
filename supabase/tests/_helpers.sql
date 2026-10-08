@@ -107,3 +107,17 @@ begin
     raise exception 'FAIL: % (wrong error: %)', description, v_error;
   end if;
 end $$;
+
+-- Add a user to an organization as an active member with the given role ('admin', 'editor' or 'viewer'),
+-- bypassing RLS and the membership trigger (test setup runs as the database owner)
+create or replace function pg_temp.add_member(org_id uuid, member_role text)
+returns uuid language plpgsql as $$
+declare
+  v_user uuid := gen_random_uuid();
+begin
+  insert into auth.users (id, aud, role, email)
+  values (v_user, 'authenticated', 'authenticated', 'sql-test-' || v_user || '@example.test');
+  insert into public.user_organizations (user_id, organization_id, is_active, accepted_at, role)
+  values (v_user, org_id, true, now(), member_role);
+  return v_user;
+end $$;

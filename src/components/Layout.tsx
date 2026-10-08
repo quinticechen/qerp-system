@@ -4,6 +4,7 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import Header from '@/components/Header';
+import { RoutePermissionGuard } from '@/components/RoutePermissionGuard';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   return (
@@ -13,7 +14,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
         <SidebarInset className="bg-background">
           <Header />
           <main className="flex-1 p-6 bg-background">
-            {children || <Outlet />}
+            <RoutePermissionGuard>{children || <Outlet />}</RoutePermissionGuard>
           </main>
         </SidebarInset>
       </div>

@@ -7,10 +7,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { EditOrderDialog } from './EditOrderDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const OrderList = () => {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditOrders');
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: orders, isLoading, refetch } = useQuery({
@@ -196,6 +199,7 @@ export const OrderList = () => {
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
           order={selectedOrder}
+          readOnly={!canEdit}
           onOrderUpdated={refetch}
         />
       )}

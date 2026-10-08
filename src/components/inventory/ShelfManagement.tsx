@@ -7,6 +7,7 @@ import { useShelves, type Shelf } from '@/hooks/useShelves';
 import { CreateShelfDialog } from './CreateShelfDialog';
 import { RenameShelfDialog } from './RenameShelfDialog';
 import { ShelfProductsDialog } from './ShelfProductsDialog';
+import { PermissionGate } from '@/components/PermissionGate';
 
 export const ShelfManagement: React.FC = () => {
   const { data: shelves, isLoading, error } = useShelves();
@@ -47,19 +48,21 @@ export const ShelfManagement: React.FC = () => {
       key: 'actions',
       title: '操作',
       render: (_value: unknown, row: Shelf) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label={`編輯貨架 ${row.name} 名稱`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setRenamingShelf(row);
-          }}
-          className="text-gray-600 hover:text-blue-700"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <PermissionGate permission="canEditShelves">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`編輯貨架 ${row.name} 名稱`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setRenamingShelf(row);
+            }}
+            className="text-gray-600 hover:text-blue-700"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </PermissionGate>
       ),
     },
   ];
@@ -68,13 +71,15 @@ export const ShelfManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">貨架管理</h2>
-        <Button
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          新增貨架
-        </Button>
+        <PermissionGate permission="canCreateShelves">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新增貨架
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

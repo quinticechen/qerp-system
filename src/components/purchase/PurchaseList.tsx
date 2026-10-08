@@ -7,8 +7,11 @@ import { EditPurchaseDialog } from './EditPurchaseDialog';
 import { ViewPurchaseDialog } from './ViewPurchaseDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const PurchaseList = () => {
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditPurchases');
   const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -192,10 +195,10 @@ export const PurchaseList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             purchase={selectedPurchase}
-            onEdit={() => {
+            onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
-            }}
+            } : undefined}
           />
           <EditPurchaseDialog
             open={editDialogOpen}

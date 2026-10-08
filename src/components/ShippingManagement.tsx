@@ -8,6 +8,7 @@ import { ShippingList } from './shipping/ShippingList';
 import { CreateShippingDialog } from './shipping/CreateShippingDialog';
 import { ViewShippingDialog } from './shipping/ViewShippingDialog';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
+import { PermissionGate } from '@/components/PermissionGate';
 
 const ShippingManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -24,13 +25,15 @@ const ShippingManagement = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">出貨管理</h2>
-        <Button 
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          新增出貨單
-        </Button>
+        <PermissionGate permission="canCreateShipping">
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="bg-blue-600 text-white hover:bg-blue-700 border-0 shadow-sm"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            新增出貨單
+          </Button>
+        </PermissionGate>
       </div>
       
       <Tabs defaultValue="shippings" className="space-y-4">

@@ -1029,6 +1029,21 @@ export type Database = {
         }
         Relationships: []
       }
+      role_permissions: {
+        Row: {
+          permission_key: string
+          role: string
+        }
+        Insert: {
+          permission_key: string
+          role: string
+        }
+        Update: {
+          permission_key?: string
+          role?: string
+        }
+        Relationships: []
+      }
       shipment_history: {
         Row: {
           created_at: string
@@ -1302,6 +1317,7 @@ export type Database = {
           is_active: boolean
           joined_at: string
           organization_id: string
+          role: string
           updated_at: string
           user_id: string
         }
@@ -1315,6 +1331,7 @@ export type Database = {
           is_active?: boolean
           joined_at?: string
           organization_id: string
+          role?: string
           updated_at?: string
           user_id: string
         }
@@ -1328,6 +1345,7 @@ export type Database = {
           is_active?: boolean
           joined_at?: string
           organization_id?: string
+          role?: string
           updated_at?: string
           user_id?: string
         }
@@ -1455,7 +1473,7 @@ export type Database = {
         Returns: undefined
       }
       add_existing_user_to_organization: {
-        Args: { _email: string; _organization_id: string; _role_id: string }
+        Args: { _email: string; _organization_id: string; _role: string }
         Returns: string
       }
       can_inspect_organization: {
@@ -1467,7 +1485,7 @@ export type Database = {
           _full_name?: string
           _organization_id: string
           _phone?: string
-          _role_id: string
+          _role: string
           _user_id: string
         }
         Returns: undefined
@@ -1539,8 +1557,12 @@ export type Database = {
         Args: { p_items: Json; p_shipping_id: string }
         Returns: undefined
       }
+      set_member_active: {
+        Args: { _is_active: boolean; _organization_id: string; _user_id: string }
+        Returns: undefined
+      }
       set_member_role: {
-        Args: { _organization_id: string; _role_id: string; _user_id: string }
+        Args: { _organization_id: string; _role: string; _user_id: string }
         Returns: undefined
       }
       transfer_organization_ownership: {

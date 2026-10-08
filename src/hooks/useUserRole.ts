@@ -1,22 +1,21 @@
 import { useOrganizationPermissions } from './useOrganizationPermissions';
 
-// Roles are scoped to the current organization (user_organization_roles), not global.
+// The current user's single role in the selected organization (user_organizations.role, or 'owner').
 // The legacy global `user_roles` table has been dropped.
 export const useUserRole = () => {
-  const { userRoles, isOwner, loading } = useOrganizationPermissions();
+  const { role, isOwner, loading } = useOrganizationPermissions();
 
-  const roles = userRoles
-    .filter((userRole) => userRole.role?.is_active)
-    .map((userRole) => userRole.role.name);
+  const roles = role ? [role] : [];
 
-  const hasRole = (role: string) => roles.includes(role);
-  const hasAnyRole = (roleList: string[]) => roleList.some((role) => roles.includes(role));
+  const hasRole = (roleName: string) => roles.includes(roleName as typeof roles[number]);
+  const hasAnyRole = (roleList: string[]) => roleList.some((roleName) => hasRole(roleName));
 
   return {
+    role,
     roles,
     isOwner,
     // The organization owner holds every permission, so treat them as admin too
-    isAdmin: isOwner || roles.includes('admin'),
+    isAdmin: isOwner || role === 'admin',
     loading,
     hasRole,
     hasAnyRole,

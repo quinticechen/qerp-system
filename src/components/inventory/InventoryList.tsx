@@ -11,9 +11,11 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 interface InventoryListProps {
   selectedInventoryId?: string | null;
   onInventorySelected?: (inventoryId: string | null) => void;
+  // Show the data without edit buttons (members without canEditInventory)
+  readOnly?: boolean;
 }
 
-export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryId, onInventorySelected }) => {
+export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryId, onInventorySelected, readOnly = false }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
@@ -232,6 +234,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryI
             if (!isOpen) onInventorySelected?.(null);
           }}
           inventory={selectedInventory}
+          readOnly={readOnly}
         />
       )}
     </div>

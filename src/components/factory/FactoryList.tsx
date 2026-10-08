@@ -7,8 +7,11 @@ import { EditFactoryDialog } from './EditFactoryDialog';
 import { ViewFactoryDialog } from './ViewFactoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export const FactoryList = () => {
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('canEditFactories');
   const [selectedFactory, setSelectedFactory] = useState<any | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -157,10 +160,10 @@ export const FactoryList = () => {
             open={viewDialogOpen}
             onOpenChange={setViewDialogOpen}
             factory={selectedFactory}
-            onEdit={() => {
+            onEdit={canEdit ? () => {
               setViewDialogOpen(false);
               setEditDialogOpen(true);
-            }}
+            } : undefined}
           />
           <EditFactoryDialog
             open={editDialogOpen}

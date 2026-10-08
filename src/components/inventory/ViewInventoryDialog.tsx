@@ -23,9 +23,11 @@ interface ViewInventoryDialogProps {
   inventory: any;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Show the data without edit buttons (members without canEditInventory)
+  readOnly?: boolean;
 }
 
-export const ViewInventoryDialog = ({ inventory, open, onOpenChange }: ViewInventoryDialogProps) => {
+export const ViewInventoryDialog = ({ inventory, open, onOpenChange, readOnly = false }: ViewInventoryDialogProps) => {
   const [isEditingBatch, setIsEditingBatch] = useState(false);
   const [editingRoll, setEditingRoll] = useState<EditableRoll | null>(null);
   const [rollDrafts, setRollDrafts] = useState<EditableInventoryRoll[] | null>(null);
@@ -141,7 +143,7 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange }: ViewInven
           {/* 基本資訊 */}
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">基本資訊</h3>
-            {!isEditingBatch && (
+            {!readOnly && !isEditingBatch && (
               <Button variant="outline" size="sm" onClick={() => setIsEditingBatch(true)}>
                 <Pencil className="mr-2 h-4 w-4" />
                 編輯批次資料
@@ -210,7 +212,7 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange }: ViewInven
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">布卷明細</h3>
-              {!rollDrafts && (
+              {!readOnly && !rollDrafts && (
                 <Button variant="outline" size="sm" onClick={startEditingRolls} disabled={isLoading}>
                   <Pencil className="mr-2 h-4 w-4" />
                   編輯布卷明細

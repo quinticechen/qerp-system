@@ -1,281 +1,135 @@
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useOrganizationPermissions } from '@/hooks/useOrganizationPermissions';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
+import { useRolePermissions } from '@/hooks/useRolePermissions';
+import { useRoleMemberCounts } from '@/hooks/useRoleMemberCounts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
-import { CreateRoleDialog } from './CreateRoleDialog';
-import { EditRoleDialog } from './EditRoleDialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TransferOwnershipDialog } from './TransferOwnershipDialog';
-import { UserPlus, Edit, Trash2, Shield, ArrowRightLeft } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowRightLeft } from 'lucide-react';
+import { PERMISSION_GROUPS } from '@/lib/permissionLabels';
+import { MEMBER_ROLES, ROLE_BADGE_CLASSES, ROLE_LABELS, type OrganizationRole } from '@/lib/roles';
 
-interface OrganizationRole {
-  id: string;
-  name: string;
-  display_name: string;
-  description?: string;
-  permissions: Record<string, boolean>;
-  is_system_role: boolean;
-  is_active: boolean;
-  user_count?: number;
-}
+const COLUMNS: OrganizationRole[] = ['owner', 'admin', 'editor', 'viewer'];
 
+const OWNER_DESCRIPTION = '擁有組織的所有權限，並可以轉移擁有權、刪除組織';
+
+// Read-only overview of the four fixed roles (docs/MULTI_TENANT_RBAC.md §4.2). Roles are assigned in user management.
 export const OrganizationRoleManagement = () => {
-  const { currentOrganization } = useOrganizationContext();
+  const { currentOrganization, refreshOrganizations } = useOrganizationContext();
   const { isOwner } = useOrganizationPermissions();
-  const { toast } = useToast();
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<OrganizationRole | null>(null);
-
-  const { data: roles = [], refetch } = useQuery({
-    queryKey: ['organization-roles', currentOrganization?.id],
-    queryFn: async () => {
-      if (!currentOrganization) return [];
-
-      const { data, error } = await supabase
-        .from('organization_roles')
-        .select('id, name, display_name, description, permissions, is_system_role, is_active')
-        .eq('organization_id', currentOrganization.id)
-        .eq('is_active', true)
-        .order('is_system_role', { ascending: false })
-        .order('display_name');
-
-      if (error) throw error;
-
-      // 「使用者數量」必須跟使用者管理頁面（UserList）採用同一套成員定義：
-      // 只算該組織目前啟用中的成員（user_organizations.is_active = true）
-      // 所持有的啟用中角色（user_organization_roles.is_active = true）。
-      // 直接用 user_organization_roles(count) 嵌入查詢會把已停用成員、
-      // 已停用的角色指派也算進去，導致跟使用者管理頁面的人數對不起來。
-      const { data: activeMemberships, error: membershipsError } = await supabase
-        .from('user_organizations')
-        .select('user_id')
-        .eq('organization_id', currentOrganization.id)
-        .eq('is_active', true);
-
-      if (membershipsError) throw membershipsError;
-
-      const activeUserIds = activeMemberships?.map(m => m.user_id) || [];
-
-      let roleCounts: Record<string, number> = {};
-      if (activeUserIds.length > 0) {
-        const { data: activeRoleAssignments, error: roleAssignmentsError } = await supabase
-          .from('user_organization_roles')
-          .select('role_id')
-          .eq('organization_id', currentOrganization.id)
-          .eq('is_active', true)
-          .in('user_id', activeUserIds);
-
-        if (roleAssignmentsError) throw roleAssignmentsError;
-
-        roleCounts = (activeRoleAssignments || []).reduce((acc, { role_id }) => {
-          acc[role_id] = (acc[role_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-      }
-
-      return data.map(role => ({
-        ...role,
-        user_count: roleCounts[role.id] || 0
-      }));
-    },
-    enabled: !!currentOrganization,
-  });
-
-  const handleEditRole = (role: OrganizationRole) => {
-    setSelectedRole(role);
-    setEditDialogOpen(true);
-  };
-
-  const handleTransferOwnership = () => {
-    setTransferDialogOpen(true);
-  };
-
-  const handleDeleteRole = async (roleId: string) => {
-    if (!currentOrganization) return;
-
-    try {
-      const { error } = await supabase
-        .from('organization_roles')
-        .update({ is_active: false })
-        .eq('id', roleId)
-        .eq('organization_id', currentOrganization.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "角色已刪除",
-        description: "角色已成功停用",
-      });
-
-      refetch();
-    } catch (error) {
-      console.error('Error deleting role:', error);
-      toast({
-        title: "刪除失敗",
-        description: "無法刪除角色，請稍後再試",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getPermissionCount = (permissions: Record<string, boolean> | null | undefined, roleName: string) => {
-    if (roleName === 'owner') {
-      return '所有權限';
-    }
-    if (!permissions || typeof permissions !== 'object') {
-      return '0 項權限';
-    }
-    return `${Object.values(permissions).filter(Boolean).length} 項權限`;
-  };
-
-  const columns: TableColumn[] = [
-    {
-      key: 'display_name',
-      title: '角色名稱',
-      sortable: true,
-      render: (value, row) => (
-        <div className="flex items-center space-x-2">
-          {row.is_system_role && (
-            <Shield className="h-4 w-4 text-blue-600" />
-          )}
-          <span className="font-medium">{value}</span>
-          {row.is_system_role && (
-            <Badge variant="outline" className="text-xs">
-              系統角色
-            </Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'description',
-      title: '描述',
-      render: (value) => (
-        <span className="text-gray-600">{value || '-'}</span>
-      ),
-    },
-    {
-      key: 'permissions',
-      title: '權限數量',
-      render: (value, row) => (
-        <Badge variant="secondary">
-          {getPermissionCount(value, row.name)}
-        </Badge>
-      ),
-    },
-    {
-      key: 'user_count',
-      title: '使用者數量',
-      render: (value) => (
-        <span className="text-sm text-gray-600">{value} 名使用者</span>
-      ),
-    },
-    {
-      key: 'actions',
-      title: '操作',
-      render: (_, row) => (
-        <div className="flex items-center space-x-2">
-          {row.name === 'owner' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleTransferOwnership}
-              disabled={!isOwner}
-              className="text-blue-600 hover:text-blue-700"
-            >
-              <ArrowRightLeft className="h-4 w-4" />
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleEditRole(row)}
-                disabled={!isOwner}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              {!row.is_system_role && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteRole(row.id)}
-                  disabled={!isOwner || row.user_count > 0}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      ),
-    },
-  ];
+  const { data: rolePermissions, isLoading, error } = useRolePermissions();
+  const { data: memberCounts, refetch: refetchCounts } = useRoleMemberCounts(
+    currentOrganization?.id,
+    currentOrganization?.owner_id,
+  );
 
   if (!currentOrganization) {
     return <div>請先選擇組織</div>;
   }
 
+  // The owner holds the admin set; other roles hold what role_permissions lists for them
+  const holds = (role: OrganizationRole, key: string) =>
+    !!rolePermissions && rolePermissions[role === 'owner' ? 'admin' : role].has(key);
+
+  const describe = (role: OrganizationRole, permissions: readonly { key: string; action: string }[]) => {
+    const actions = permissions.filter((permission) => holds(role, permission.key)).map((permission) => permission.action);
+    return actions.length > 0 ? actions.join('、') : '–';
+  };
+
+  const roleCards = [
+    { role: 'owner' as const, description: OWNER_DESCRIPTION },
+    ...MEMBER_ROLES.map((option) => ({ role: option.value, description: option.description })),
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">組織角色管理</h2>
-        </div>
+        <h2 className="text-2xl font-bold text-slate-800">角色說明</h2>
         {isOwner && (
-          <Button
-            onClick={() => setCreateDialogOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            新增角色
+          <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+            <ArrowRightLeft className="mr-2 h-4 w-4" />
+            轉移擁有權
           </Button>
         )}
       </div>
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {roleCards.map(({ role, description }) => (
+          <Card key={role}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <Badge variant="outline" className={ROLE_BADGE_CLASSES[role]}>
+                  {ROLE_LABELS[role]}
+                </Badge>
+                <span className="text-sm text-gray-600">{memberCounts?.[role] ?? 0} 名成員</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600">{description}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>角色列表</CardTitle>
+          <CardTitle>各角色可使用的功能</CardTitle>
           <CardDescription>
-            管理 {currentOrganization.name} 的角色和權限設定
+            角色固定為以上四種，於用戶管理指派。所有修改都會留下編輯紀錄。
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <EnhancedTable
-            columns={columns}
-            data={roles}
-            searchPlaceholder="搜尋角色..."
-            emptyMessage="暫無角色資料"
-          />
+          {isLoading ? (
+            <div className="py-4 text-center text-gray-500">載入中...</div>
+          ) : error ? (
+            <div className="py-4 text-center text-red-600">無法載入角色權限</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>功能</TableHead>
+                  {COLUMNS.map((role) => (
+                    <TableHead key={role} className="whitespace-nowrap">{ROLE_LABELS[role]}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Object.entries(PERMISSION_GROUPS).map(([group, permissions]) => (
+                  <TableRow key={group}>
+                    <TableCell className="whitespace-nowrap font-medium">{group}</TableCell>
+                    {COLUMNS.map((role) => (
+                      <TableCell key={role} className="whitespace-nowrap text-gray-700">
+                        {describe(role, permissions)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell className="whitespace-nowrap font-medium">轉移擁有權、刪除組織</TableCell>
+                  {COLUMNS.map((role) => (
+                    <TableCell key={role} className="text-gray-700">
+                      {role === 'owner' ? '可以' : '–'}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
-
-      <CreateRoleDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        onSuccess={refetch}
-      />
-
-      <EditRoleDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        role={selectedRole}
-        onSuccess={refetch}
-      />
 
       <TransferOwnershipDialog
         open={transferDialogOpen}
         onOpenChange={setTransferDialogOpen}
-        onSuccess={refetch}
+        // Reload the organization so its owner_id, and with it everyone's permissions, are current
+        onSuccess={() => {
+          refreshOrganizations();
+          refetchCounts();
+        }}
       />
     </div>
   );
