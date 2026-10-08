@@ -364,8 +364,79 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         panel_closed = page.locator("div.pointer-events-none.opacity-0").count() > 0
         check("Chat panel closes on button toggle", panel_closed, page, "10_closed")
 
+        # ── 7. Mobile full screen ─────────────────────────────────────────────
+        section("7. Mobile Full Screen")
+        verify_mobile(browser, base_url, session)
+
         browser.close()
         return summary()
+
+
+MOBILE_VIEWPORT = {"width": 390, "height": 844}
+
+def verify_mobile(browser, base_url: str, session: dict) -> None:
+    """On a phone the chat opens as a full-screen page; back arrow, browser back and swipe-right close it."""
+    ctx = browser.new_context(viewport=MOBILE_VIEWPORT, has_touch=True, is_mobile=True)
+    page = ctx.new_page()
+    page.set_default_timeout(TIMEOUT_MS)
+    if not inject_session(page, base_url, session):
+        check("Mobile: authenticated", False, page, "m00_auth")
+        ctx.close()
+        return
+    page.wait_for_timeout(1500)
+    start_url = page.url
+    panel = page.locator("div[role='dialog'][aria-label='Query 助理']")
+    cdp = ctx.new_cdp_session(page)
+
+    def open_chat() -> None:
+        page.locator("button[aria-label='開啟 Query 助理']").click()
+        page.wait_for_timeout(500)   # slide-in transition is 300ms
+
+    def is_open() -> bool:
+        return panel.is_visible()
+
+    def swipe(x0: int, x1: int, y: int, steps: int, pause_ms: int) -> None:
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x0, "y": y}]})
+        for i in range(1, steps + 1):
+            page.wait_for_timeout(pause_ms)
+            x = x0 + (x1 - x0) * i // steps
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x, "y": y}]})
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        page.wait_for_timeout(600)
+
+    open_chat()
+    box = panel.bounding_box() or {}
+    full = (box.get("x") == 0 and box.get("y") == 0
+            and box.get("width") == MOBILE_VIEWPORT["width"]
+            and box.get("height") == MOBILE_VIEWPORT["height"])
+    check("Mobile: chat opens full screen", is_open() and full, page, "m01_fullscreen")
+    check("Mobile: float button hidden while open",
+          page.locator("button[aria-label='開啟 Query 助理']").count() == 0)
+
+    back = page.locator("button[aria-label='返回 ERP']")
+    back_box = back.bounding_box() or {}
+    check("Mobile: back arrow at top-left",
+          back.is_visible() and back_box.get("x", 999) < 40 and back_box.get("y", 999) < 40)
+
+    back.click()
+    page.wait_for_timeout(600)
+    check("Mobile: back arrow returns to ERP", not is_open() and page.url == start_url, page, "m02_back_arrow")
+
+    open_chat()
+    page.go_back()
+    page.wait_for_timeout(600)
+    check("Mobile: browser back returns to ERP", not is_open() and page.url == start_url)
+
+    open_chat()
+    swipe(60, 100, 400, steps=4, pause_ms=100)    # short, slow drag springs back
+    check("Mobile: short swipe keeps chat open", is_open(), page, "m03_short_swipe")
+    swipe(40, 320, 400, steps=6, pause_ms=16)
+    check("Mobile: swipe right returns to ERP", not is_open() and page.url == start_url, page, "m04_swiped")
+
+    open_chat()
+    page.locator("button[aria-label='返回 ERP']").click()
+    page.wait_for_timeout(600)
+    ctx.close()
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
