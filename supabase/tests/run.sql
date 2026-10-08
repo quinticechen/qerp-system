@@ -2,147 +2,285 @@
 -- 結果為 "ALL TESTS PASSED" 代表通過；"FAIL: ..." 或其他錯誤代表未通過。
 -- 最後一定會丟出例外，整批 SQL 會回滾，不會留下任何變更。
 
--- ===== migration: 20261009002334_rbac_r4_business_rls.sql
--- RBAC R4：業務資料表依權限鍵收緊 RLS（docs/MULTI_TENANT_RBAC.md §4.4、§5；R3、R5）
+-- ===== migration: 20261009003415_api_a6_shelves.sql
+-- 業務 API A6 貨架（docs/BUSINESS_API.md §3、§5，決策 B4、B6）
 --
--- 原本業務資料表只檢查「是不是組織成員」，訪客也能直接寫入與刪除。改為：
---   主檔與單據：SELECT → 查看鍵、INSERT → 新增鍵、UPDATE → 編輯鍵；不開放 DELETE（停用／取消取代刪除，R5）
---   明細與關聯（品項、指定工廠、採購關聯、布卷、出貨項目、出貨紀錄）：依上層單據的組織判斷；
---     SELECT → 查看鍵、INSERT → 新增或編輯鍵、UPDATE／DELETE → 編輯鍵（編輯單據時替換品項需要刪除明細）
--- 業務 API（A1–A6）以函式擁有者身分執行，不受影響；仍直接寫表的頁面（貨架）與 AI tools 只要使用者有對應的鍵就照常運作。
--- 條件一律使用 user_has_organization_permission(auth.uid(), organization_id, '<鍵>')，與 RPC、AI authGuard 相同。
--- policy 只開放給 authenticated，匿名請求讀不到也寫不了任何一列。
+-- 1. 貨架（warehouses）新增 is_active；名稱組織內唯一（不分大小寫）
+-- 2. create_shelf、update_shelf（名稱、位置）、set_shelf_active
+-- 3. 停用的貨架不能放新布卷，也不能把布卷移過去；已在上面的布卷不受影響（save_inventory_rolls，其餘與 A4 相同）
 
--- ===== 1. 移除舊的「組織成員即可」policy
+-- ===== 1. 貨架狀態與唯一性
 
-DO $$
-DECLARE
-  v_policy record;
+ALTER TABLE public.warehouses ADD COLUMN is_active boolean NOT NULL DEFAULT true;
+CREATE UNIQUE INDEX warehouses_organization_name_key ON public.warehouses (organization_id, lower(btrim(name)));
+
+-- ===== 2. 停用的貨架不能再放布卷
+
+CREATE OR REPLACE FUNCTION public.save_inventory_rolls(p_inventory_id uuid, p_rolls jsonb)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $function$
+declare
+  v_org uuid;
+  v_roll record;
+  v_existing inventory_rolls;
+  v_shipped numeric;
+  v_number text;
+begin
+  select organization_id into v_org from inventories where id = p_inventory_id for update;
+  if not found then
+    raise exception '找不到入庫紀錄，或沒有編輯權限' using errcode = 'P0002', hint = 'inventory_not_found';
+  end if;
+  if jsonb_typeof(coalesce(p_rolls, '[]')) <> 'array' or jsonb_array_length(coalesce(p_rolls, '[]')) = 0 then
+    raise exception '入庫紀錄至少需要一卷布' using errcode = '22023', hint = 'rolls_required';
+  end if;
+
+  for v_roll in
+    select * from jsonb_to_recordset(p_rolls)
+      as x(id uuid, product_id uuid, warehouse_id uuid, shelf text, quality fabric_quality,
+           quantity numeric, roll_number text, specifications jsonb)
+  loop
+    if v_roll.product_id is null
+      or not exists (select 1 from products_new where id = v_roll.product_id and organization_id = v_org) then
+      raise exception '請選擇此組織的產品' using errcode = 'P0002', hint = 'product_not_found';
+    end if;
+    if v_roll.warehouse_id is null
+      or not exists (select 1 from warehouses where id = v_roll.warehouse_id and organization_id = v_org) then
+      raise exception '請選擇此組織的倉庫' using errcode = 'P0002', hint = 'warehouse_not_found';
+    end if;
+    -- New rolls and rolls moved to another shelf need an active one; rolls staying put may stay on a disabled shelf
+    if not (select is_active from warehouses where id = v_roll.warehouse_id)
+      and not exists (select 1 from inventory_rolls where id = v_roll.id and inventory_id = p_inventory_id and warehouse_id = v_roll.warehouse_id) then
+      raise exception '貨架「%」已停用', (select name from warehouses where id = v_roll.warehouse_id)
+        using errcode = '22023', hint = 'warehouse_inactive';
+    end if;
+    if coalesce(v_roll.quantity, 0) <= 0 then
+      raise exception '布卷重量必須大於 0' using errcode = '22023', hint = 'invalid_quantity';
+    end if;
+  end loop;
+
+  for v_existing in
+    select * from inventory_rolls ir
+    where ir.inventory_id = p_inventory_id
+      and ir.id not in (
+        select x.id from jsonb_to_recordset(p_rolls) as x(id uuid) where x.id is not null
+      )
+  loop
+    if exists (select 1 from shipping_items where inventory_roll_id = v_existing.id) then
+      raise exception '布卷「%」已出貨，不可刪除', v_existing.roll_number using errcode = '55000', hint = 'roll_shipped';
+    end if;
+    delete from inventory_rolls where id = v_existing.id;
+  end loop;
+
+  for v_roll in
+    select * from jsonb_to_recordset(p_rolls)
+      as x(id uuid, product_id uuid, warehouse_id uuid, shelf text, quality fabric_quality,
+           quantity numeric, roll_number text, specifications jsonb)
+  loop
+    if v_roll.id is null then
+      v_number := coalesce(nullif(trim(v_roll.roll_number), ''), api_new_roll_number());
+      if exists (select 1 from inventory_rolls where roll_number = v_number) then
+        raise exception '布卷編號「%」已被使用', v_number using errcode = '23505', hint = 'roll_number_taken';
+      end if;
+      -- clock_timestamp() rather than now(): rolls added in one call keep the order they were given in
+      insert into inventory_rolls (inventory_id, product_id, warehouse_id, shelf, quality, quantity, current_quantity, roll_number, specifications, created_at)
+      values (p_inventory_id, v_roll.product_id, v_roll.warehouse_id, nullif(trim(v_roll.shelf), ''),
+              coalesce(v_roll.quality, 'A'), v_roll.quantity, v_roll.quantity, v_number, v_roll.specifications, clock_timestamp());
+      continue;
+    end if;
+
+    select * into v_existing from inventory_rolls where id = v_roll.id and inventory_id = p_inventory_id;
+    if not found then
+      raise exception '布卷不屬於此入庫紀錄' using errcode = 'P0002', hint = 'roll_not_found';
+    end if;
+
+    if v_roll.product_id <> v_existing.product_id
+      and exists (select 1 from shipping_items where inventory_roll_id = v_existing.id) then
+      raise exception '布卷「%」已出貨，不可更換產品', v_existing.roll_number using errcode = '55000', hint = 'roll_shipped';
+    end if;
+
+    -- Shipped weight stays fixed; current stock follows the corrected received weight
+    v_shipped := v_existing.quantity - v_existing.current_quantity;
+    if v_roll.quantity < v_shipped then
+      raise exception '布卷「%」的入庫重量不可低於已出貨 % 公斤', v_existing.roll_number, v_shipped
+        using errcode = '55000', hint = 'quantity_below_shipped';
+    end if;
+
+    update inventory_rolls
+    set product_id = v_roll.product_id,
+        warehouse_id = v_roll.warehouse_id,
+        shelf = nullif(trim(v_roll.shelf), ''),
+        quality = coalesce(v_roll.quality, v_existing.quality),
+        quantity = v_roll.quantity,
+        current_quantity = v_roll.quantity - v_shipped,
+        is_allocated = (v_roll.quantity - v_shipped) <= 0,
+        specifications = v_roll.specifications
+    where id = v_roll.id;
+  end loop;
+end;
+$function$;
+
+-- ===== 3. 貨架 API
+
+-- Raise unless a shelf name is given and not used by another shelf of the organization
+CREATE FUNCTION public.api_check_shelf_name(p_organization_id uuid, p_name text, p_except_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+SET search_path TO 'public'
+AS $function$
 BEGIN
-  FOR v_policy IN
-    SELECT tablename, policyname FROM pg_policies
-    WHERE schemaname = 'public' AND tablename IN (
-      'customers', 'factories', 'products_new', 'warehouses',
-      'orders', 'order_products', 'order_factories',
-      'purchase_orders', 'purchase_order_items', 'purchase_order_relations',
-      'inventories', 'inventory_rolls',
-      'shippings', 'shipping_items', 'shipment_history')
-  LOOP
-    EXECUTE format('DROP POLICY %I ON public.%I', v_policy.policyname, v_policy.tablename);
-  END LOOP;
-END $$;
+  IF p_name IS NULL THEN
+    RAISE EXCEPTION '請輸入貨架名稱' USING ERRCODE = '22023', HINT = 'name_required';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.warehouses
+    WHERE organization_id = p_organization_id AND lower(btrim(name)) = lower(p_name) AND id IS DISTINCT FROM p_except_id
+  ) THEN
+    RAISE EXCEPTION '已有同名的貨架「%」', p_name USING ERRCODE = '23505', HINT = 'shelf_name_taken';
+  END IF;
+END;
+$function$;
 
--- ===== 2. 主檔與單據
+-- 「N 卷，X 公斤」 still on a shelf
+CREATE FUNCTION public.api_shelf_stock_label(p_shelf_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SET search_path TO 'public'
+AS $function$
+  SELECT CASE WHEN count(*) = 0 THEN NULL
+              ELSE count(*) || ' 卷，' || public.api_number(sum(current_quantity)) || ' 公斤' END
+  FROM public.inventory_rolls WHERE warehouse_id = p_shelf_id AND current_quantity > 0;
+$function$;
 
-DO $$
+CREATE FUNCTION public.create_shelf(
+  p_organization_id uuid,
+  p_name text,
+  p_location text DEFAULT NULL,
+  p_dry_run boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
 DECLARE
-  v_table record;
+  v_name text := public.api_clean(p_name);
+  v_location text := public.api_clean(p_location);
+  v_id uuid;
+  v_fields jsonb;
 BEGIN
-  FOR v_table IN
-    SELECT * FROM (VALUES
-      ('customers', 'Customers'),
-      ('factories', 'Factories'),
-      ('products_new', 'Products'),
-      ('warehouses', 'Shelves'),
-      ('orders', 'Orders'),
-      ('purchase_orders', 'Purchases'),
-      ('inventories', 'Inventory'),
-      ('shippings', 'Shipping')
-    ) AS t(name, area)
-  LOOP
-    EXECUTE format($p$CREATE POLICY rbac_select ON public.%I FOR SELECT TO authenticated
-      USING (public.user_has_organization_permission(auth.uid(), organization_id, %L))$p$, v_table.name, 'canView' || v_table.area);
-    EXECUTE format($p$CREATE POLICY rbac_insert ON public.%I FOR INSERT TO authenticated
-      WITH CHECK (public.user_has_organization_permission(auth.uid(), organization_id, %L))$p$, v_table.name, 'canCreate' || v_table.area);
-    EXECUTE format($p$CREATE POLICY rbac_update ON public.%I FOR UPDATE TO authenticated
-      USING (public.user_has_organization_permission(auth.uid(), organization_id, %L))
-      WITH CHECK (public.user_has_organization_permission(auth.uid(), organization_id, %L))$p$,
-      v_table.name, 'canEdit' || v_table.area, 'canEdit' || v_table.area);
-  END LOOP;
-END $$;
+  PERFORM public.api_require_permission(p_organization_id, 'canCreateShelves');
+  PERFORM public.api_check_shelf_name(p_organization_id, v_name, NULL);
 
--- ===== 3. 明細與關聯：依上層單據的組織
+  v_fields := public.api_fields('貨架名稱', v_name, '位置', v_location);
+  IF p_dry_run THEN
+    RETURN public.api_result(true, NULL, NULL, '建立貨架', v_fields);
+  END IF;
 
--- Child tables whose rows belong to a parent document through a foreign key
-DO $$
+  INSERT INTO public.warehouses (organization_id, name, location) VALUES (p_organization_id, v_name, v_location)
+  RETURNING id INTO v_id;
+
+  RETURN public.api_result(false, v_id, NULL, '建立貨架', v_fields);
+END;
+$function$;
+
+-- p_changes may hold name, location
+CREATE FUNCTION public.update_shelf(
+  p_organization_id uuid,
+  p_shelf_id uuid,
+  p_changes jsonb,
+  p_dry_run boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
 DECLARE
-  v_table record;
-  v_parent text;
+  v_old public.warehouses%ROWTYPE;
+  v_name text;
+  v_location text;
+  v_title text;
+  v_fields jsonb;
 BEGIN
-  FOR v_table IN
-    SELECT * FROM (VALUES
-      ('order_products', 'order_id', 'orders', 'Orders'),
-      ('purchase_order_items', 'purchase_order_id', 'purchase_orders', 'Purchases'),
-      ('inventory_rolls', 'inventory_id', 'inventories', 'Inventory'),
-      ('shipping_items', 'shipping_id', 'shippings', 'Shipping')
-    ) AS t(name, fk, parent, area)
-  LOOP
-    -- The child's column is qualified with its table name so it never resolves to a parent column
-    v_parent := format('EXISTS (SELECT 1 FROM public.%I p WHERE p.id = %I.%I AND public.user_has_organization_permission(auth.uid(), p.organization_id, %%L))',
-      v_table.parent, v_table.name, v_table.fk);
-    EXECUTE format('CREATE POLICY rbac_select ON public.%I FOR SELECT TO authenticated USING (' || v_parent || ')',
-      v_table.name, 'canView' || v_table.area);
-    EXECUTE format('CREATE POLICY rbac_insert ON public.%I FOR INSERT TO authenticated WITH CHECK (' || v_parent || ' OR ' || v_parent || ')',
-      v_table.name, 'canCreate' || v_table.area, 'canEdit' || v_table.area);
-    EXECUTE format('CREATE POLICY rbac_update ON public.%I FOR UPDATE TO authenticated USING (' || v_parent || ') WITH CHECK (' || v_parent || ')',
-      v_table.name, 'canEdit' || v_table.area, 'canEdit' || v_table.area);
-    EXECUTE format('CREATE POLICY rbac_delete ON public.%I FOR DELETE TO authenticated USING (' || v_parent || ')',
-      v_table.name, 'canEdit' || v_table.area);
-  END LOOP;
-END $$;
+  PERFORM public.api_require_permission(p_organization_id, 'canEditShelves');
+  PERFORM public.api_check_change_keys(p_changes, ARRAY['name', 'location']);
 
--- An order's factories: the factory must be in the order's organization (R0 S4)
-CREATE POLICY rbac_select ON public.order_factories FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_factories.order_id
-                 AND public.user_has_organization_permission(auth.uid(), o.organization_id, 'canViewOrders')));
-CREATE POLICY rbac_insert ON public.order_factories FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM public.orders o JOIN public.factories f ON f.id = order_factories.factory_id AND f.organization_id = o.organization_id
-                      WHERE o.id = order_factories.order_id
-                        AND (public.user_has_organization_permission(auth.uid(), o.organization_id, 'canCreateOrders')
-                             OR public.user_has_organization_permission(auth.uid(), o.organization_id, 'canEditOrders'))));
-CREATE POLICY rbac_update ON public.order_factories FOR UPDATE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_factories.order_id
-                 AND public.user_has_organization_permission(auth.uid(), o.organization_id, 'canEditOrders')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.orders o JOIN public.factories f ON f.id = order_factories.factory_id AND f.organization_id = o.organization_id
-                      WHERE o.id = order_factories.order_id AND public.user_has_organization_permission(auth.uid(), o.organization_id, 'canEditOrders')));
-CREATE POLICY rbac_delete ON public.order_factories FOR DELETE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id = order_factories.order_id
-                 AND public.user_has_organization_permission(auth.uid(), o.organization_id, 'canEditOrders')));
+  SELECT * INTO v_old FROM public.warehouses WHERE id = p_shelf_id AND organization_id = p_organization_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '找不到此貨架' USING ERRCODE = 'P0002', HINT = 'shelf_not_found';
+  END IF;
 
--- A purchase order's linked orders: the order must be in the purchase order's organization (R0 S4)
-CREATE POLICY rbac_select ON public.purchase_order_relations FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.purchase_orders po WHERE po.id = purchase_order_relations.purchase_order_id
-                 AND public.user_has_organization_permission(auth.uid(), po.organization_id, 'canViewPurchases')));
-CREATE POLICY rbac_insert ON public.purchase_order_relations FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM public.purchase_orders po JOIN public.orders o ON o.id = purchase_order_relations.order_id AND o.organization_id = po.organization_id
-                      WHERE po.id = purchase_order_relations.purchase_order_id
-                        AND (public.user_has_organization_permission(auth.uid(), po.organization_id, 'canCreatePurchases')
-                             OR public.user_has_organization_permission(auth.uid(), po.organization_id, 'canEditPurchases'))));
-CREATE POLICY rbac_update ON public.purchase_order_relations FOR UPDATE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.purchase_orders po WHERE po.id = purchase_order_relations.purchase_order_id
-                 AND public.user_has_organization_permission(auth.uid(), po.organization_id, 'canEditPurchases')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.purchase_orders po JOIN public.orders o ON o.id = purchase_order_relations.order_id AND o.organization_id = po.organization_id
-                      WHERE po.id = purchase_order_relations.purchase_order_id AND public.user_has_organization_permission(auth.uid(), po.organization_id, 'canEditPurchases')));
-CREATE POLICY rbac_delete ON public.purchase_order_relations FOR DELETE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.purchase_orders po WHERE po.id = purchase_order_relations.purchase_order_id
-                 AND public.user_has_organization_permission(auth.uid(), po.organization_id, 'canEditPurchases')));
+  v_name := public.api_changed(p_changes, 'name', v_old.name);
+  v_location := public.api_changed(p_changes, 'location', v_old.location);
+  PERFORM public.api_check_shelf_name(p_organization_id, v_name, p_shelf_id);
 
--- Shipment history rows belong to the organization of their customer
-CREATE POLICY rbac_select ON public.shipment_history FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = shipment_history.customer_id
-                 AND public.user_has_organization_permission(auth.uid(), c.organization_id, 'canViewShipping')));
-CREATE POLICY rbac_insert ON public.shipment_history FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = shipment_history.customer_id
-                      AND (public.user_has_organization_permission(auth.uid(), c.organization_id, 'canCreateShipping')
-                           OR public.user_has_organization_permission(auth.uid(), c.organization_id, 'canEditShipping'))));
-CREATE POLICY rbac_update ON public.shipment_history FOR UPDATE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = shipment_history.customer_id
-                 AND public.user_has_organization_permission(auth.uid(), c.organization_id, 'canEditShipping')))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = shipment_history.customer_id
-                      AND public.user_has_organization_permission(auth.uid(), c.organization_id, 'canEditShipping')));
-CREATE POLICY rbac_delete ON public.shipment_history FOR DELETE TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.customers c WHERE c.id = shipment_history.customer_id
-                 AND public.user_has_organization_permission(auth.uid(), c.organization_id, 'canEditShipping')));
+  v_title := format('修改貨架「%s」', v_old.name);
+  v_fields := public.api_changed_fields('貨架名稱', v_old.name, v_name, '位置', v_old.location, v_location);
+  IF p_dry_run THEN
+    RETURN public.api_result(true, p_shelf_id, NULL, v_title, v_fields);
+  END IF;
+
+  UPDATE public.warehouses SET name = v_name, location = v_location WHERE id = p_shelf_id;
+
+  RETURN public.api_result(false, p_shelf_id, NULL, v_title, v_fields);
+END;
+$function$;
+
+-- A disabled shelf keeps the rolls on it but gets no new ones; the card shows what is still there
+CREATE FUNCTION public.set_shelf_active(
+  p_organization_id uuid,
+  p_shelf_id uuid,
+  p_is_active boolean,
+  p_dry_run boolean DEFAULT false
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_old public.warehouses%ROWTYPE;
+  v_title text;
+  v_fields jsonb;
+BEGIN
+  PERFORM public.api_require_permission(p_organization_id, 'canEditShelves');
+  IF p_is_active IS NULL THEN
+    RAISE EXCEPTION '請指定要啟用或停用' USING ERRCODE = '22023', HINT = 'is_active_required';
+  END IF;
+
+  SELECT * INTO v_old FROM public.warehouses WHERE id = p_shelf_id AND organization_id = p_organization_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION '找不到此貨架' USING ERRCODE = 'P0002', HINT = 'shelf_not_found';
+  END IF;
+
+  v_title := format('%s貨架「%s」', CASE WHEN p_is_active THEN '啟用' ELSE '停用' END, v_old.name);
+  v_fields := public.api_changed_fields('狀態',
+      CASE WHEN v_old.is_active THEN '啟用' ELSE '停用' END,
+      CASE WHEN p_is_active THEN '啟用' ELSE '停用' END)
+    || CASE WHEN p_is_active THEN '[]'::jsonb ELSE public.api_fields('仍有庫存', public.api_shelf_stock_label(p_shelf_id)) END;
+  IF p_dry_run THEN
+    RETURN public.api_result(true, p_shelf_id, NULL, v_title, v_fields);
+  END IF;
+
+  UPDATE public.warehouses SET is_active = p_is_active WHERE id = p_shelf_id AND is_active IS DISTINCT FROM p_is_active;
+
+  RETURN public.api_result(false, p_shelf_id, NULL, v_title, v_fields);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.api_check_shelf_name(uuid, text, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.api_shelf_stock_label(uuid) FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON FUNCTION public.create_shelf(uuid, text, text, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.update_shelf(uuid, uuid, jsonb, boolean) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.set_shelf_active(uuid, uuid, boolean, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_shelf(uuid, text, text, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_shelf(uuid, uuid, jsonb, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_shelf_active(uuid, uuid, boolean, boolean) TO authenticated;
 
 -- ===== _helpers.sql
 -- SQL 測試共用工具。
@@ -1778,6 +1916,96 @@ begin
   perform pg_temp.check_raises_as(v_viewer, format('insert into public.product_groups (organization_id, name) values (%L, %L)', v_org, 'x'),
     'permission denied', 'products cannot be written directly');
   perform pg_temp.check(not has_function_privilege('authenticated', 'public.api_check_product_name(uuid, text, uuid)', 'EXECUTE'), 'product helpers are internal');
+end $$;
+
+
+-- ===== test: api_a6_shelves.test.sql
+-- 業務 API A6：貨架（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- Fixture: one shelf (測試倉) holding one roll with 60kg left.
+
+-- create_shelf and update_shelf: names are unique within the organization
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  other jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_result jsonb;
+  v_preview jsonb;
+  v_shelf uuid;
+begin
+  v_preview := pg_temp.call_as(v_editor, format('select public.create_shelf(%L, %L, %L, true)', v_org, ' 1A 上 ', '一樓'));
+  perform pg_temp.check(not exists (select 1 from public.warehouses where organization_id = v_org and name = '1A 上'), 'a dry run stores no shelf');
+
+  v_result := pg_temp.call_as(v_editor, format('select public.create_shelf(%L, %L, %L)', v_org, ' 1A 上 ', '一樓'));
+  v_shelf := (v_result->>'id')::uuid;
+  perform pg_temp.check(v_preview->'summary' = v_result->'summary', 'the dry run shows the same summary');
+  perform pg_temp.check((select name = '1A 上' and location = '一樓' and is_active from public.warehouses where id = v_shelf), 'the shelf is stored, trimmed and active');
+  perform pg_temp.check(v_result->'summary' = jsonb_build_object('title', '建立貨架', 'fields', jsonb_build_array(
+      jsonb_build_object('label', '貨架名稱', 'value', '1A 上'), jsonb_build_object('label', '位置', 'value', '一樓'))),
+    'the summary shows the shelf, got ' || (v_result->'summary')::text);
+
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.create_shelf(%L, %L)', v_org, '2B'), '42501', 'forbidden', 'a viewer cannot create shelves');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.create_shelf(%L, %L)', v_org, ' '), '22023', 'name_required', 'a shelf needs a name');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.create_shelf(%L, %L)', v_org, '1a 上'), '23505', 'shelf_name_taken', 'shelf names are unique');
+  -- The same name in another organization is fine
+  perform pg_temp.call_as((other->>'user_id')::uuid, format('select public.create_shelf(%L, %L)', other->>'org_id', '1A 上'));
+
+  v_result := pg_temp.call_as(v_editor, format('select public.update_shelf(%L, %L, %L)', v_org, v_shelf, '{"name":"1A 下","location":""}'));
+  perform pg_temp.check(v_result->'summary'->>'title' = '修改貨架「1A 上」', 'the summary names the shelf');
+  perform pg_temp.check(v_result->'summary'->'fields' = jsonb_build_array(
+      jsonb_build_object('label', '貨架名稱', 'value', '1A 上 → 1A 下'), jsonb_build_object('label', '位置', 'value', '一樓 → （空白）')),
+    'the summary lists the changes, got ' || (v_result->'summary'->'fields')::text);
+  perform pg_temp.check((select name = '1A 下' and location is null from public.warehouses where id = v_shelf), 'the shelf is renamed and its location cleared');
+
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_shelf(%L, %L, %L)', v_org, v_shelf, '{"name":"測試倉"}'),
+    '23505', 'shelf_name_taken', 'a shelf cannot take another shelf''s name');
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.update_shelf(%L, %L, %L)', v_org, v_shelf, '{"name":"x"}'),
+    '42501', 'forbidden', 'a viewer cannot rename shelves');
+  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select public.update_shelf(%L, %L, %L)', other->>'org_id', v_shelf, '{"name":"x"}'),
+    'P0002', 'shelf_not_found', 'another organization''s shelf is not found');
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_shelf(%L, %L, %L)', v_org, v_shelf, '{"is_active":false}'),
+    '22023', 'unknown_field', 'disabling goes through set_shelf_active');
+end $$;
+
+-- A disabled shelf keeps its rolls but gets no new ones
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
+  v_shelf uuid := (fx->>'warehouse_id')::uuid;
+  v_spare uuid;
+  v_result jsonb;
+  v_roll public.inventory_rolls%rowtype;
+begin
+  select * into v_roll from public.inventory_rolls where id = (fx->>'roll_id')::uuid;
+  insert into public.warehouses (name, organization_id) values ('備用倉', v_org) returning id into v_spare;
+
+  v_result := pg_temp.call_as(v_editor, format('select public.set_shelf_active(%L, %L, false)', v_org, v_shelf));
+  perform pg_temp.check(v_result->'summary'->'fields' = jsonb_build_array(
+      jsonb_build_object('label', '狀態', 'value', '啟用 → 停用'), jsonb_build_object('label', '仍有庫存', 'value', '1 卷，60 公斤')),
+    'disabling warns about the stock still on the shelf, got ' || (v_result->'summary'->'fields')::text);
+  perform pg_temp.check(not (select is_active from public.warehouses where id = v_shelf), 'the shelf is disabled');
+
+  perform pg_temp.check_api_error_as(v_editor, format('select public.receive_inventory(%L, %L, %L)', v_org, fx->>'po_id',
+      jsonb_build_array(jsonb_build_object('product_id', fx->>'product_id', 'quantity', 5, 'warehouse_id', v_shelf))),
+    '22023', 'warehouse_inactive', 'new rolls cannot go on a disabled shelf');
+
+  -- The roll already on it can be edited in place, but not moved back onto it once moved away
+  perform pg_temp.call_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, '{"shelf":"B-01"}'));
+  perform pg_temp.check((select shelf from public.inventory_rolls where id = v_roll.id) = 'B-01', 'a roll on a disabled shelf can still be edited');
+  perform pg_temp.call_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, jsonb_build_object('warehouse_id', v_spare)));
+  perform pg_temp.check_api_error_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, jsonb_build_object('warehouse_id', v_shelf)),
+    '22023', 'warehouse_inactive', 'a roll cannot be moved onto a disabled shelf');
+
+  perform pg_temp.call_as(v_editor, format('select public.set_shelf_active(%L, %L, true)', v_org, v_shelf));
+  perform pg_temp.call_as(v_editor, format('select public.update_inventory_roll(%L, %L, %L)', v_org, v_roll.id, jsonb_build_object('warehouse_id', v_shelf)));
+  perform pg_temp.check((select warehouse_id from public.inventory_rolls where id = v_roll.id) = v_shelf, 'an enabled shelf takes rolls again');
+
+  perform pg_temp.check_api_error_as(v_editor, format('select public.set_shelf_active(%L, %L, null)', v_org, v_shelf),
+    '22023', 'is_active_required', 'enable or disable must be stated');
 end $$;
 
 

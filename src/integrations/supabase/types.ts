@@ -1457,6 +1457,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           location: string | null
           name: string
           organization_id: string | null
@@ -1465,6 +1466,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           location?: string | null
           name: string
           organization_id?: string | null
@@ -1473,6 +1475,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           location?: string | null
           name?: string
           organization_id?: string | null
@@ -1579,6 +1582,33 @@ export type Database = {
       }
     }
     Functions: {
+      create_shelf: {
+        Args: {
+          p_dry_run?: boolean
+          p_location?: string
+          p_name: string
+          p_organization_id: string
+        }
+        Returns: Json
+      }
+      set_shelf_active: {
+        Args: {
+          p_dry_run?: boolean
+          p_is_active: boolean
+          p_organization_id: string
+          p_shelf_id: string
+        }
+        Returns: Json
+      }
+      update_shelf: {
+        Args: {
+          p_changes: Json
+          p_dry_run?: boolean
+          p_organization_id: string
+          p_shelf_id: string
+        }
+        Returns: Json
+      }
       cancel_shipping: {
         Args: {
           p_dry_run?: boolean

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { createShelf, setShelfActive, updateShelf } from '@/lib/api/shelves';
 
 // Shelves are stored in the `warehouses` table (selected as "倉庫" when creating inventory).
 
@@ -8,6 +9,7 @@ export interface Shelf {
   id: string;
   name: string;
   location: string | null;
+  isActive: boolean;
   rollCount: number;
   totalQuantity: number;
 }
@@ -32,7 +34,7 @@ export const useShelves = () => {
 
       const { data, error } = await supabase
         .from('warehouses')
-        .select('id, name, location, inventory_rolls(current_quantity)')
+        .select('id, name, location, is_active, inventory_rolls(current_quantity)')
         .eq('organization_id', organizationId)
         .order('name');
 
@@ -46,6 +48,7 @@ export const useShelves = () => {
           id: warehouse.id,
           name: warehouse.name,
           location: warehouse.location,
+          isActive: warehouse.is_active,
           rollCount: stockedRolls.length,
           totalQuantity: stockedRolls.reduce((sum, roll) => sum + roll.current_quantity, 0),
         };
@@ -104,8 +107,7 @@ export const useCreateShelf = () => {
   return useMutation({
     mutationFn: async (name: string) => {
       if (!organizationId) throw new Error('請先選擇組織');
-      const { error } = await supabase.from('warehouses').insert({ name, organization_id: organizationId });
-      if (error) throw error;
+      await createShelf(organizationId, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shelves'] });
@@ -116,15 +118,33 @@ export const useCreateShelf = () => {
 
 export const useRenameShelf = () => {
   const queryClient = useQueryClient();
+  const { organizationId } = useCurrentOrganization();
 
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from('warehouses').update({ name }).eq('id', id);
-      if (error) throw error;
+      if (!organizationId) throw new Error('請先選擇組織');
+      await updateShelf(organizationId, id, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shelves'] });
       queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+    },
+  });
+};
+
+export const useSetShelfActive = () => {
+  const queryClient = useQueryClient();
+  const { organizationId } = useCurrentOrganization();
+
+  return useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      if (!organizationId) throw new Error('請先選擇組織');
+      await setShelfActive(organizationId, id, isActive);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shelves'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouses'] });
+      queryClient.invalidateQueries({ queryKey: ['warehouse-options'] });
     },
   });
 };

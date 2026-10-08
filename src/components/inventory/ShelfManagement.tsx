@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EnhancedTable, type TableColumn } from '@/components/ui/enhanced-table';
-import { Pencil, Plus, Warehouse } from 'lucide-react';
-import { useShelves, type Shelf } from '@/hooks/useShelves';
+import { Pencil, Plus, Power, PowerOff, Warehouse } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/lib/api/client';
+import { useSetShelfActive, useShelves, type Shelf } from '@/hooks/useShelves';
 import { CreateShelfDialog } from './CreateShelfDialog';
 import { RenameShelfDialog } from './RenameShelfDialog';
 import { ShelfProductsDialog } from './ShelfProductsDialog';
@@ -14,6 +17,23 @@ export const ShelfManagement: React.FC = () => {
   const [viewingShelf, setViewingShelf] = useState<Shelf | null>(null);
   const [renamingShelf, setRenamingShelf] = useState<Shelf | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const setShelfActive = useSetShelfActive();
+
+  // A disabled shelf keeps its rolls but cannot receive new ones
+  const toggleActive = (shelf: Shelf) => {
+    setShelfActive.mutate(
+      { id: shelf.id, isActive: !shelf.isActive },
+      {
+        onSuccess: () =>
+          toast({
+            title: shelf.isActive ? '已停用貨架' : '已啟用貨架',
+            description: shelf.isActive ? `「${shelf.name}」不能再放入新的布卷，現有布卷不受影響` : `「${shelf.name}」可以放入布卷`,
+          }),
+        onError: (error: Error) => toast({ title: '變更狀態失敗', description: apiErrorMessage(error), variant: 'destructive' }),
+      },
+    );
+  };
 
   const columns: TableColumn[] = [
     {
@@ -45,6 +65,19 @@ export const ShelfManagement: React.FC = () => {
         ),
     },
     {
+      key: 'isActive',
+      title: '狀態',
+      sortable: true,
+      render: (value: boolean) => (
+        <Badge
+          variant="outline"
+          className={value ? 'border-green-200 bg-green-100 text-green-800' : 'border-gray-300 bg-gray-100 text-gray-600'}
+        >
+          {value ? '啟用' : '停用'}
+        </Badge>
+      ),
+    },
+    {
       key: 'actions',
       title: '操作',
       render: (_value: unknown, row: Shelf) => (
@@ -53,7 +86,23 @@ export const ShelfManagement: React.FC = () => {
             type="button"
             variant="ghost"
             size="sm"
+            aria-label={`${row.isActive ? '停用' : '啟用'}貨架 ${row.name}`}
+            title={row.isActive ? '停用貨架' : '啟用貨架'}
+            disabled={setShelfActive.isPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleActive(row);
+            }}
+            className="text-gray-600 hover:text-blue-700"
+          >
+            {row.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             aria-label={`編輯貨架 ${row.name} 名稱`}
+            title="編輯貨架名稱"
             onClick={(e) => {
               e.stopPropagation();
               setRenamingShelf(row);

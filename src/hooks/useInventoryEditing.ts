@@ -52,11 +52,12 @@ export const useWarehouseOptions = (organizationId: string | null | undefined) =
     queryFn: async (): Promise<NamedOption[]> => {
       const { data, error } = await supabase
         .from('warehouses')
-        .select('id, name')
+        .select('id, name, is_active')
         .eq('organization_id', organizationId!)
         .order('name');
       if (error) throw error;
-      return data ?? [];
+      // Rolls already on a disabled shelf keep showing it; it cannot be picked for other rolls
+      return (data ?? []).map((shelf) => ({ id: shelf.id, name: shelf.is_active === false ? `${shelf.name}（已停用）` : shelf.name }));
     },
     enabled: !!organizationId,
   });

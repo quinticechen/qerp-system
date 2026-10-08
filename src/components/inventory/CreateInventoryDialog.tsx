@@ -131,6 +131,8 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
         .from('warehouses')
         .select('*')
         .eq('organization_id', organizationId)
+        // Disabled shelves cannot receive new rolls
+        .eq('is_active', true)
         .order('name');
         
       if (error) {

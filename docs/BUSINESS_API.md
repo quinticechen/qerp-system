@@ -116,7 +116,7 @@
 |----|-----|--------|------|
 | A1 工廠（與客戶同一組） | `create_factory`、`update_factory`、`set_factory_active` | `canCreateFactories`／`canEditFactories` | ✅ |
 | A6 產品 | `create_product`、`update_product`、`set_product_active`、`add_product_color`、`update_product_color`、`set_product_color_active`（兩層，見 §7） | `canCreateProducts`／`canEditProducts` | ✅ |
-| A6 貨架 | `create_shelf`、`rename_shelf`、`set_shelf_active` | `canCreateShelves`／`canEditShelves` | ⏳ |
+| A6 貨架 | `create_shelf`、`update_shelf`（名稱、位置）、`set_shelf_active` | `canCreateShelves`／`canEditShelves` | ✅ |
 
 客戶與工廠的欄位與規則相同，所以與 A1 一起完成。
 
@@ -374,6 +374,24 @@ Migration：`supabase/migrations/20261008185816_api_a6_products.sql`；測試：
 | `22023` | `invalid_color_hex`、`invalid_stock_threshold`、`is_active_required` | 色值格式不正確，請使用 #RRGGBB；安全庫存不可為負數 |
 | `22023` | `unknown_field`、`invalid_changes` | 不支援修改的欄位（例如在產品上改顏色） |
 | `23505` | `product_name_taken`、`product_color_taken` | 已有同名的產品「…」，請在該產品下新增顏色；此產品已有顏色「…」 |
+
+### A6 貨架
+
+Migration：`supabase/migrations/20261009003415_api_a6_shelves.sql`；測試：`supabase/tests/api_a6_shelves.test.sql`；前端：`src/lib/api/shelves.ts`。貨架存放在 `warehouses`（入庫畫面稱「倉庫」）。
+
+| API | 權限鍵 | 參數 | 說明 |
+|-----|--------|------|------|
+| `create_shelf` | `canCreateShelves` | `p_name`、`p_location?` | 名稱組織內唯一（不分大小寫、去除前後空白，B6） |
+| `update_shelf` | `canEditShelves` | `p_shelf_id`、`p_changes`（`name`、`location`；空字串清除位置） | `summary` 只列有變的欄位 |
+| `set_shelf_active` | `canEditShelves` | `p_shelf_id`、`p_is_active` | 停用後不能再放入新布卷，也不能把布卷移過去；已在上面的布卷不受影響（B4）。停用時 `summary` 會列「仍有庫存」 |
+
+`warehouses` 新增 `is_active`。布卷的貨架檢查在 `save_inventory_rolls`，因此 `receive_inventory`、`update_inventory`、`update_inventory_roll` 都適用。
+
+| SQLSTATE | 代碼 | 訊息 |
+|----------|------|------|
+| `P0002` | `shelf_not_found` | 找不到此貨架 |
+| `22023` | `name_required`、`is_active_required`、`unknown_field`、`warehouse_inactive` | 請輸入貨架名稱；貨架「…」已停用 |
+| `23505` | `shelf_name_taken` | 已有同名的貨架「…」 |
 
 ## 6. 決策
 
