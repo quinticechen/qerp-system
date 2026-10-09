@@ -95,10 +95,6 @@
 |------|------|
 | `products_new.name`、`category`、`unit_of_measure` | 兩層產品之後由 `product_groups` 同步過來的副本；以 `product_groups` 為準。AI tools 與 view 仍讀這些欄位，改讀 `product_groups` 後再移除 |
 
-### 4.2 沒有被使用的函式
-
-`is_admin`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`：沒有 policy、觸發器、其他函式或程式呼叫，也是 Supabase 資安建議「search_path 未固定」「可被呼叫」警告的來源之一。
-
 ## 5. 清理紀錄
 
 **2026-10-09**（使用者決定，`supabase/migrations/20261009102350_cleanup_deprecated.sql`，測試 `supabase/tests/cleanup_deprecated.test.sql`）：棄用的資料表連同舊的編輯紀錄一起移除，不再顯示 R1 之前的角色編輯紀錄。
@@ -106,3 +102,7 @@
 - 移除資料表：`organization_roles`、`user_organization_roles`（R1 改為固定角色後不再讀寫）、`shipment_history`（從未有資料，出貨紀錄在 `shipping_items`），以及它們在 `record_audit_logs` 中的紀錄。
 - 移除欄位：`purchase_orders.order_id`（舊的一對一欄位，全部為空值，改用 `purchase_order_relations`）、`user_organizations.invited_role_id`（邀請直接寫 `role`）、`organizations.settings`（沒有功能讀寫）。
 - 移除函式 `create_default_organization_roles`；`order_product_is_purchased`、`api_release_orders`、`cancel_order`、`cancel_purchase_order` 改為只看 `purchase_order_relations`。
+
+**2026-10-09**（`supabase/migrations/20261009133702_function_hardening.sql`，測試 `supabase/tests/function_hardening.test.sql`）：刪除沒有任何呼叫的函式 `is_admin`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`；固定 `handle_new_user`、`set_current_quantity`、`update_updated_at`、`update_updated_by` 的 `search_path`；觸發器函式不再開放用戶端呼叫。
+
+**2026-10-09**（`supabase/migrations/20261009140512_private_definer_functions.sql`，測試 `supabase/tests/private_definer_functions.test.sql`）：以函式擁有者身分執行的業務 API、組織與成員 RPC、權限函式移到不公開的 `private` schema，`public` 留同名的包裝函式（[API.md](./API.md) §2.1）；`api_assign_document_number` 移到 `private`，不再能從 `/rpc` 呼叫。

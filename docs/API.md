@@ -21,7 +21,8 @@
 |------|------|
 | 名稱 | `<動作>_<對象>`：`create_customer`、`update_customer`、`set_customer_active`、`create_order`、`cancel_order` |
 | 參數 | 一律 `p_` 開頭；第一個參數是 `p_organization_id`；最後一個是 `p_dry_run boolean DEFAULT false` |
-| 安全性 | `SECURITY DEFINER`、`SET search_path TO 'public'`；只開放給 `authenticated`。開頭先檢查權限鍵，再確認每一筆引用的資料（客戶、產品、訂單…）都屬於 `p_organization_id` |
+| 安全性 | 實作在不公開的 `private` schema：`SECURITY DEFINER`、`SET search_path TO 'public'`；`public` 只放同名、同參數的 `SECURITY INVOKER` 包裝函式，供 PostgREST 呼叫（`supabase.rpc('<名稱>')`）。只開放給 `authenticated`。開頭先檢查權限鍵，再確認每一筆引用的資料（客戶、產品、訂單…）都屬於 `p_organization_id`。§4 的組織與成員 RPC、權限函式也是同樣的結構 |
+| 修改與新增 | 修改實作用 `CREATE OR REPLACE FUNCTION private.<名稱>`，包裝函式不用動；**不要** `CREATE OR REPLACE` public 裡的同名函式（會蓋掉包裝函式）。新增 API 時兩個都要建立，參照 `supabase/migrations/20261009140512_private_definer_functions.sql` |
 | 權限 | 以 `api_require_permission(p_organization_id, '<鍵>')` 檢查，內部使用 `user_has_organization_permission()`（[SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4 的契約） |
 | 更新 | 以 `p_changes jsonb` 傳入要改的欄位：沒出現的欄位不變，出現且為空字串或 `null` 的欄位清空。方便 AI 只改一個欄位，也讓試算結果能列出「舊值 → 新值」 |
 | 刪除 | 不提供。主檔以 `set_<對象>_active` 停用；單據以 `cancel_<對象>` 取消（R5） |
@@ -368,7 +369,8 @@ Migration：`supabase/migrations/20261009003415_api_a6_shelves.sql`；測試：`
 | `save_order_items`、`save_purchase_order_items`、`save_inventory_rolls`、`save_shipping_items` | 單據明細的整批儲存與鎖定規則；由業務 API 呼叫。以呼叫者身分執行，直接呼叫時受 RLS 與權限鍵限制 |
 | `recompute_order_shipments`、`recompute_purchase_order_receipts` | 重算訂單出貨進度、採購單入庫進度；由觸發器與業務 API 呼叫 |
 | `order_product_is_purchased` | 訂單品項是否已在進行中的採購單上 |
-| `api_fail`、`api_new_roll_number`、`api_assign_document_number` | 錯誤回報、布卷編號、直接寫表時的單據編號 |
+| `api_fail`、`api_new_roll_number` | 錯誤回報、布卷編號 |
+| `private.api_assign_document_number` | 直接寫表時的單據編號，只由單據編號觸發器呼叫（不在 public，無法從 `/rpc` 呼叫） |
 
 `api_*` 開頭的其他函式都只供業務 API 內部使用，不開放呼叫。
 

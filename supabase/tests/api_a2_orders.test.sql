@@ -256,7 +256,7 @@ begin
   perform pg_temp.check(not exists (select 1 from public.inventories where receipt_number is null), 'every receiving batch has a number');
 
   perform pg_temp.check(not has_function_privilege('authenticated', 'public.api_next_document_number(uuid, text)', 'EXECUTE'), 'numbering is internal');
-  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select public.api_assign_document_number(%L, %L)', v_org, 'order'),
+  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select private.api_assign_document_number(%L, %L)', v_org, 'order'),
     '42501', 'forbidden', 'nobody can read another organization''s numbering');
 end $$;
 

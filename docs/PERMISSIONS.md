@@ -35,7 +35,7 @@
 
 ## 3. 檢查在哪裡發生
 
-唯一的判斷函式是 `user_has_organization_permission(使用者, 組織, 權限鍵)`，以下各層都使用它：
+唯一的判斷函式是 `user_has_organization_permission(使用者, 組織, 權限鍵)`（實作在 `private` schema，RLS policy 直接呼叫實作；`public` 的同名函式是供前端與 AI 以 RPC 呼叫的包裝），以下各層都使用它：
 
 | 層 | 做法 |
 |----|------|

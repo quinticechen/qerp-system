@@ -2,169 +2,144 @@
 -- 結果為 "ALL TESTS PASSED" 代表通過；"FAIL: ..." 或其他錯誤代表未通過。
 -- 最後一定會丟出例外，整批 SQL 會回滾，不會留下任何變更。
 
--- ===== migration: 20261009102350_cleanup_deprecated.sql
--- 清理棄用的資料表、欄位與函式（docs/DATABASE_TABLES.md §4，2026-10-09 使用者確認）
+-- ===== migration: 20261009140512_private_definer_functions.sql
+-- SECURITY DEFINER 函式移出公開的 API schema（資安建議 0028、0029，2026-10-09 使用者確認）
 --
--- 1. 刪除 R1 之前的自訂角色表 organization_roles、user_organization_roles 與其編輯紀錄（不再顯示 R1 之前的角色紀錄），
---    以及只寫入這些表的 create_default_organization_roles()
--- 2. 刪除從未使用的 shipment_history（出貨紀錄在 shipping_items）
--- 3. 刪除棄用欄位：purchase_orders.order_id（改用 purchase_order_relations，現有資料皆為空值）、
---    user_organizations.invited_role_id（邀請直接寫 role）、organizations.settings（沒有功能讀寫）
---    仍檢查 purchase_orders.order_id 的函式改為只看 purchase_order_relations
+-- PostgREST 只公開 public schema。以函式擁有者身分執行的函式改放在不公開的 private schema：
+-- 1. 業務 API、組織與成員 RPC、權限函式：實作移到 private，public 留下同名、同參數的 SECURITY INVOKER 包裝函式，
+--    前端與 AI 的呼叫方式不變（supabase.rpc('<名稱>')）。RLS policy 以 OID 參照函式，會跟著移到 private，直接呼叫實作。
+--    之後修改這些函式時改 private 裡的實作（CREATE OR REPLACE FUNCTION private.<名稱>），public 的包裝函式不用動。
+-- 2. api_assign_document_number 只給單據編號觸發器使用：移到 private，不留包裝函式，不能再從 /rpc 呼叫。
+-- 3. touch_query_session_updated_at 是觸發器函式（AI Session 的物件）：依使用者要求撤銷用戶端的 EXECUTE，只改權限、不改定義。
 
--- ===== 1. 只看採購關聯的函式
+CREATE SCHEMA private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC;
+GRANT USAGE ON SCHEMA private TO authenticated, service_role;
 
-CREATE OR REPLACE FUNCTION public.order_product_is_purchased(p_order_id uuid, p_product_id uuid)
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SET search_path TO 'public'
-AS $function$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.purchase_order_items poi
-    JOIN public.purchase_orders po ON po.id = poi.purchase_order_id
-    JOIN public.purchase_order_relations r ON r.purchase_order_id = po.id AND r.order_id = p_order_id
-    WHERE poi.product_id = p_product_id AND po.status <> 'cancelled'
-  );
-$function$;
+-- ===== 1. 實作移到 private，public 留包裝函式
 
--- Orders marked 已向工廠下單 that no longer have a live purchase order go back to 已確認
-CREATE OR REPLACE FUNCTION public.api_release_orders(p_order_ids uuid[])
-RETURNS void
-LANGUAGE sql
-SET search_path TO 'public'
-AS $function$
-  UPDATE public.orders o
-  SET status = 'confirmed'
-  WHERE o.id = ANY (coalesce(p_order_ids, '{}'))
-    AND o.status = 'factory_ordered'
-    AND NOT EXISTS (
-      SELECT 1 FROM public.purchase_orders po
-      JOIN public.purchase_order_relations r ON r.purchase_order_id = po.id AND r.order_id = o.id
-      WHERE po.status <> 'cancelled'
-    );
-$function$;
-
-CREATE OR REPLACE FUNCTION public.cancel_order(
-  p_organization_id uuid,
-  p_order_id uuid,
-  p_reason text DEFAULT NULL,
-  p_dry_run boolean DEFAULT false
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
+DO $$
 DECLARE
-  v_old public.orders%ROWTYPE;
-  v_po_number text;
-  v_title text;
-  v_fields jsonb;
+  v_name text;
+  v_fn record;
+  v_call text;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditOrders');
+  FOREACH v_name IN ARRAY ARRAY[
+    -- 業務 API（docs/API.md §3）
+    'create_customer', 'update_customer', 'set_customer_active',
+    'create_factory', 'update_factory', 'set_factory_active',
+    'create_order', 'update_order', 'cancel_order',
+    'create_purchase_order', 'update_purchase_order', 'cancel_purchase_order',
+    'receive_inventory', 'update_inventory', 'update_inventory_roll',
+    'create_shipping', 'update_shipping', 'cancel_shipping',
+    'create_product', 'update_product', 'set_product_active',
+    'add_product_color', 'update_product_color', 'set_product_color_active',
+    'create_shelf', 'update_shelf', 'set_shelf_active',
+    -- 組織與成員 RPC（docs/API.md §4）
+    'accept_organization_invitation', 'add_existing_user_to_organization', 'complete_user_invitation',
+    'delete_organization', 'get_my_pending_invitations', 'get_organization_member_status',
+    'set_member_active', 'set_member_role', 'transfer_organization_ownership',
+    -- 權限函式（docs/PERMISSIONS.md）
+    'user_has_organization_permission', 'user_belongs_to_organization', 'is_organization_owner', 'can_inspect_organization'
+  ] LOOP
+    SELECT p.oid, p.pronargs, p.proretset, p.provolatile,
+           pg_get_function_arguments(p.oid) AS args,
+           pg_get_function_identity_arguments(p.oid) AS identity_args,
+           pg_get_function_result(p.oid) AS result
+    INTO STRICT v_fn
+    FROM pg_proc p
+    WHERE p.pronamespace = 'public'::regnamespace AND p.proname = v_name AND p.prosecdef;
 
-  SELECT * INTO v_old FROM public.orders WHERE id = p_order_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND THEN
-    PERFORM public.api_fail('P0002', 'order_not_found', '找不到此訂單');
-  END IF;
-  IF v_old.status = 'cancelled' THEN
-    PERFORM public.api_fail('55000', 'order_already_cancelled', format('訂單 %s 已取消', v_old.order_number));
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.shippings WHERE order_id = p_order_id AND status <> 'cancelled') THEN
-    PERFORM public.api_fail('55000', 'order_has_shipments', format('訂單 %s 已有出貨紀錄，不能取消', v_old.order_number));
-  END IF;
+    EXECUTE format('ALTER FUNCTION public.%I(%s) SET SCHEMA private', v_name, v_fn.identity_args);
+    EXECUTE format('REVOKE ALL ON FUNCTION private.%I(%s) FROM PUBLIC, anon', v_name, v_fn.identity_args);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION private.%I(%s) TO authenticated, service_role', v_name, v_fn.identity_args);
 
-  SELECT po.po_number INTO v_po_number
-  FROM public.purchase_orders po
-  WHERE po.status <> 'cancelled'
-    AND EXISTS (SELECT 1 FROM public.purchase_order_relations r WHERE r.purchase_order_id = po.id AND r.order_id = p_order_id)
-  ORDER BY po.created_at
-  LIMIT 1;
-  IF v_po_number IS NOT NULL THEN
-    PERFORM public.api_fail('55000', 'order_has_purchase_orders', format('訂單 %s 有進行中的採購單 %s，請先取消採購單', v_old.order_number, v_po_number));
+    SELECT coalesce(string_agg('$' || i, ', ' ORDER BY i), '') INTO v_call FROM generate_series(1, v_fn.pronargs) AS i;
+    EXECUTE format(
+      'CREATE FUNCTION public.%I(%s) RETURNS %s LANGUAGE sql %s SECURITY INVOKER SET search_path = '''' AS %L',
+      v_name, v_fn.args, v_fn.result,
+      CASE v_fn.provolatile WHEN 's' THEN 'STABLE' WHEN 'i' THEN 'IMMUTABLE' ELSE 'VOLATILE' END,
+      CASE WHEN v_fn.proretset THEN format('SELECT * FROM private.%I(%s)', v_name, v_call)
+           ELSE format('SELECT private.%I(%s)', v_name, v_call) END);
+    EXECUTE format('REVOKE ALL ON FUNCTION public.%I(%s) FROM PUBLIC, anon', v_name, v_fn.identity_args);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.%I(%s) TO authenticated, service_role', v_name, v_fn.identity_args);
+    EXECUTE format('COMMENT ON FUNCTION public.%I(%s) IS %L', v_name, v_fn.identity_args,
+      format('呼叫 private.%s（實作在 private schema）', v_name));
+  END LOOP;
+END $$;
+
+-- ===== 2. 單據編號只給觸發器使用
+
+ALTER FUNCTION public.api_assign_document_number(uuid, text) SET SCHEMA private;
+REVOKE ALL ON FUNCTION private.api_assign_document_number(uuid, text) FROM PUBLIC, anon;
+-- Direct inserts by signed-in users run the numbering triggers as `authenticated`
+GRANT EXECUTE ON FUNCTION private.api_assign_document_number(uuid, text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.generate_new_order_number()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF current_user IN ('authenticated', 'anon') THEN
+    NEW.order_number := private.api_assign_document_number(NEW.organization_id, 'order');
+  ELSIF NEW.order_number IS NULL OR NEW.order_number IN ('', 'temp') THEN
+    NEW.order_number := public.api_next_document_number(NEW.organization_id, 'order');
   END IF;
-
-  v_title := format('取消訂單 %s', v_old.order_number);
-  v_fields := public.api_changed_fields('訂單狀態', public.api_order_status_label(v_old.status::text), '已取消')
-    || public.api_fields('取消原因', public.api_clean(p_reason));
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_order_id, v_old.order_number, v_title, v_fields);
-  END IF;
-
-  UPDATE public.orders
-  SET status = 'cancelled', cancelled_at = now(), cancel_reason = public.api_clean(p_reason)
-  WHERE id = p_order_id;
-
-  RETURN public.api_result(false, p_order_id, v_old.order_number, v_title, v_fields);
+  RETURN NEW;
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.cancel_purchase_order(
-  p_organization_id uuid,
-  p_purchase_order_id uuid,
-  p_reason text DEFAULT NULL,
-  p_dry_run boolean DEFAULT false
-)
-RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.generate_po_number()
+RETURNS trigger
 LANGUAGE plpgsql
-SECURITY DEFINER
 SET search_path TO 'public'
 AS $function$
-DECLARE
-  v_old public.purchase_orders%ROWTYPE;
-  v_order_ids uuid[];
-  v_title text;
-  v_fields jsonb;
 BEGIN
-  PERFORM public.api_require_permission(p_organization_id, 'canEditPurchases');
-
-  SELECT * INTO v_old FROM public.purchase_orders WHERE id = p_purchase_order_id AND organization_id = p_organization_id FOR UPDATE;
-  IF NOT FOUND THEN
-    PERFORM public.api_fail('P0002', 'purchase_order_not_found', '找不到此採購單');
+  IF current_user IN ('authenticated', 'anon') THEN
+    NEW.po_number := private.api_assign_document_number(NEW.organization_id, 'purchase_order');
+  ELSIF NEW.po_number IS NULL OR NEW.po_number = '' THEN
+    NEW.po_number := public.api_next_document_number(NEW.organization_id, 'purchase_order');
   END IF;
-  IF v_old.status = 'cancelled' THEN
-    PERFORM public.api_fail('55000', 'purchase_order_already_cancelled', format('採購單 %s 已取消', v_old.po_number));
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.inventories WHERE purchase_order_id = p_purchase_order_id) THEN
-    PERFORM public.api_fail('55000', 'purchase_order_received', format('採購單 %s 已有入庫紀錄，不能取消', v_old.po_number));
-  END IF;
-
-  v_title := format('取消採購單 %s', v_old.po_number);
-  v_fields := public.api_changed_fields('狀態', public.api_purchase_status_label(v_old.status::text), '已取消')
-    || public.api_fields('取消原因', public.api_clean(p_reason));
-  IF p_dry_run THEN
-    RETURN public.api_result(true, p_purchase_order_id, v_old.po_number, v_title, v_fields);
-  END IF;
-
-  UPDATE public.purchase_orders
-  SET status = 'cancelled', cancelled_at = now(), cancel_reason = public.api_clean(p_reason)
-  WHERE id = p_purchase_order_id;
-
-  -- Linked orders stay linked (for the record) but no longer count this purchase order as placed
-  SELECT coalesce(array_agg(order_id), '{}') INTO v_order_ids FROM public.purchase_order_relations WHERE purchase_order_id = p_purchase_order_id;
-  PERFORM public.api_release_orders(v_order_ids);
-
-  RETURN public.api_result(false, p_purchase_order_id, v_old.po_number, v_title, v_fields);
+  RETURN NEW;
 END;
 $function$;
 
--- ===== 2. 刪除欄位
+CREATE OR REPLACE FUNCTION public.generate_receipt_number()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF current_user IN ('authenticated', 'anon') THEN
+    NEW.receipt_number := private.api_assign_document_number(NEW.organization_id, 'receiving');
+  ELSIF NEW.receipt_number IS NULL OR NEW.receipt_number = '' THEN
+    NEW.receipt_number := public.api_next_document_number(NEW.organization_id, 'receiving');
+  END IF;
+  RETURN NEW;
+END;
+$function$;
 
-ALTER TABLE public.purchase_orders DROP COLUMN order_id;
-ALTER TABLE public.user_organizations DROP COLUMN invited_role_id;
-ALTER TABLE public.organizations DROP COLUMN settings;
+CREATE OR REPLACE FUNCTION public.generate_shipping_number()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  IF current_user IN ('authenticated', 'anon') THEN
+    NEW.shipping_number := private.api_assign_document_number(NEW.organization_id, 'shipping');
+  ELSIF NEW.shipping_number IS NULL OR NEW.shipping_number = '' THEN
+    NEW.shipping_number := public.api_next_document_number(NEW.organization_id, 'shipping');
+  END IF;
+  RETURN NEW;
+END;
+$function$;
 
--- ===== 3. 刪除資料表與函式
+-- ===== 3. AI Session 的觸發器函式
 
-DROP FUNCTION public.create_default_organization_roles(uuid);
-DROP TABLE public.shipment_history;
-DROP TABLE public.user_organization_roles;
-DROP TABLE public.organization_roles;
+REVOKE EXECUTE ON FUNCTION public.touch_query_session_updated_at() FROM PUBLIC, anon, authenticated;
 
--- The history of the dropped tables is no longer shown anywhere
-DELETE FROM public.record_audit_logs WHERE table_name IN ('organization_roles', 'user_organization_roles', 'shipment_history');
+NOTIFY pgrst, 'reload schema';
 
 -- ===== _helpers.sql
 -- SQL 測試共用工具。
@@ -293,7 +268,7 @@ begin
 end $$;
 
 -- Run a statement as the given user and require it to fail with the business-API error contract
--- (docs/BUSINESS_API.md §2.3): the given SQLSTATE and HINT code
+-- (docs/API.md §2.3): the given SQLSTATE and HINT code
 create or replace function pg_temp.check_api_error_as(user_id uuid, statement text, expected_state text, expected_hint text, description text)
 returns void language plpgsql as $$
 declare
@@ -340,7 +315,7 @@ begin
 end $$;
 
 -- ===== test: api_a1_customers_factories.test.sql
--- 業務 API A1：客戶與工廠（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A1：客戶與工廠（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- create_customer: editors create, viewers and outsiders are refused; anonymous callers cannot call it at all
 do $$
@@ -554,7 +529,7 @@ end $$;
 
 
 -- ===== test: api_a2_orders.test.sql
--- 業務 API A2：訂單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A2：訂單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- Add an active factory to an organization (test setup)
 create or replace function pg_temp.add_factory(org_id uuid, factory_name text, active boolean default true)
@@ -812,13 +787,13 @@ begin
   perform pg_temp.check(not exists (select 1 from public.inventories where receipt_number is null), 'every receiving batch has a number');
 
   perform pg_temp.check(not has_function_privilege('authenticated', 'public.api_next_document_number(uuid, text)', 'EXECUTE'), 'numbering is internal');
-  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select public.api_assign_document_number(%L, %L)', v_org, 'order'),
+  perform pg_temp.check_api_error_as((other->>'user_id')::uuid, format('select private.api_assign_document_number(%L, %L)', v_org, 'order'),
     '42501', 'forbidden', 'nobody can read another organization''s numbering');
 end $$;
 
 
 -- ===== test: api_a3_purchase_orders.test.sql
--- 業務 API A3：採購單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A3：採購單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- Add an active factory to an organization (test setup; same as in api_a2_orders.test.sql)
 create or replace function pg_temp.add_factory(org_id uuid, factory_name text, active boolean default true)
@@ -1090,7 +1065,7 @@ end $$;
 
 
 -- ===== test: api_a4_receiving.test.sql
--- 業務 API A4：入庫（進貨單）（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A4：入庫（進貨單）（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: purchase order (product 1, 100kg ordered, fully received) with one receiving batch holding one roll
 -- (100kg received, 40kg shipped); product 2 is not on the purchase order.
 
@@ -1314,7 +1289,7 @@ end $$;
 
 
 -- ===== test: api_a5_shipping.test.sql
--- 業務 API A5：出貨單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A5：出貨單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: order (product 1, 100kg) with one shipping of 40kg from a roll of 100kg (60kg left).
 
 -- Add a roll of a product to the fixture's receiving batch (test setup)
@@ -1518,7 +1493,7 @@ end $$;
 
 
 -- ===== test: api_a6_products.test.sql
--- 業務 API A6：產品（母）與顏色（子）（docs/BUSINESS_API.md §7）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A6：產品（母）與顏色（子）（docs/requirements/PHASE1_BUSINESS_API.md §7）。先載入 _helpers.sql 再執行本檔。
 
 -- Products written without a product (legacy pages, tools, the fixture) are filed under a product of the same name
 do $$
@@ -1813,7 +1788,7 @@ end $$;
 
 
 -- ===== test: api_a6_shelves.test.sql
--- 業務 API A6：貨架（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A6：貨架（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: one shelf (測試倉) holding one roll with 60kg left.
 
 -- create_shelf and update_shelf: names are unique within the organization
@@ -1903,7 +1878,7 @@ end $$;
 
 
 -- ===== test: api_http_status.test.sql
--- 業務 API 的錯誤以 PostgREST 自訂錯誤回報，HTTP 狀態依錯誤類別（docs/BUSINESS_API.md §2.3）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API 的錯誤以 PostgREST 自訂錯誤回報，HTTP 狀態依錯誤類別（docs/API.md §2.3）。先載入 _helpers.sql 再執行本檔。
 
 -- api_fail() keeps the code, hint and message and picks the HTTP status from the code
 do $$
@@ -1954,7 +1929,7 @@ begin
   -- No business function raises a bare SQLSTATE with a hint any more
   perform pg_temp.check(not exists (
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prosrc ~* 'HINT\s*=\s*''' ),
+      where n.nspname in ('public', 'private') and p.prosrc ~* 'HINT\s*=\s*''' ),
     'every hinted error goes through api_fail()');
 end $$;
 
@@ -2055,8 +2030,59 @@ begin
 end $$;
 
 
+-- ===== test: function_hardening.test.sql
+-- 函式清理與資安建議（supabase/migrations/20261009133702_function_hardening.sql）。先載入 _helpers.sql 再執行本檔。
+
+-- The unused functions are gone; the ones kept have a fixed search_path and are not callable by clients
+do $$
+declare
+  v_name text;
+begin
+  foreach v_name in array array['is_admin', 'get_user_organizations', 'ensure_user_profile', 'generate_order_number'] loop
+    perform pg_temp.check(not exists (select 1 from pg_proc where pronamespace = 'public'::regnamespace and proname = v_name),
+      v_name || ' is dropped');
+  end loop;
+
+  foreach v_name in array array['handle_new_user', 'set_current_quantity', 'update_updated_at', 'update_updated_by'] loop
+    perform pg_temp.check((select proconfig from pg_proc where pronamespace = 'public'::regnamespace and proname = v_name)
+        @> array['search_path=public'],
+      v_name || ' has a fixed search_path');
+  end loop;
+
+  foreach v_name in array array['handle_new_user', 'handle_organization_creation', 'update_updated_by', 'update_updated_at', 'set_current_quantity'] loop
+    perform pg_temp.check(not has_function_privilege('anon', format('public.%I()', v_name), 'EXECUTE')
+        and not has_function_privilege('authenticated', format('public.%I()', v_name), 'EXECUTE'),
+      v_name || ' cannot be called by clients');
+  end loop;
+end $$;
+
+-- The triggers still fire for signed-in users
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_user uuid := (fx->>'user_id')::uuid;
+  v_org uuid := gen_random_uuid();
+  v_product uuid := (fx->>'product_id')::uuid;
+begin
+  perform pg_temp.act_as(v_user);
+
+  -- handle_organization_creation: the creator becomes a member of the new organization
+  insert into public.organizations (id, name, owner_id) values (v_org, '觸發器測試組織', v_user);
+  perform pg_temp.check(exists (select 1 from public.user_organizations where organization_id = v_org and user_id = v_user),
+    'creating an organization still adds its owner as a member');
+
+  -- update_updated_by on a product color the user did not edit before
+  perform pg_temp.check((select updated_by is distinct from v_user from public.products_new where id = v_product), 'the seeded color was not edited by the user yet');
+  update public.products_new set color_code = 'T-1' where id = v_product;
+  perform pg_temp.check((select updated_by = v_user from public.products_new where id = v_product),
+    'editing a product color still records who edited it');
+
+  execute 'reset role';
+end $$;
+
+
 -- ===== test: rbac_r0_security.test.sql
--- RBAC R0 安全修補測試（docs/MULTI_TENANT_RBAC.md §2.1）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R0 安全修補測試（docs/requirements/MULTI_TENANT_RBAC.md §2.1）。先載入 _helpers.sql 再執行本檔。
 
 -- S1–S3: an outsider cannot join an organization, grant itself a role, or create roles there
 do $$
@@ -2218,9 +2244,9 @@ end $$;
 
 
 -- ===== test: rbac_r1_roles.test.sql
--- RBAC R1 固定角色測試（docs/MULTI_TENANT_RBAC.md §4）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R1 固定角色測試（docs/requirements/MULTI_TENANT_RBAC.md §4）。先載入 _helpers.sql 再執行本檔。
 
--- Every role holds exactly the permissions of docs/MULTI_TENANT_RBAC.md §4.3; removed keys are granted to nobody
+-- Every role holds exactly the permissions of docs/requirements/MULTI_TENANT_RBAC.md §4.3; removed keys are granted to nobody
 do $$
 declare
   fx jsonb := pg_temp.seed_fixture();
@@ -2507,7 +2533,7 @@ end $$;
 
 
 -- ===== test: rbac_r4_business_rls.test.sql
--- RBAC R4：業務資料表依權限鍵的 RLS（docs/MULTI_TENANT_RBAC.md §4.4）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R4：業務資料表依權限鍵的 RLS（docs/requirements/MULTI_TENANT_RBAC.md §4.4）。先載入 _helpers.sql 再執行本檔。
 
 -- Run a statement as the given user and return how many rows it touched (or the single integer a query returns)
 create or replace function pg_temp.rows_as(user_id uuid, statement text)
@@ -3162,6 +3188,91 @@ begin
 
   perform pg_temp.check(v_status = 'confirmed', 'empty purchase order falls back to confirmed, got ' || v_status);
   perform pg_temp.check(v_cancelled_status = 'cancelled', 'cancelled purchase order stays cancelled, got ' || v_cancelled_status);
+end $$;
+
+
+-- ===== test: private_definer_functions.test.sql
+-- SECURITY DEFINER 函式移到 private schema（supabase/migrations/20261009140512_private_definer_functions.sql）。先載入 _helpers.sql 再執行本檔。
+
+-- Nothing in the exposed schema runs as its owner for a client
+do $$
+declare
+  v_list text;
+begin
+  select string_agg(p.proname, ', ') into v_list
+  from pg_proc p
+  where p.pronamespace = 'public'::regnamespace and p.prosecdef
+    and (has_function_privilege('anon', p.oid, 'EXECUTE') or has_function_privilege('authenticated', p.oid, 'EXECUTE'));
+  perform pg_temp.check(v_list is null, 'no SECURITY DEFINER function in public is callable by clients, found ' || coalesce(v_list, ''));
+
+  select string_agg(p.proname, ', ') into v_list
+  from pg_proc p
+  where p.pronamespace = 'public'::regnamespace and p.prosecdef and p.prorettype <> 'trigger'::regtype;
+  perform pg_temp.check(v_list is null, 'only trigger functions stay SECURITY DEFINER in public, found ' || coalesce(v_list, ''));
+
+  perform pg_temp.check(not has_schema_privilege('anon', 'private', 'USAGE'), 'anon cannot use the private schema');
+  perform pg_temp.check(to_regprocedure('public.api_assign_document_number(uuid, text)') is null
+      and to_regprocedure('private.api_assign_document_number(uuid, text)') is not null,
+    'document numbering is no longer exposed');
+  perform pg_temp.check(not has_function_privilege('authenticated', 'public.touch_query_session_updated_at()', 'EXECUTE'),
+    'the query session trigger function cannot be called by clients');
+end $$;
+
+-- Each wrapper keeps its name and parameters, runs as the caller and forwards to the implementation
+do $$
+declare
+  v_fn record;
+begin
+  for v_fn in
+    select p.proname, pg_get_function_arguments(p.oid) as args, q.oid as impl,
+           pg_get_function_arguments(q.oid) as impl_args, p.proconfig
+    from pg_proc p
+    join pg_proc q on q.proname = p.proname and q.pronamespace = 'private'::regnamespace
+    where p.pronamespace = 'public'::regnamespace
+  loop
+    perform pg_temp.check(v_fn.args = v_fn.impl_args, v_fn.proname || ' keeps its parameters');
+    perform pg_temp.check(v_fn.proconfig @> array['search_path=""'], v_fn.proname || ' has a fixed search_path');
+    perform pg_temp.check((select prosecdef from pg_proc where oid = v_fn.impl), v_fn.proname || ' implementation runs as its owner');
+  end loop;
+  perform pg_temp.check((select count(*) from pg_proc p join pg_proc q on q.proname = p.proname
+      where p.pronamespace = 'public'::regnamespace and q.pronamespace = 'private'::regnamespace) = 40,
+    'all 40 client functions have a wrapper');
+  -- Policies refer to functions by OID, so they moved along with the implementations
+  perform pg_temp.check(not exists (select 1 from pg_depend d join pg_proc p on p.oid = d.refobjid
+      where d.classid = 'pg_policy'::regclass and p.pronamespace = 'public'::regnamespace
+        and exists (select 1 from pg_proc q where q.proname = p.proname and q.pronamespace = 'private'::regnamespace)),
+    'no policy goes through a wrapper');
+  perform pg_temp.check(exists (select 1 from pg_depend d
+      where d.classid = 'pg_policy'::regclass and d.refobjid = 'private.user_has_organization_permission(uuid, uuid, text)'::regprocedure),
+    'policies call the permission check in private directly');
+end $$;
+
+-- Through the wrappers: named parameters, set-returning functions, permission refusals and direct inserts still work
+do $$
+declare
+  fx jsonb := pg_temp.seed_fixture();
+  v_org uuid := (fx->>'org_id')::uuid;
+  v_editor uuid := pg_temp.add_member(v_org, 'editor');
+  v_viewer uuid := pg_temp.add_member(v_org, 'viewer');
+  v_result jsonb;
+  v_number text;
+begin
+  v_result := pg_temp.call_as(v_editor, format('select public.create_customer(%L, %L, %L, p_phone => %L, p_dry_run => true)', v_org, '包裝函式客戶', '陳先生', '0911'));
+  perform pg_temp.check((v_result->>'dry_run')::boolean, 'a dry run through the wrapper answers');
+  perform pg_temp.check_api_error_as(v_viewer, format('select public.create_customer(%L, %L, %L, p_phone => %L)', v_org, '訪客客戶', '陳先生', '0911'),
+    '42501', 'forbidden', 'a viewer is still refused through the wrapper');
+
+  perform pg_temp.check(pg_temp.call_as(v_editor, format('select to_jsonb(public.user_has_organization_permission(%L, %L, %L))',
+      v_editor, v_org, 'canCreateCustomers'))::boolean, 'the permission check answers through the wrapper');
+  perform pg_temp.check(pg_temp.call_as((fx->>'user_id')::uuid, format('select to_jsonb(count(*)) from public.get_organization_member_status(%L)', v_org))::int >= 3,
+    'a set-returning RPC answers through the wrapper');
+
+  -- A direct insert by a signed-in user still gets a system number
+  perform pg_temp.act_as(v_editor);
+  insert into public.orders (customer_id, user_id, organization_id, order_number)
+  values ((fx->>'customer_id')::uuid, v_editor, v_org, 'X-1') returning order_number into v_number;
+  execute 'reset role';
+  perform pg_temp.check(v_number ~ '^B\d{12}$', 'a direct insert is numbered by the system, got ' || coalesce(v_number, 'none'));
 end $$;
 
 

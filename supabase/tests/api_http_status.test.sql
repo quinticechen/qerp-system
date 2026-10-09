@@ -49,7 +49,7 @@ begin
   -- No business function raises a bare SQLSTATE with a hint any more
   perform pg_temp.check(not exists (
       select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prosrc ~* 'HINT\s*=\s*''' ),
+      where n.nspname in ('public', 'private') and p.prosrc ~* 'HINT\s*=\s*''' ),
     'every hinted error goes through api_fail()');
 end $$;
 

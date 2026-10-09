@@ -33,7 +33,7 @@ src/
 | 項目 | 做法 |
 |------|------|
 | 資料庫 | Supabase PostgreSQL 17 |
-| 商業邏輯 | PL/pgSQL 函式（業務 API，`SECURITY DEFINER`），經 PostgREST 以 RPC 呼叫；錯誤以 `api_fail()` 回報 4xx（[API.md](./API.md) §2.3） |
+| 商業邏輯 | PL/pgSQL 函式（業務 API）：實作在不公開的 `private` schema（`SECURITY DEFINER`），`public` 的同名包裝函式經 PostgREST 以 RPC 呼叫；錯誤以 `api_fail()` 回報 4xx（[API.md](./API.md) §2.3） |
 | 權限 | RLS 依權限鍵（[PERMISSIONS.md](./PERMISSIONS.md)） |
 | 衍生資料 | 觸發器重算出貨、入庫進度與單據編號；`record_audit_logs` 觸發器記錄編輯紀錄 |
 | 結構變更 | `supabase/migrations/*.sql`，在 Supabase SQL Editor 套用 |
