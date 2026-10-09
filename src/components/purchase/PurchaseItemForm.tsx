@@ -97,22 +97,8 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
 
   return (
     <div className="border border-gray-200 rounded p-4 space-y-4">
-      <div className="flex justify-between items-center">
-        <h4 className="font-medium text-gray-900">項目 {index + 1}</h4>
-        {canRemove && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => removeItem(index)}
-            className="border-red-300 text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="flex items-start gap-4">
+      <div className="grid flex-1 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Product Name Selection */}
         <div className="space-y-2">
           <Label>產品名稱 *</Label>
@@ -245,6 +231,21 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
             <p className="text-sm text-red-600">{errors.unit_price}</p>
           )}
         </div>
+      </div>
+
+        {canRemove && (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => removeItem(index)}
+            className="mt-8 shrink-0 border-red-300 text-red-700 hover:bg-red-50"
+            aria-label={`刪除第 ${index + 1} 項`}
+            title="刪除此項"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Subtotal Display */}
