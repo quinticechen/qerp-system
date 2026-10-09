@@ -72,12 +72,15 @@ describe("EnhancedInventorySummary roll editing", () => {
     const row = (await within(rollsDialog).findByText("R-001")).closest("tr")!;
     expect(within(row).getByText("PO-001")).toBeInTheDocument();
 
-    await user.click(within(row).getByRole("button", { name: "編輯布卷" }));
+    // The row opens the roll in view mode; editing starts from 編輯
+    await user.click(row);
+    const rollView = await screen.findByRole("dialog", { name: "布卷 R-001" });
+    await user.click(within(rollView).getByRole("button", { name: "編輯" }));
     const rollDialog = await screen.findByRole("dialog", { name: "編輯布卷 R-001" });
     const shelf = within(rollDialog).getByLabelText("貨架");
     await user.clear(shelf);
     await user.type(shelf, "C-07");
-    await user.click(within(rollDialog).getByRole("button", { name: "儲存" }));
+    await user.click(within(rollDialog).getByRole("button", { name: "更新" }));
 
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toContainEqual({

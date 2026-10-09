@@ -1,23 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { EditShippingDialog } from './EditShippingDialog';
-import { ViewShippingDialog } from './ViewShippingDialog';
+import { ShippingDialog } from './ShippingDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 
-export const ShippingList = () => {
+interface ShippingListProps {
+  // The shipping open in the dialog; the page opens a newly created one here too
+  selectedId: string | null;
+  onSelectedIdChange: (id: string | null) => void;
+}
+
+export const ShippingList = ({ selectedId, onSelectedIdChange }: ShippingListProps) => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditShipping');
-  const [selectedShipping, setSelectedShipping] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: shippings, isLoading, refetch } = useQuery({
+  const { data: shippings, isLoading } = useQuery({
     queryKey: ['shippings', organizationId],
     queryFn: async () => {
       if (!organizationId) {
@@ -56,10 +58,7 @@ export const ShippingList = () => {
     enabled: hasOrganization
   });
 
-  const handleView = (shipping: any) => {
-    setSelectedShipping(shipping);
-    setViewDialogOpen(true);
-  };
+  const handleView = (shipping: { id: string }) => onSelectedIdChange(shipping.id);
 
   const columns: TableColumn[] = [
     {
@@ -155,6 +154,8 @@ export const ShippingList = () => {
     );
   }
 
+  const selectedShipping = (shippings ?? []).find((shipping) => shipping.id === selectedId) ?? null;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -173,24 +174,13 @@ export const ShippingList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
       {selectedShipping && (
-        <>
-          <ViewShippingDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            shipping={selectedShipping}
-            onEdit={canEdit && selectedShipping.status !== 'cancelled' ? () => {
-              setViewDialogOpen(false);
-              setEditDialogOpen(true);
-            } : undefined}
-          />
-          <EditShippingDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            shipping={selectedShipping}
-          />
-        </>
+        <ShippingDialog
+          open
+          onOpenChange={(open) => !open && onSelectedIdChange(null)}
+          shipping={selectedShipping}
+          canEdit={canEdit}
+        />
       )}
     </div>
   );

@@ -4,14 +4,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { ViewInventoryDialog } from './ViewInventoryDialog';
+import { InventoryDialog } from './InventoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface InventoryListProps {
   selectedInventoryId?: string | null;
   onInventorySelected?: (inventoryId: string | null) => void;
-  // Show the data without edit buttons (members without canEditInventory)
+  // Open records without the 編輯 button (members without canEditInventory)
   readOnly?: boolean;
 }
 
@@ -226,7 +226,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryI
 
       {/* 對話框 */}
       {selectedInventory && (
-        <ViewInventoryDialog
+        <InventoryDialog
           open={viewDialogOpen}
           onOpenChange={(isOpen) => {
             setViewDialogOpen(isOpen);
@@ -234,7 +234,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryI
             if (!isOpen) onInventorySelected?.(null);
           }}
           inventory={selectedInventory}
-          readOnly={readOnly}
+          canEdit={!readOnly}
         />
       )}
     </div>

@@ -21,5 +21,6 @@
 | [PRD.md](./PRD.md) | 最初的產品需求（2025-08，紡織業 ERP 整體）；角色、技術選型已被取代（見文件開頭） | — | 參考 |
 | [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md) | 多租戶角色與權限（R0–R4） | RBAC Session | 已完成（2026-10-09） |
 | [PHASE1_BUSINESS_API.md](./PHASE1_BUSINESS_API.md) | Phase 1 業務 API 的計畫與決策（A1–A6、B1–B8） | RBAC Session | 已完成（2026-10-09） |
+| [UI_CONSISTENCY.md](./UI_CONSISTENCY.md) | 資料視窗的查看／編輯／新增模式與共用元件 | RBAC Session | 已完成（2026-10-09） |
 
 AI Agent 的規劃文件（`QUERY_AGENT_PHASE0.md`、`QUERY_AGENT_PHASE1.md`、`QUERY_AGENT_TPM_ALIGNMENT.md`、`QUERY_AGENT_ARCHITECTURE_EVAL.md`）目前仍在上一層，將由 AI Session 移到這裡（[SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §6）。

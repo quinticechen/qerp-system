@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil } from 'lucide-react';
 import { useProductRolls } from '@/hooks/useInventoryEditing';
-import { EditableRoll, EditRollDialog } from './EditRollDialog';
+import { RecordDialog } from '@/components/common/RecordDialog';
+import { RollDialog } from './RollDialog';
 
 export interface ProductRollsTarget {
   productId: string;
@@ -17,7 +15,7 @@ interface ProductRollsDialogProps {
   product: ProductRollsTarget | null;
   organizationId: string | null | undefined;
   onOpenChange: (open: boolean) => void;
-  // Show the data without edit buttons (members without canEditInventory)
+  // Open rolls without the 編輯 button (members without canEditInventory)
   readOnly?: boolean;
 }
 
@@ -29,22 +27,17 @@ const QUALITY_LABELS: Record<string, string> = {
   defective: '瑕疵',
 };
 
+// The rolls of one product that hold stock; a row opens the roll
 export const ProductRollsDialog = ({ product, organizationId, onOpenChange, readOnly = false }: ProductRollsDialogProps) => {
   const { data: rolls, isLoading } = useProductRolls(product?.productId ?? null);
-  const [editingRoll, setEditingRoll] = useState<EditableRoll | null>(null);
+  const [openRollId, setOpenRollId] = useState<string | null>(null);
+  const openRoll = rolls?.find((roll) => roll.id === openRollId) ?? null;
 
   const title = product ? `${product.productName}${product.color ? ` - ${product.color}` : ''} 布卷明細` : '';
 
   return (
-    <Dialog open={!!product} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">{title}</DialogTitle>
-          <DialogDescription className="text-gray-600">
-            目前有庫存的布卷，點擊編輯可修改倉儲位置、品質與重量
-          </DialogDescription>
-        </DialogHeader>
-
+    <>
+      <RecordDialog open={!!product} onOpenChange={onOpenChange} mode="view" title={title} description="目前有庫存的布卷，點選布卷查看或編輯" size="xl">
         {isLoading ? (
           <div className="py-4 text-center text-gray-500">載入中...</div>
         ) : !rolls || rolls.length === 0 ? (
@@ -61,12 +54,11 @@ export const ProductRollsDialog = ({ product, organizationId, onOpenChange, read
                 <TableHead className="text-center">品質</TableHead>
                 <TableHead className="text-right">入庫重量</TableHead>
                 <TableHead className="text-right">當前重量</TableHead>
-                <TableHead className="text-center">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rolls.map((roll) => (
-                <TableRow key={roll.id}>
+                <TableRow key={roll.id} className="cursor-pointer" onClick={() => setOpenRollId(roll.id)}>
                   <TableCell className="font-medium text-gray-900">{roll.roll_number}</TableCell>
                   <TableCell className="text-gray-700">{roll.inventories?.purchase_orders?.po_number ?? '-'}</TableCell>
                   <TableCell className="text-gray-700">
@@ -79,25 +71,19 @@ export const ProductRollsDialog = ({ product, organizationId, onOpenChange, read
                   </TableCell>
                   <TableCell className="text-right text-gray-900">{roll.quantity.toFixed(2)}</TableCell>
                   <TableCell className="text-right text-gray-900">{roll.current_quantity.toFixed(2)}</TableCell>
-                  <TableCell className="text-center">
-                    {!readOnly && (
-                      <Button variant="ghost" size="sm" aria-label="編輯布卷" onClick={() => setEditingRoll(roll)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
-      </DialogContent>
+      </RecordDialog>
 
-      <EditRollDialog
-        roll={editingRoll}
+      <RollDialog
+        roll={openRoll}
         organizationId={organizationId}
-        onOpenChange={(isOpen) => !isOpen && setEditingRoll(null)}
+        onOpenChange={(isOpen) => !isOpen && setOpenRollId(null)}
+        canEdit={!readOnly}
       />
-    </Dialog>
+    </>
   );
 };

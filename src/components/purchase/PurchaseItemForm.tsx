@@ -3,11 +3,11 @@ import React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Check, ChevronsUpDown, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PurchaseItem } from './types';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface Product {
   id: string;
@@ -223,12 +223,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
         {/* Quantity Input */}
         <div className="space-y-2">
           <Label>訂購數量 (公斤) *</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={item.ordered_quantity || ''}
-            onChange={(e) => updateItem(index, 'ordered_quantity', parseFloat(e.target.value) || 0)}
+          <NumberInput
+            value={item.ordered_quantity}
+            onValueChange={(text) => updateItem(index, 'ordered_quantity', parseFloat(text) || 0)}
             placeholder="輸入數量"
           />
           {errors?.ordered_quantity && (
@@ -239,12 +236,9 @@ export const PurchaseItemForm: React.FC<PurchaseItemFormProps> = ({
         {/* Unit Price Input */}
         <div className="space-y-2">
           <Label>單價 *</Label>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            value={item.unit_price || ''}
-            onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+          <NumberInput
+            value={item.unit_price}
+            onValueChange={(text) => updateItem(index, 'unit_price', parseFloat(text) || 0)}
             placeholder="輸入單價"
           />
           {errors?.unit_price && (

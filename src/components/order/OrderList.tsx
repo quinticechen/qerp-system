@@ -4,19 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { EditOrderDialog } from './EditOrderDialog';
+import { OrderDialog } from './OrderDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 
 export const OrderList = () => {
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditOrders');
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: orders, isLoading, refetch } = useQuery({
+  const { data: orders, isLoading } = useQuery({
     queryKey: ['orders', organizationId],
     queryFn: async () => {
       if (!organizationId) {
@@ -51,10 +50,7 @@ export const OrderList = () => {
     enabled: hasOrganization
   });
 
-  const handleEdit = (order: any) => {
-    setSelectedOrder(order);
-    setEditDialogOpen(true);
-  };
+  const handleEdit = (order: { id: string }) => setSelectedId(order.id);
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -153,6 +149,13 @@ export const OrderList = () => {
         </span>
       )
     },
+    {
+      key: 'note',
+      title: '備註',
+      sortable: false,
+      filterable: false,
+      render: (value) => <span className="block max-w-xs truncate text-gray-700" title={value || undefined}>{value || '-'}</span>
+    },
   ];
 
   if (!hasOrganization) {
@@ -175,6 +178,8 @@ export const OrderList = () => {
     );
   }
 
+  const selectedOrder = (orders ?? []).find((order) => order.id === selectedId) ?? null;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -193,14 +198,12 @@ export const OrderList = () => {
         </CardContent>
       </Card>
 
-      {/* 編輯對話框 */}
       {selectedOrder && (
-        <EditOrderDialog
-          open={editDialogOpen}
-          onOpenChange={setEditDialogOpen}
+        <OrderDialog
+          open
+          onOpenChange={(open) => !open && setSelectedId(null)}
           order={selectedOrder}
-          readOnly={!canEdit}
-          onOrderUpdated={refetch}
+          canEdit={canEdit}
         />
       )}
     </div>

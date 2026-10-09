@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Plus, Check } from 'lucide-react';
+import { Plus, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Order {
@@ -40,11 +40,10 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-gray-900 flex items-center justify-between">
-          關聯訂單 (可選擇多個)
-          <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-gray-800">關聯訂單 (可選擇多個)</Label>
+        <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="ml-2" size="icon" aria-label="搜尋並添加訂單" title="搜尋並添加訂單">
                 <Plus className="h-4 w-4" />
@@ -82,9 +81,8 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
               </Command>
             </PopoverContent>
           </Popover>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </div>
+      <div className="space-y-3">
         {selectedOrderIds.length > 0 ? (
           selectedOrderIds.map((orderId) => {
             const order = orders?.find(o => o.id === orderId);
@@ -97,12 +95,15 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
                   )}
                 </div>
                 <Button
-                  variant="outline"
-                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeOrder(orderId)}
-                  className="text-red-600 hover:text-red-700"
+                  className="h-8 w-8 text-red-600 hover:text-red-700"
+                  aria-label={`移除訂單 ${order?.order_number ?? ''}`}
+                  title="移除訂單"
                 >
-                  移除
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             );
@@ -110,7 +111,7 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
         ) : (
           <div className="text-gray-500 text-sm">尚未選擇訂單</div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

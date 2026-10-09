@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +12,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { PRODUCT_CATALOG_QUERY_KEY } from '@/hooks/useProductCatalog';
 import { createProduct, PRODUCT_CATEGORIES } from '@/lib/api/products';
 import { apiErrorMessage } from '@/lib/api/client';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface CreateProductDialogProps {
   open: boolean;
@@ -98,19 +93,22 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      if (!open) resetForm();
-      onOpenChange(open);
-    }}>
-      <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>新增產品</DialogTitle>
-          <DialogDescription>
-            一個產品可以有多個顏色；同名產品已存在時，請到產品列表在該產品下新增顏色
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <RecordDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) resetForm();
+        onOpenChange(next);
+      }}
+      mode="create"
+      title="新增產品"
+      description="一個產品可以有多個顏色；同名產品已存在時，請到產品列表在該產品下新增顏色"
+      size="xl"
+      formId="create-product-form"
+      submitting={loading}
+      submitDisabled={!canSubmit}
+      submitLabel={`新增產品（${colors.length} 個顏色）`}
+    >
+        <form id="create-product-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">產品名稱 *</Label>
@@ -203,12 +201,9 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.1"
+                        <NumberInput
                           value={row.stockThreshold}
-                          onChange={(e) => updateColor(row.key, 'stockThreshold', e.target.value)}
+                          onValueChange={(value) => updateColor(row.key, 'stockThreshold', value)}
                           placeholder="如：100"
                           aria-label={`安全庫存 ${index + 1}`}
                         />
@@ -243,17 +238,7 @@ export const CreateProductDialog: React.FC<CreateProductDialogProps> = ({
               )}
             </div>
           </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              取消
-            </Button>
-            <Button type="submit" disabled={loading || !canSubmit}>
-              {loading ? '新增中...' : `新增產品（${colors.length} 個顏色）`}
-            </Button>
-          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </RecordDialog>
   );
 };

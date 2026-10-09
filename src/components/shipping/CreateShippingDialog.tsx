@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { todayInTaiwan } from '@/lib/dates';
 import { createShipping } from '@/lib/api/shipping';
 import { apiErrorMessage } from '@/lib/api/client';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface CreateShippingDialogProps {
   open: boolean;
@@ -383,14 +384,17 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   const selectedOrder = orders?.find(o => o.id === orderId);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">新增出貨單</DialogTitle>
-          <DialogDescription className="text-gray-700">
-            選擇客戶訂單並確認要出貨的項目
-          </DialogDescription>
-        </DialogHeader>
+    <RecordDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      mode="create"
+      title="新增出貨單"
+      description="選擇客戶訂單並確認要出貨的項目"
+      size="2xl"
+      onSubmit={handleSubmit}
+      submitting={createShippingMutation.isPending}
+      submitLabel="建立出貨單"
+    >
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -672,14 +676,10 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                                         </span>
                                       )}
                                     </Label>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      max={maxQuantity}
-                                      value={roll.shipped_quantity || 0}
-                                      onChange={(e) => {
-                                        const inputValue = parseFloat(e.target.value) || 0;
+                                    <NumberInput
+                                      value={roll.shipped_quantity}
+                                      onValueChange={(text) => {
+                                        const inputValue = parseFloat(text) || 0;
                                         const validValue = Math.min(inputValue, maxQuantity);
                                         updateRollQuantity(product.id, rollIndex, validValue);
                                       }}
@@ -726,19 +726,6 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-gray-700 border-gray-300 hover:bg-gray-50">
-            取消
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={createShippingMutation.isPending}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {createShippingMutation.isPending ? '建立中...' : '建立出貨單'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </RecordDialog>
   );
 };

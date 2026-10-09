@@ -5,13 +5,7 @@ import { InventoryRollPayload, newLineItemKey } from '@/lib/documentItemsService
 import { updateInventory } from '@/lib/api/inventory';
 import { generateRollNumber } from '@/lib/rollNumber';
 import type { Json } from '@/integrations/supabase/types';
-import {
-  BatchEdits,
-  RollEdits,
-  RollSnapshot,
-  updateInventoryBatch,
-  updateInventoryRoll,
-} from '@/lib/inventoryService';
+import { RollEdits, RollSnapshot, updateInventoryRoll } from '@/lib/inventoryService';
 
 export interface NamedOption {
   id: string;
@@ -67,15 +61,6 @@ const useInvalidateInventory = () => {
   return () => {
     INVENTORY_QUERY_KEYS.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
   };
-};
-
-export const useUpdateInventoryBatch = () => {
-  const invalidate = useInvalidateInventory();
-  return useMutation({
-    mutationFn: ({ organizationId, inventoryId, edits }: { organizationId: string; inventoryId: string; edits: BatchEdits }) =>
-      updateInventoryBatch(organizationId, inventoryId, edits),
-    onSuccess: invalidate,
-  });
 };
 
 export const useUpdateInventoryRoll = () => {
@@ -186,12 +171,23 @@ export const toInventoryRollsPayload = (rolls: EditableInventoryRoll[]): Invento
     specifications: roll.specifications,
   }));
 
-export const useSaveInventoryRolls = () => {
+export interface InventoryBatchEdits {
+  arrival_date: string;
+  note: string;
+  rolls: EditableInventoryRoll[];
+}
+
+export const useSaveInventoryBatch = () => {
   const invalidate = useInvalidateInventory();
   return useMutation({
-    // One call saves the complete roll list; the database checks the lock rules
-    mutationFn: ({ organizationId, inventoryId, rolls }: { organizationId: string; inventoryId: string; rolls: EditableInventoryRoll[] }) =>
-      updateInventory(organizationId, inventoryId, { rolls: toInventoryRollsPayload(rolls) }),
+    // One call saves the date, note and complete roll list; the factory follows the purchase order.
+    // The database checks the lock rules.
+    mutationFn: ({ organizationId, inventoryId, edits }: { organizationId: string; inventoryId: string; edits: InventoryBatchEdits }) =>
+      updateInventory(organizationId, inventoryId, {
+        arrival_date: edits.arrival_date,
+        note: edits.note.trim(),
+        rolls: toInventoryRollsPayload(edits.rolls),
+      }),
     onSuccess: invalidate,
   });
 };

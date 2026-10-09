@@ -1,23 +1,26 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
-import { EditPurchaseDialog } from './EditPurchaseDialog';
-import { ViewPurchaseDialog } from './ViewPurchaseDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
+import { lastArrivalDate } from '@/lib/purchaseArrivals';
+import { PurchaseDialog } from './PurchaseDialog';
 
-export const PurchaseList = () => {
+interface PurchaseListProps {
+  // The purchase order open in the dialog; the page opens a newly created one here too
+  selectedId: string | null;
+  onSelectedIdChange: (id: string | null) => void;
+}
+
+export const PurchaseList = ({ selectedId, onSelectedIdChange }: PurchaseListProps) => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditPurchases');
-  const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: purchases, isLoading, refetch } = useQuery({
+  const { data: purchases, isLoading } = useQuery({
     queryKey: ['purchases', organizationId],
     queryFn: async () => {
       if (!organizationId) {
@@ -33,10 +36,20 @@ export const PurchaseList = () => {
           factories (name),
           purchase_order_items (
             id,
+            product_id,
             ordered_quantity,
             received_quantity,
             unit_price,
             products_new (name, color)
+          ),
+          purchase_order_relations (
+            orders (order_number, note)
+          ),
+          inventories (
+            id,
+            receipt_number,
+            arrival_date,
+            inventory_rolls (product_id)
           )
         `)
         .eq('organization_id', organizationId)
@@ -47,16 +60,13 @@ export const PurchaseList = () => {
         throw error;
       }
 
-      console.log('Fetched purchases:', data);
-      return data;
+      // The list shows when goods last arrived; the detail shows it per product
+      return (data ?? []).map((purchase) => ({ ...purchase, last_arrival_date: lastArrivalDate(purchase.inventories) }));
     },
     enabled: hasOrganization
   });
 
-  const handleView = (purchase: any) => {
-    setSelectedPurchase(purchase);
-    setViewDialogOpen(true);
-  };
+  const handleView = (purchase: { id: string }) => onSelectedIdChange(purchase.id);
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
@@ -148,6 +158,20 @@ export const PurchaseList = () => {
         return <span className="text-gray-700">NT$ {totalAmount.toLocaleString()}</span>;
       }
     },
+    {
+      key: 'last_arrival_date',
+      title: '最近入庫',
+      sortable: true,
+      filterable: false,
+      render: (value) => <span className="text-gray-700">{value ? new Date(value).toLocaleDateString('zh-TW') : '-'}</span>
+    },
+    {
+      key: 'note',
+      title: '備註',
+      sortable: false,
+      filterable: false,
+      render: (value) => <span className="block max-w-xs truncate text-gray-700" title={value || undefined}>{value || '-'}</span>
+    },
   ];
 
   if (!hasOrganization) {
@@ -170,6 +194,8 @@ export const PurchaseList = () => {
     );
   }
 
+  const selectedPurchase = (purchases ?? []).find((purchase) => purchase.id === selectedId) ?? null;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -188,24 +214,13 @@ export const PurchaseList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
       {selectedPurchase && (
-        <>
-          <ViewPurchaseDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            purchase={selectedPurchase}
-            onEdit={canEdit && selectedPurchase.status !== 'cancelled' ? () => {
-              setViewDialogOpen(false);
-              setEditDialogOpen(true);
-            } : undefined}
-          />
-          <EditPurchaseDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            purchase={selectedPurchase}
-          />
-        </>
+        <PurchaseDialog
+          open
+          onOpenChange={(open) => !open && onSelectedIdChange(null)}
+          purchase={selectedPurchase}
+          canEdit={canEdit}
+        />
       )}
     </div>
   );

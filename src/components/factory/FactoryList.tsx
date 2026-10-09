@@ -3,25 +3,20 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { EditFactoryDialog } from './EditFactoryDialog';
-import { ViewFactoryDialog } from './ViewFactoryDialog';
+import { PartnerDialog } from '@/components/common/PartnerDialog';
+import type { PartnerRow } from '@/lib/partnerForm';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { setPartnerActive } from '@/lib/api/partners';
-import { apiErrorMessage } from '@/lib/api/client';
 
 export const FactoryList = () => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditFactories');
-  const [selectedFactory, setSelectedFactory] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: factories, isLoading, refetch } = useQuery({
+  const { data: factories, isLoading } = useQuery({
     queryKey: ['factories', organizationId],
     queryFn: async () => {
       if (!organizationId) {
@@ -47,24 +42,7 @@ export const FactoryList = () => {
     enabled: hasOrganization
   });
 
-  // Disabled factorys stay on existing documents but are hidden from pickers for new ones
-  const handleToggleActive = async () => {
-    if (!organizationId || !selectedFactory) return;
-    try {
-      const nextActive = !selectedFactory.is_active;
-      await setPartnerActive('factory', organizationId, selectedFactory.id, nextActive);
-      toast.success(nextActive ? '工廠已啟用' : '工廠已停用');
-      setSelectedFactory({ ...selectedFactory, is_active: nextActive });
-      refetch();
-    } catch (error) {
-      toast.error(`變更工廠狀態失敗：${apiErrorMessage(error)}`);
-    }
-  };
-
-  const handleView = (factory: any) => {
-    setSelectedFactory(factory);
-    setViewDialogOpen(true);
-  };
+  const handleView = (row: PartnerRow) => setSelectedId(row.id);
 
   const columns: TableColumn[] = [
     {
@@ -186,27 +164,13 @@ export const FactoryList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
-      {selectedFactory && (
-        <>
-          <ViewFactoryDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            factory={selectedFactory}
-            onToggleActive={canEdit ? handleToggleActive : undefined}
-            onEdit={canEdit ? () => {
-              setViewDialogOpen(false);
-              setEditDialogOpen(true);
-            } : undefined}
-          />
-          <EditFactoryDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            factory={selectedFactory}
-            onFactoryUpdated={refetch}
-          />
-        </>
-      )}
+      <PartnerDialog
+        kind="factory"
+        partner={(factories ?? []).find((row) => row.id === selectedId) ?? null}
+        open={selectedId !== null}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+        canEdit={canEdit}
+      />
     </div>
   );
 };

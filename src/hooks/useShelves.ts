@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { createShelf, setShelfActive, updateShelf } from '@/lib/api/shelves';
+import { createShelf, setShelfActive, updateShelf, type ShelfChanges } from '@/lib/api/shelves';
 
 // Shelves are stored in the `warehouses` table (selected as "倉庫" when creating inventory).
 
@@ -105,9 +105,9 @@ export const useCreateShelf = () => {
   const { organizationId } = useCurrentOrganization();
 
   return useMutation({
-    mutationFn: async (name: string) => {
+    mutationFn: async (shelf: { name: string; location?: string }) => {
       if (!organizationId) throw new Error('請先選擇組織');
-      await createShelf(organizationId, { name });
+      await createShelf(organizationId, shelf);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shelves'] });
@@ -116,14 +116,15 @@ export const useCreateShelf = () => {
   });
 };
 
-export const useRenameShelf = () => {
+export const useUpdateShelf = () => {
   const queryClient = useQueryClient();
   const { organizationId } = useCurrentOrganization();
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    // Only the given fields change; an empty location clears it
+    mutationFn: async ({ id, changes }: { id: string; changes: ShelfChanges }) => {
       if (!organizationId) throw new Error('請先選擇組織');
-      await updateShelf(organizationId, id, { name });
+      await updateShelf(organizationId, id, changes);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shelves'] });

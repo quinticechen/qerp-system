@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { EditableInventoryRoll, NamedOption, newInventoryRoll } from '@/hooks/useInventoryEditing';
 import { ProductOption, productLabel } from '@/hooks/useProductOptions';
 import { FabricQuality, QUALITY_OPTIONS } from '@/lib/fabricQuality';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface InventoryRollsEditorProps {
   rolls: EditableInventoryRoll[];
@@ -115,13 +116,10 @@ export const InventoryRollsEditor = ({ rolls, onChange, products, warehouses }: 
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Input
-                      type="number"
-                      min={roll.shipped}
-                      step="0.01"
+                    <NumberInput
                       aria-label={`第 ${position} 卷入庫重量（公斤）`}
                       value={roll.quantity}
-                      onChange={(e) => updateRoll(roll.key, { quantity: e.target.value })}
+                      onValueChange={(value) => updateRoll(roll.key, { quantity: value })}
                     />
                   </TableCell>
                   <TableCell>

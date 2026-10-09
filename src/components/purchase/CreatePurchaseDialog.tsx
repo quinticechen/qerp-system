@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -383,116 +382,106 @@ export const CreatePurchaseDialog: React.FC<CreatePurchaseDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">新增採購單</DialogTitle>
-          <DialogDescription className="text-gray-700">
-            建立新的採購單並添加產品項目
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FactorySelector
-              factories={factories}
-              factoryId={factoryId}
-              setFactoryId={(id) => {
-                setFactoryId(id);
-                if (validationErrors.factoryId) {
-                  setValidationErrors(prev => ({ ...prev, factoryId: undefined }));
+    <>
+      <RecordDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        mode="create"
+        title="新增採購單"
+        description="建立新的採購單並添加產品項目"
+        size="xl"
+        onSubmit={handleSubmit}
+        submitting={createPurchaseMutation.isPending}
+        submitLabel="建立採購單"
+      >
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FactorySelector
+                factories={factories}
+                factoryId={factoryId}
+                setFactoryId={(id) => {
+                  setFactoryId(id);
+                  if (validationErrors.factoryId) {
+                    setValidationErrors(prev => ({ ...prev, factoryId: undefined }));
+                  }
+                }}
+                factoryOpen={factoryOpen}
+                setFactoryOpen={setFactoryOpen}
+                error={validationErrors.factoryId}
+              />
+  
+              <div className="space-y-2">
+                <Label htmlFor="arrival_date" className="text-gray-800">預計到貨日期</Label>
+                <Input
+                  id="arrival_date"
+                  type="date"
+                  value={expectedArrivalDate}
+                  onChange={(e) => setExpectedArrivalDate(e.target.value)}
+                  className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+  
+            {/* Order Selection */}
+            <OrderSelector
+              orders={orders}
+              selectedOrderIds={selectedOrderIds}
+              setSelectedOrderIds={setSelectedOrderIds}
+              orderSearchOpen={orderSearchOpen}
+              setOrderSearchOpen={setOrderSearchOpen}
+            />
+  
+            {/* Order Products Display */}
+            <OrderProductsDisplay
+              orderProducts={orderProducts}
+              getInventoryInfo={getInventoryInfo}
+            />
+  
+            {/* Manual Items Section */}
+            <PurchaseItemsSection
+              items={items}
+              products={products}
+              uniqueProductNames={uniqueProductNames}
+              getColorVariants={getColorVariants}
+              addItem={addItem}
+              removeItem={removeItem}
+              updateItem={(index, field, value) => {
+                updateItem(index, field, value);
+                // Clear validation errors for this field
+                if (validationErrors.items?.[index]?.[field as keyof PurchaseItem]) {
+                  setValidationErrors(prev => ({
+                    ...prev,
+                    items: {
+                      ...prev.items,
+                      [index]: {
+                        ...prev.items?.[index],
+                        [field]: undefined
+                      }
+                    }
+                  }));
                 }
               }}
-              factoryOpen={factoryOpen}
-              setFactoryOpen={setFactoryOpen}
-              error={validationErrors.factoryId}
+              productNameOpens={productNameOpens}
+              setProductNameOpens={setProductNameOpens}
+              colorOpens={colorOpens}
+              setColorOpens={setColorOpens}
+              itemErrors={validationErrors.items}
             />
-
+  
+            {/* Note */}
             <div className="space-y-2">
-              <Label htmlFor="arrival_date" className="text-gray-800">預計到貨日期</Label>
-              <Input
-                id="arrival_date"
-                type="date"
-                value={expectedArrivalDate}
-                onChange={(e) => setExpectedArrivalDate(e.target.value)}
+              <Label htmlFor="note" className="text-gray-800">備註</Label>
+              <Textarea
+                id="note"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="輸入備註..."
                 className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
           </div>
-
-          {/* Order Selection */}
-          <OrderSelector
-            orders={orders}
-            selectedOrderIds={selectedOrderIds}
-            setSelectedOrderIds={setSelectedOrderIds}
-            orderSearchOpen={orderSearchOpen}
-            setOrderSearchOpen={setOrderSearchOpen}
-          />
-
-          {/* Order Products Display */}
-          <OrderProductsDisplay
-            orderProducts={orderProducts}
-            getInventoryInfo={getInventoryInfo}
-          />
-
-          {/* Manual Items Section */}
-          <PurchaseItemsSection
-            items={items}
-            products={products}
-            uniqueProductNames={uniqueProductNames}
-            getColorVariants={getColorVariants}
-            addItem={addItem}
-            removeItem={removeItem}
-            updateItem={(index, field, value) => {
-              updateItem(index, field, value);
-              // Clear validation errors for this field
-              if (validationErrors.items?.[index]?.[field as keyof PurchaseItem]) {
-                setValidationErrors(prev => ({
-                  ...prev,
-                  items: {
-                    ...prev.items,
-                    [index]: {
-                      ...prev.items?.[index],
-                      [field]: undefined
-                    }
-                  }
-                }));
-              }
-            }}
-            productNameOpens={productNameOpens}
-            setProductNameOpens={setProductNameOpens}
-            colorOpens={colorOpens}
-            setColorOpens={setColorOpens}
-            itemErrors={validationErrors.items}
-          />
-
-          {/* Note */}
-          <div className="space-y-2">
-            <Label htmlFor="note" className="text-gray-800">備註</Label>
-            <Textarea
-              id="note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="輸入備註..."
-              className="border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-gray-700 border-gray-300 hover:bg-gray-50">
-            取消
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={createPurchaseMutation.isPending}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {createPurchaseMutation.isPending ? '建立中...' : '建立採購單'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </RecordDialog>
+    </>
   );
 };

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { apiErrorMessage } from '@/lib/api/client';
 import { useCreateShelf, type Shelf } from '@/hooks/useShelves';
+import { RecordDialog } from '@/components/common/RecordDialog';
+import { FormField } from '@/components/common/FormField';
 
 interface CreateShelfDialogProps {
   open: boolean;
@@ -12,13 +12,18 @@ interface CreateShelfDialogProps {
   existingShelves: Shelf[];
 }
 
+// The same fields as the shelf's edit mode
 export const CreateShelfDialog: React.FC<CreateShelfDialogProps> = ({ open, onOpenChange, existingShelves }) => {
   const { toast } = useToast();
   const createShelf = useCreateShelf();
   const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
 
   useEffect(() => {
-    if (!open) setName('');
+    if (!open) {
+      setName('');
+      setLocation('');
+    }
   }, [open]);
 
   const trimmedName = name.trim();
@@ -26,28 +31,34 @@ export const CreateShelfDialog: React.FC<CreateShelfDialogProps> = ({ open, onOp
 
   const handleCreate = () => {
     if (!trimmedName || isDuplicate) return;
-    createShelf.mutate(trimmedName, {
-      onSuccess: () => {
-        toast({ title: '已新增貨架', description: `貨架「${trimmedName}」已建立` });
-        onOpenChange(false);
+    createShelf.mutate(
+      { name: trimmedName, location: location.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast({ title: '已新增貨架', description: `貨架「${trimmedName}」已建立` });
+          onOpenChange(false);
+        },
+        onError: (error: Error) => {
+          toast({ title: '新增失敗', description: apiErrorMessage(error), variant: 'destructive' });
+        },
       },
-      onError: (error: Error) => {
-        toast({ title: '新增失敗', description: error.message, variant: 'destructive' });
-      },
-    });
+    );
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">新增貨架</DialogTitle>
-          <DialogDescription className="text-gray-700">
-            新增後即可在「新增入庫」選擇此貨架存放布卷
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="new-shelf-name" className="text-gray-800">貨架名稱 *</Label>
+    <RecordDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      mode="create"
+      title="新增貨架"
+      description="新增後即可在「新增入庫」選擇此貨架存放布卷"
+      onSubmit={handleCreate}
+      submitting={createShelf.isPending}
+      submitDisabled={!trimmedName || isDuplicate}
+      submitLabel="新增"
+    >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField label="貨架名稱" htmlFor="new-shelf-name" required error={isDuplicate ? '已有相同名稱的貨架' : undefined}>
           <Input
             id="new-shelf-name"
             value={name}
@@ -56,24 +67,13 @@ export const CreateShelfDialog: React.FC<CreateShelfDialogProps> = ({ open, onOp
               if (e.key === 'Enter') handleCreate();
             }}
             placeholder="例如：1A 上"
-            className="border-gray-300 text-gray-900"
             autoFocus
           />
-          {isDuplicate && <p className="text-sm text-red-600">已有相同名稱的貨架</p>}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-gray-700 border-gray-300">
-            取消
-          </Button>
-          <Button
-            onClick={handleCreate}
-            disabled={!trimmedName || isDuplicate || createShelf.isPending}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {createShelf.isPending ? '新增中...' : '新增'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </FormField>
+        <FormField label="位置" htmlFor="new-shelf-location">
+          <Input id="new-shelf-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="例如：一樓" />
+        </FormField>
+      </div>
+    </RecordDialog>
   );
 };

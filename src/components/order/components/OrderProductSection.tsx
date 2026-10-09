@@ -1,7 +1,7 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/common/NumberInput';
 import { Textarea } from '@/components/ui/textarea';
 import { PackagePlus, Plus, Trash } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,8 +17,9 @@ interface Product {
 interface OrderProduct {
   base_product_name: string;
   product_id: string;
-  quantity: number;
-  unit_price: number;
+  // Typed text; parsed when the order is saved
+  quantity: string;
+  unit_price: string;
   specifications: any;
 }
 
@@ -133,13 +134,11 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
 
                 <div className="space-y-2">
                   <Label className="text-gray-800">公斤數 *</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    aria-label={`第 ${index + 1} 項公斤數`}
                     value={product.quantity}
-                    onChange={(e) => onUpdateProduct(index, 'quantity', parseFloat(e.target.value) || 0)}
+                    onValueChange={(value) => onUpdateProduct(index, 'quantity', value)}
                     className="border-gray-200 text-gray-900"
-                    min="0"
-                    step="0.01"
                   />
                   {productFieldErrors?.quantity && (
                     <p className="text-sm text-red-600">{productFieldErrors.quantity}</p>
@@ -148,13 +147,11 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
 
                 <div className="space-y-2">
                   <Label className="text-gray-800">單價 (每公斤) *</Label>
-                  <Input
-                    type="number"
+                  <NumberInput
+                    aria-label={`第 ${index + 1} 項單價`}
                     value={product.unit_price}
-                    onChange={(e) => onUpdateProduct(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                    onValueChange={(value) => onUpdateProduct(index, 'unit_price', value)}
                     className="border-gray-200 text-gray-900"
-                    min="0"
-                    step="0.01"
                   />
                   {productFieldErrors?.unit_price && (
                     <p className="text-sm text-red-600">{productFieldErrors.unit_price}</p>
@@ -164,7 +161,7 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
 
               <div className="mt-4 flex justify-between items-center">
                 <div className="text-sm text-gray-700">
-                  小計: ${(product.quantity * product.unit_price).toLocaleString()}
+                  小計: ${((Number(product.quantity) || 0) * (Number(product.unit_price) || 0)).toLocaleString()}
                 </div>
                 {products.length > 1 && (
                   <Button
@@ -198,7 +195,7 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
       {/* Order Total */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <div className="text-lg font-semibold text-gray-900">
-          訂單總計: ${products.reduce((total, p) => total + (p.quantity * p.unit_price), 0).toLocaleString()}
+          訂單總計: ${products.reduce((total, p) => total + (Number(p.quantity) || 0) * (Number(p.unit_price) || 0), 0).toLocaleString()}
         </div>
       </div>
     </div>
