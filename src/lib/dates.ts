@@ -1,4 +1,4 @@
-// Business dates follow Taiwan time, like the document numbers the database assigns (BUSINESS_API.md §2.5).
+// Business dates follow Taiwan time, like the document numbers the database assigns (API.md §2.5).
 // toISOString() would give the UTC date, a day behind between midnight and 08:00 in Taiwan.
 const TAIWAN_DATE = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });
 

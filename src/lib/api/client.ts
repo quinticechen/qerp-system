@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database, Json } from '@/integrations/supabase/types';
 
-// Shared plumbing for the business APIs (docs/BUSINESS_API.md §2): every write API returns the same
+// Shared plumbing for the business APIs (docs/API.md §2): every write API returns the same
 // result shape and raises errors as a Chinese message plus a stable code in the hint.
 
 export interface ApiSummaryField {

@@ -1,4 +1,4 @@
--- 業務 API A3：採購單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A3：採購單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- Add an active factory to an organization (test setup; same as in api_a2_orders.test.sql)
 create or replace function pg_temp.add_factory(org_id uuid, factory_name text, active boolean default true)

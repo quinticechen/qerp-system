@@ -2,7 +2,7 @@ import type { Json } from '@/integrations/supabase/types';
 import { callApi } from './client';
 import type { OrderItemPayload } from '@/lib/documentItemsService';
 
-// Orders (docs/BUSINESS_API.md §5, A2)
+// Orders (docs/API.md §3, A2)
 
 export interface NewOrderLine {
   product_id: string;

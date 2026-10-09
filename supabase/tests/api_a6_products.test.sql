@@ -1,4 +1,4 @@
--- 業務 API A6：產品（母）與顏色（子）（docs/BUSINESS_API.md §7）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A6：產品（母）與顏色（子）（docs/requirements/PHASE1_BUSINESS_API.md §7）。先載入 _helpers.sql 再執行本檔。
 
 -- Products written without a product (legacy pages, tools, the fixture) are filed under a product of the same name
 do $$

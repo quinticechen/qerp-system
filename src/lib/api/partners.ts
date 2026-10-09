@@ -1,6 +1,6 @@
 import { callApi, type ApiChanges } from './client';
 
-// Customers and factories share their fields and rules (docs/BUSINESS_API.md §3, A1)
+// Customers and factories share their fields and rules (docs/API.md §3, A1)
 
 export type PartnerKind = 'customer' | 'factory';
 

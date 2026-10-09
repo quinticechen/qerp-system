@@ -1,7 +1,7 @@
 import type { Json } from '@/integrations/supabase/types';
 import { callApi } from './client';
 
-// Products and their colors (docs/BUSINESS_API.md §7, A6). A product holds the name, category and unit;
+// Products and their colors (docs/requirements/PHASE1_BUSINESS_API.md §7, A6). A product holds the name, category and unit;
 // each color is what orders, purchases and stock refer to.
 
 export const PRODUCT_CATEGORIES = ['布料', '胚布', '紗線', '輔料'];

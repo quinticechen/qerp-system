@@ -1,4 +1,4 @@
--- 業務 API A1：客戶與工廠（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A1：客戶與工廠（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- create_customer: editors create, viewers and outsiders are refused; anonymous callers cannot call it at all
 do $$

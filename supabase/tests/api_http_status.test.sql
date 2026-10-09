@@ -1,4 +1,4 @@
--- 業務 API 的錯誤以 PostgREST 自訂錯誤回報，HTTP 狀態依錯誤類別（docs/BUSINESS_API.md §2.3）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API 的錯誤以 PostgREST 自訂錯誤回報，HTTP 狀態依錯誤類別（docs/API.md §2.3）。先載入 _helpers.sql 再執行本檔。
 
 -- api_fail() keeps the code, hint and message and picks the HTTP status from the code
 do $$

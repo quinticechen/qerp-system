@@ -1,8 +1,10 @@
 # Multi-Tenant Roles and Permissions Planning
 
+> Requirement document (RBAC Session). R0–R4 are done; the permission model as it stands now is described in [../PERMISSIONS.md](../PERMISSIONS.md).
+
 > Status: Role model confirmed (2026-10-07); R0 applied and passed rollback testing (`20261007164641_rbac_r0_security_hardening.sql`); R1 applied (2026-10-08) and passed all SQL rollback tests; R2 frontend guarding completed (uncommitted) (`20261008132011_rbac_r1_fixed_roles.sql`, `supabase/tests/rbac_r1_roles.test.sql`); R2 committed; R3/R4 applied (2026-10-09): business tables use key-based RLS (SELECT → view, INSERT → create, UPDATE → edit, no DELETE on master tables; child tables follow the parent's keys) (`20261009002334_rbac_r4_business_rls.sql`, `supabase/tests/rbac_r4_business_rls.test.sql`)
 > Scope: Roles, permission keys, database RLS/RPC, frontend guarding, and AI tools permissions within organizations (tenants)
-> Related Documents: [QUERY_AGENT_PHASE0.md](https://www.google.com/search?q=./QUERY_AGENT_PHASE0.md) (§4.2 Permissions and Organization, D1–D5), [SESSION_COORDINATION.md](https://www.google.com/search?q=./SESSION_COORDINATION.md)
+> Related Documents: [QUERY_AGENT_PHASE0.md](../QUERY_AGENT_PHASE0.md) (§4.2 Permissions and Organization, D1–D5), [SESSION_COORDINATION.md](../SESSION_COORDINATION.md)
 
 ## 1. Background and Objectives
 

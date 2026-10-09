@@ -1,4 +1,4 @@
--- 業務 API A6：貨架（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A6：貨架（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: one shelf (測試倉) holding one roll with 60kg left.
 
 -- create_shelf and update_shelf: names are unique within the organization

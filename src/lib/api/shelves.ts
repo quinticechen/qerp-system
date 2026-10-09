@@ -1,7 +1,7 @@
 import type { Json } from '@/integrations/supabase/types';
 import { callApi } from './client';
 
-// Shelves, stored in the warehouses table (docs/BUSINESS_API.md §5, A6)
+// Shelves, stored in the warehouses table (docs/API.md §3, A6)
 
 export const createShelf = (organizationId: string, shelf: { name: string; location?: string }, dryRun = false) =>
   callApi('create_shelf', {

@@ -2,7 +2,7 @@ import type { Json } from '@/integrations/supabase/types';
 import type { ShippingItemPayload } from '@/lib/documentItemsService';
 import { callApi } from './client';
 
-// Shippings (docs/BUSINESS_API.md §5, A5)
+// Shippings (docs/API.md §3, A5)
 
 export interface NewShippingItem {
   inventory_roll_id: string;

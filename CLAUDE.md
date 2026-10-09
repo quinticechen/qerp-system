@@ -130,6 +130,13 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 - Remove the wrapper in the same change that makes the feature work.
 - Do not ship a half-wired feature unwrapped: if saving, the permission check or the database part is missing, it is unfinished.
 
+## Documentation
+
+- `README.md`: overall architecture and the docs index.
+- `docs/`: the current state — features, tech stack, services, dependencies, API, tables, permissions, AI agent, evals. Describe what exists now, not plans.
+- `docs/requirements/`: requirements, plans and decisions. Write the requirement there before building it.
+- **When a requirement (or one of its phases) is done, update the matching `docs/` file in the same change** — the mapping is in `docs/requirements/README.md`. A change is not complete while the current-state docs still describe the old behaviour.
+
 ## Known Configuration
 
 | Item | Value |

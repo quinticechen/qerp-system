@@ -2,7 +2,7 @@ import type { Json } from '@/integrations/supabase/types';
 import type { InventoryRollPayload } from '@/lib/documentItemsService';
 import { callApi } from './client';
 
-// Receiving batches (進貨單) and their rolls (docs/BUSINESS_API.md §5, A4)
+// Receiving batches (進貨單) and their rolls (docs/API.md §3, A4)
 
 export interface NewInventoryRoll {
   product_id: string;

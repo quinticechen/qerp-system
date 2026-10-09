@@ -1,73 +1,73 @@
-# Welcome to your Lovable project
+# 紡織業 ERP 系統（weave-flow-erp-system）
 
-## Project info
+給紡織業的多組織 ERP：管理產品（產品與顏色）、客戶、工廠、貨架，並串起「訂單 → 採購 → 入庫 → 出貨」的流程與庫存；另有以中文對話查詢與建立資料的 AI 助理。
 
-**URL**: https://lovable.dev/projects/a2c5b0ca-e286-4bd8-82b6-75f101419054
+## 架構
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/a2c5b0ca-e286-4bd8-82b6-75f101419054) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+┌──────────────────────────┐        ┌──────────────────────────────┐
+│ 前端（React + Vite）      │        │ AI 伺服器 mcp-server          │
+│ Vercel                    │──────▶ │ Cloud Run（Express + AI SDK） │──▶ OpenRouter（模型）
+│ src/                      │ /query │ 路由器 + 子 Agent + tools      │
+└────────────┬─────────────┘        └──────────────┬───────────────┘
+             │ supabase-js（使用者 JWT）              │ supabase-js（同一位使用者的 JWT）
+             ▼                                        ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ Supabase（PostgreSQL 17、Auth、PostgREST）                         │
+│ · 業務 API：PL/pgSQL 函式，檢查權限、寫入、計算進度與編號           │
+│ · RLS：依組織與權限鍵限制讀寫                                       │
+│ · 觸發器：出貨與入庫進度、單據編號、編輯紀錄                         │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-**Edit a file directly in GitHub**
+- **所有業務寫入都經過資料庫的業務 API**（`supabase.rpc`），前端與 AI 共用同一套規則；讀取直接查資料表或 view，由 RLS 限制。
+- **權限在資料庫判斷**：`user_has_organization_permission()` 是唯一的判斷來源，RLS、業務 API、AI 都用它；前端只負責畫面一致。
+- **AI 不直接寫入**：寫入類 tool 只產生確認卡片，使用者確認後才執行。
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 目錄
 
-**Use GitHub Codespaces**
+| 路徑 | 內容 |
+|------|------|
+| `src/` | 前端（頁面、元件、hooks、`lib/api` 業務 API 呼叫） |
+| `mcp-server/` | AI 伺服器、tools、eval |
+| `supabase/migrations/` | 資料庫結構與函式 |
+| `supabase/tests/` | 資料庫回滾測試 |
+| `scripts/` | 瀏覽器驗證腳本 |
+| `docs/` | 現況文件（下表） |
+| `docs/requirements/` | 開發需求、計畫與決策（[規則](./docs/requirements/README.md)） |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 文件
 
-## What technologies are used for this project?
+現況（系統現在是什麼樣子）：
 
-This project is built with:
+| 文件 | 內容 |
+|------|------|
+| [FEATURES.md](./docs/FEATURES.md) | 功能 |
+| [TECH_STACK.md](./docs/TECH_STACK.md) | 技術棧與程式結構 |
+| [SERVICES.md](./docs/SERVICES.md) | 選用的外部服務與環境 |
+| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | 套件相依性 |
+| [API.md](./docs/API.md) | 業務 API、組織與成員 RPC、AI 伺服器端點 |
+| [DATABASE_TABLES.md](./docs/DATABASE_TABLES.md) | 資料表與業務邏輯 |
+| [PERMISSIONS.md](./docs/PERMISSIONS.md) | 角色與權限 |
+| [AGENT.md](./docs/AGENT.md) | AI 查詢助理的架構與 tools |
+| [EVALS.md](./docs/EVALS.md) | AI eval 服務 |
+| [SESSION_COORDINATION.md](./docs/SESSION_COORDINATION.md) | 兩個開發 Session 的分工與交接 |
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+需求做完時，同一次修改要更新對應的現況文件（[docs/requirements/README.md](./docs/requirements/README.md)）。
 
-## How can I deploy this project?
+## 開發
 
-Simply open [Lovable](https://lovable.dev/projects/a2c5b0ca-e286-4bd8-82b6-75f101419054) and click on Share -> Publish.
+```bash
+bun run dev          # 前端，http://localhost:8080
+bun run test         # 前端單元測試
+bun run lint
 
-## Can I connect a custom domain to my Lovable project?
+cd mcp-server
+bun run dev          # AI 伺服器，http://localhost:3100
+bun run test         # tools 與權限測試
+bun run eval -- --label <改了什麼>
+```
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- 驗證 AI 查詢畫面：`python3 scripts/verify-query-ui.py --headless`（帳號在 `.env` 的 `VERIFY_EMAIL`／`VERIFY_PASSWORD`）。
+- 資料庫變更：`supabase/tests/build-run.sh <migration> -- <測試檔…>` 產生 `run.sql`，在 Supabase SQL Editor 執行通過（結果為 `ALL TESTS PASSED`，一定回滾）後，再套用 migration。
+- 開發規則見 [CLAUDE.md](./CLAUDE.md)。

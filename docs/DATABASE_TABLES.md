@@ -10,8 +10,8 @@
 | 使用中（組織與權限） | `organizations`、`user_organizations`、`role_permissions`、`profiles`、`user_operation_logs` |
 | 使用中（紀錄） | `record_audit_logs` |
 | 使用中（AI 查詢，AI Session 負責） | `query_sessions`、`query_messages`、`query_pending_actions`、`query_traces` |
-| 已棄用（保留供編輯紀錄） | `organization_roles`、`user_organization_roles` |
-| 從未使用 | `shipment_history` |
+| 已棄用（移除中，見 §5） | `organization_roles`、`user_organization_roles` |
+| 從未使用（移除中，見 §5） | `shipment_history` |
 
 唯讀 view：`product_catalog`、`inventory_summary`、`inventory_summary_enhanced`（皆為 `security_invoker`，依呼叫者的權限讀取）。
 
@@ -33,9 +33,9 @@
 出貨單 shippings（O） ── 出貨布卷 shipping_items ────────┘
 ```
 
-- 所有業務寫入都經過業務 API（[BUSINESS_API.md](./BUSINESS_API.md)），以函式擁有者身分執行；資料表本身的 RLS 依權限鍵控制（[MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md) R4）。前端已沒有直接寫業務資料表的地方；AI tools 仍有幾處直接寫表（SESSION_COORDINATION.md §6）。
+- 所有業務寫入都經過業務 API（[API.md](./API.md)），以函式擁有者身分執行；資料表本身的 RLS 依權限鍵控制（[PERMISSIONS.md](./PERMISSIONS.md)）。前端已沒有直接寫業務資料表的地方；AI tools 仍有幾處直接寫表（SESSION_COORDINATION.md §6）。
 - 業務資料不實際刪除：主檔停用（`is_active`、顏色 `status`），單據取消（`status = cancelled` 加 `cancelled_at`、`cancel_reason`）。
-- 單據編號為「字母＋YYYYMMDD＋四位流水號」，組織內唯一、依台灣日期（BUSINESS_API.md §2.5）。
+- 單據編號為「字母＋YYYYMMDD＋四位流水號」，組織內唯一、依台灣日期（[API.md](./API.md) §2.5）。
 
 ## 3. 使用中的資料表
 
@@ -68,7 +68,7 @@
 
 | 資料表 | 筆數 | 用途與規則 | 寫入 |
 |--------|------|------------|------|
-| `organizations` 組織 | 4 | 名稱、擁有者 `owner_id`、`is_active`；建立時觸發器把擁有者加為成員 | 建立組織、轉移擁有權、刪除組織（RPC） |
+| `organizations` 組織 | 4 | 名稱、描述 `description`（建立組織時填寫）、擁有者 `owner_id`、`is_active`；建立時觸發器把擁有者加為成員 | 建立組織、轉移擁有權、刪除組織（RPC） |
 | `user_organizations` 成員 | 7 | 使用者在組織中的成員資格與角色 `role`（admin／editor／viewer，一人一個）、邀請與接受時間；`protect_membership_columns` 觸發器防止自行修改 | 邀請、接受、`set_member_role`、`set_member_active`（RPC） |
 | `role_permissions` 角色權限 | 65 | 三個固定角色各有哪些權限鍵（全域，不分組織）；擁有者取得管理員的權限。`user_has_organization_permission()` 讀這張表，RLS、API、AI 都經由它判斷 | migration |
 | `profiles` 使用者資料 | 6 | 姓名、電話、`is_active`；註冊時由觸發器建立 | 個人設定、用戶管理 |
@@ -106,16 +106,20 @@
 | `purchase_orders.order_id` | 舊的「一張採購單對一張訂單」欄位，現在全部是空值，改用 `purchase_order_relations`。部分函式為相容仍會一併檢查它；前端的訂單編輯視窗原本用它找關聯採購單，因此一直找不到，已於 2026-10-09 修正 |
 | `user_organizations.invited_role_id` | R1 之前邀請時指定的自訂角色；現在邀請直接寫 `role` |
 | `products_new.name`、`category`、`unit_of_measure` | 兩層產品之後由 `product_groups` 同步過來的副本，供尚未改讀母表的查詢使用；以 `product_groups` 為準 |
-| `organizations.settings`、`organizations.description` | 沒有任何功能讀寫；組織設定頁的設定卡片尚未實作（正式環境不顯示） |
+| `organizations.settings` | 沒有任何功能讀寫；組織設定頁的設定卡片尚未實作（正式環境不顯示）。`organizations.description` 由建立組織的視窗寫入，仍在使用 |
 
 ### 4.3 沒有被使用的函式
 
 `is_admin`、`create_default_organization_roles`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`：沒有 policy、觸發器、其他函式或程式呼叫。其中多數也是 Supabase 資安建議中「search_path 未固定」「匿名可執行」警告的來源。
 
-## 5. 清理建議（尚未執行）
+## 5. 清理（migration 待套用）
 
-移除資料表或函式無法復原，需先確認：
+使用者決定（2026-10-09）：棄用的資料表連同舊的編輯紀錄一起移除，不再顯示 R1 之前的角色編輯紀錄。`supabase/migrations/20261009102350_cleanup_deprecated.sql`（測試 `supabase/tests/cleanup_deprecated.test.sql`）：
 
-1. AI Session 確認沒有使用 §4 的資料表與函式（SESSION_COORDINATION.md §6）。
-2. 決定是否還要顯示 R1 之前（2026-10-08 以前）的角色相關編輯紀錄；不需要的話可一併移除 `organization_roles`、`user_organization_roles`。
-3. 一個 migration 移除：`shipment_history`、§4.3 的函式、`purchase_orders.order_id`（連同仍檢查它的程式）、`user_organizations.invited_role_id`。
+1. 改寫仍檢查 `purchase_orders.order_id` 的函式（`order_product_is_purchased`、`api_release_orders`、`cancel_order`、`cancel_purchase_order`），改為只看 `purchase_order_relations`。
+2. 移除欄位 `purchase_orders.order_id`、`user_organizations.invited_role_id`、`organizations.settings`。
+3. 移除函式 `create_default_organization_roles`，資料表 `shipment_history`、`user_organization_roles`、`organization_roles`，以及這些資料表在 `record_audit_logs` 中的紀錄。
+
+套用後更新本文件 §1、§4。
+
+`products_new.name`、`category`、`unit_of_measure` 暫不移除：AI tools 與 view 仍讀這些欄位，待改讀 `product_groups` 後再移除。§4.3 其餘函式的處理見下一次清理。

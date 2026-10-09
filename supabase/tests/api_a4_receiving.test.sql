@@ -1,4 +1,4 @@
--- 業務 API A4：入庫（進貨單）（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A4：入庫（進貨單）（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: purchase order (product 1, 100kg ordered, fully received) with one receiving batch holding one roll
 -- (100kg received, 40kg shipped); product 2 is not on the purchase order.
 

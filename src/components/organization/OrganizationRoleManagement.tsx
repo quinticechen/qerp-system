@@ -16,7 +16,7 @@ const COLUMNS: OrganizationRole[] = ['owner', 'admin', 'editor', 'viewer'];
 
 const OWNER_DESCRIPTION = '擁有組織的所有權限，並可以轉移擁有權、刪除組織';
 
-// Read-only overview of the four fixed roles (docs/MULTI_TENANT_RBAC.md §4.2). Roles are assigned in user management.
+// Read-only overview of the four fixed roles (docs/requirements/MULTI_TENANT_RBAC.md §4.2). Roles are assigned in user management.
 export const OrganizationRoleManagement = () => {
   const { currentOrganization, refreshOrganizations } = useOrganizationContext();
   const { isOwner } = useOrganizationPermissions();

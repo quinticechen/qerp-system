@@ -1,4 +1,4 @@
--- 業務 API A5：出貨單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A5：出貨單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 -- Fixture: order (product 1, 100kg) with one shipping of 40kg from a roll of 100kg (60kg left).
 
 -- Add a roll of a product to the fixture's receiving batch (test setup)
