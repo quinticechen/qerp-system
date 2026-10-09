@@ -18,7 +18,7 @@
 
 | 文件 | 內容 | 負責 | 狀態 |
 |------|------|------|------|
-| [PRD.md](./PRD.md) | 產品需求（紡織業 ERP 整體） | — | 參考 |
+| [PRD.md](./PRD.md) | 最初的產品需求（2025-08，紡織業 ERP 整體）；角色、技術選型已被取代（見文件開頭） | — | 參考 |
 | [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md) | 多租戶角色與權限（R0–R4） | RBAC Session | 已完成（2026-10-09） |
 | [PHASE1_BUSINESS_API.md](./PHASE1_BUSINESS_API.md) | Phase 1 業務 API 的計畫與決策（A1–A6、B1–B8） | RBAC Session | 已完成（2026-10-09） |
 

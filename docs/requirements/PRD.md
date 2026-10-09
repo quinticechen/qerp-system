@@ -1,5 +1,10 @@
-
 # 紡織業 ERP 系統 - 產品需求文件 (PRD)
+
+> 需求文件：專案最初的產品需求（2025-08）。下列部分已被後續決定取代，現況以右側文件為準：
+>
+> - 角色與權限（§1.3、§2.2、§3.9、§6.3）：改為固定的擁有者、管理員、編輯者、訪客，不提供自訂角色 → [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md)、[PERMISSIONS.md](../PERMISSIONS.md)
+> - 技術選型與架構（§5、§6）：沒有使用 Zustand 與 Edge Functions，業務邏輯在資料庫函式 → [TECH_STACK.md](../TECH_STACK.md)
+> - 資料模型（§7）→ [DATABASE_TABLES.md](../DATABASE_TABLES.md)；功能現況 → [FEATURES.md](../FEATURES.md)
 
 ## 1. 產品概述
 
