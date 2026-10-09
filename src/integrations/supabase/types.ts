@@ -1647,7 +1647,6 @@ export type Database = {
         Args: { _confirm_name: string; _organization_id: string }
         Returns: undefined
       }
-      ensure_user_profile: { Args: never; Returns: undefined }
       get_my_pending_invitations: {
         Args: never
         Returns: {
@@ -1667,13 +1666,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_user_organizations: {
-        Args: { _user_id: string }
-        Returns: {
-          organization_id: string
-        }[]
-      }
-      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_organization_owner: {
         Args: { _organization_id: string; _user_id: string }
         Returns: boolean
