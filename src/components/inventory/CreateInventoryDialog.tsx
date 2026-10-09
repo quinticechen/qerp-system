@@ -525,12 +525,9 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                               <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
                                 onClick={() => addRollToProduct(item.id, item.product_id)}
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                新增布卷
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50" size="icon" aria-label="新增布卷" title="新增布卷">
+                                <Plus className="h-4 w-4" />
                               </Button>
                             </div>
 

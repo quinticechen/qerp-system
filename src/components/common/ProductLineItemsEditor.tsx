@@ -152,9 +152,8 @@ export const ProductLineItemsEditor = <T extends ProductLineItem>({
       </Table>
 
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" size="sm" onClick={() => onChange([...items, createItem()])}>
-          <Plus className="mr-2 h-4 w-4" />
-          新增產品
+        <Button type="button" variant="outline" onClick={() => onChange([...items, createItem()])} size="icon" aria-label="新增產品" title="新增產品">
+          <Plus className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium text-gray-900">
           {totalLabel}：${total.toLocaleString()}

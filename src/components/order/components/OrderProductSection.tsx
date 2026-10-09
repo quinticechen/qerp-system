@@ -3,7 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash } from 'lucide-react';
+import { PackagePlus, Plus, Trash } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
 
@@ -68,15 +68,11 @@ export const OrderProductSection: React.FC<OrderProductSectionProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
-            onClick={onCreateProduct}
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            新增產品
+            onClick={onCreateProduct} size="icon" aria-label="新增產品" title="新增產品">
+            <PackagePlus className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onAddProduct}>
-            <Plus className="h-4 w-4 mr-2" />
-            新增明細
+          <Button type="button" variant="outline" onClick={onAddProduct} size="icon" aria-label="新增明細" title="新增明細">
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
       </div>

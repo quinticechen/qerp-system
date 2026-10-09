@@ -56,7 +56,7 @@ const seedTables = () => ({
     { id: "p-2", name: "麻布", color: null, organization_id: "org-1" },
     { id: "p-3", name: "絲綢", color: "紅", organization_id: "org-1" },
   ],
-  purchase_orders: [],
+  purchase_order_relations: [] as Record<string, unknown>[],
   shippings: [],
 });
 
@@ -154,5 +154,33 @@ describe("EditOrderDialog product editing", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("產品「棉布」的數量不可低於已出貨 40 公斤");
     expect(fake.current!.updates.some((u) => u.table === "orders")).toBe(false);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("shows the purchase orders linked to the order and locks the products they buy", async () => {
+    const tables = seedTables();
+    tables.purchase_order_relations = [
+      {
+        order_id: "order-1",
+        purchase_orders: {
+          id: "po-1",
+          po_number: "P202610090001",
+          status: "confirmed",
+          order_date: "2026-10-09",
+          factories: { name: "大東織造" },
+          purchase_order_items: [{ id: "poi-1", product_id: "p-2", products_new: { name: "麻布", color: null } }],
+        },
+      },
+    ];
+    fake.current = createFakeSupabase(tables);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <EditOrderDialog order={order} open onOpenChange={() => {}} onOrderUpdated={() => {}} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("P202610090001")).toBeInTheDocument();
+    const row = (await screen.findByLabelText("第 2 項數量（公斤）")).closest("tr")!;
+    await waitFor(() => expect(within(row).getByRole("button", { name: "刪除第 2 項" })).toBeDisabled());
   });
 });

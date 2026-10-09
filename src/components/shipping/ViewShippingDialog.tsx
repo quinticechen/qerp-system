@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Pencil } from 'lucide-react';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewShippingDialogProps {
@@ -140,7 +141,11 @@ export const ViewShippingDialog: React.FC<ViewShippingDialogProps> = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
-          {onEdit && <Button onClick={onEdit}>編輯</Button>}
+          {onEdit && (
+            <Button size="icon" onClick={onEdit} aria-label="編輯" title="編輯">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

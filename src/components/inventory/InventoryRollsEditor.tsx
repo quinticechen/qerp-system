@@ -145,9 +145,8 @@ export const InventoryRollsEditor = ({ rolls, onChange, products, warehouses }: 
       </div>
 
       <div className="flex items-center justify-between">
-        <Button type="button" variant="outline" size="sm" onClick={() => onChange([...rolls, newInventoryRoll()])}>
-          <Plus className="mr-2 h-4 w-4" />
-          新增布卷
+        <Button type="button" variant="outline" onClick={() => onChange([...rolls, newInventoryRoll()])} size="icon" aria-label="新增布卷" title="新增布卷">
+          <Plus className="h-4 w-4" />
         </Button>
         <span className="text-sm font-medium text-gray-900">
           共 {rolls.length} 卷，{totalWeight.toFixed(2)} 公斤

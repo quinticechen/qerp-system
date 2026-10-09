@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Pencil, Power, PowerOff } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
@@ -108,11 +109,21 @@ export const ViewFactoryDialog: React.FC<ViewFactoryDialogProps> = ({
             關閉
           </Button>
           {onToggleActive && (
-            <Button variant="outline" onClick={onToggleActive}>
-              {factory.is_active ? '停用' : '啟用'}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={onToggleActive}
+              aria-label={factory.is_active ? '停用' : '啟用'}
+              title={factory.is_active ? '停用' : '啟用'}
+            >
+              {factory.is_active ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
             </Button>
           )}
-          {onEdit && <Button onClick={onEdit}>編輯</Button>}
+          {onEdit && (
+            <Button size="icon" onClick={onEdit} aria-label="編輯" title="編輯">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

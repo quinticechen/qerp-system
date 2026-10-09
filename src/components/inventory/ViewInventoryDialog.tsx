@@ -146,9 +146,8 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange, readOnly = 
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">基本資訊</h3>
             {!readOnly && !isEditingBatch && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditingBatch(true)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                編輯批次資料
+              <Button variant="outline" onClick={() => setIsEditingBatch(true)} size="icon" aria-label="編輯批次資料" title="編輯批次資料">
+                <Pencil className="h-4 w-4" />
               </Button>
             )}
           </div>
@@ -215,9 +214,8 @@ export const ViewInventoryDialog = ({ inventory, open, onOpenChange, readOnly = 
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">布卷明細</h3>
               {!readOnly && !rollDrafts && (
-                <Button variant="outline" size="sm" onClick={startEditingRolls} disabled={isLoading}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  編輯布卷明細
+                <Button variant="outline" onClick={startEditingRolls} disabled={isLoading} size="icon" aria-label="編輯布卷明細" title="編輯布卷明細">
+                  <Pencil className="h-4 w-4" />
                 </Button>
               )}
             </div>

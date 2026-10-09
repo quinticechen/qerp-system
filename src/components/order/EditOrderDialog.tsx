@@ -85,20 +85,23 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   const { data: relatedData } = useQuery({
     queryKey: ['order-related-data', order.id],
     queryFn: async () => {
-      // Fetch purchase orders related to this order
-      const { data: purchaseOrders, error: poError } = await supabase
-        .from('purchase_orders')
+      // Purchase orders linked to this order (purchase_order_relations; purchase_orders.order_id is no longer filled)
+      const { data: links, error: poError } = await supabase
+        .from('purchase_order_relations')
         .select(`
-          *,
-          factories (name),
-          purchase_order_items (
+          purchase_orders (
             *,
-            products_new (name, color)
+            factories (name),
+            purchase_order_items (
+              *,
+              products_new (name, color)
+            )
           )
         `)
         .eq('order_id', order.id);
 
       if (poError) throw poError;
+      const purchaseOrders = (links ?? []).map((link) => link.purchase_orders).filter((po) => po !== null);
 
       // Fetch shipping records for this order
       const { data: shippings, error: shippingError } = await supabase

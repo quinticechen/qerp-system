@@ -126,6 +126,7 @@ Users must never meet a control that does nothing. Any UI whose feature is not i
 The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINISHED_FEATURES`). `vite.config.ts` sets it at build time from Vercel's `VERCEL_ENV`: `production` → production, `preview` → staging; the dev server is development. Set `VITE_APP_ENV` to override.
 
 - Wrap whole cards or sections, not single inputs; pass a grid span such as `lg:col-span-2` as the wrapper's `className`.
+- For a short value or line of text inside a working card (e.g. a placeholder trend figure), use `variant="inline"`.
 - Remove the wrapper in the same change that makes the feature work.
 - Do not ship a half-wired feature unwrapped: if saving, the permission check or the database part is missing, it is unfinished.
 
