@@ -141,6 +141,13 @@ begin
   end;
   execute 'reset role';
 
+  -- Business APIs raise through api_fail(): SQLSTATE PGRST with the real code, hint and message as JSON
+  if v_state = 'PGRST' then
+    v_hint := v_message::json->>'hint';
+    v_state := v_message::json->>'code';
+    v_message := v_message::json->>'message';
+  end if;
+
   if v_state is null then
     raise exception 'FAIL: % (no error raised)', description;
   end if;

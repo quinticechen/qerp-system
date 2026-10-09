@@ -48,15 +48,17 @@
 
 ### 2.3 錯誤
 
-錯誤以 `RAISE EXCEPTION '<給使用者看的中文>' USING ERRCODE = '<類別>', HINT = '<代碼>'` 拋出。前端與 AI 直接顯示 `message`，依 `hint` 判斷情況，不顯示資料庫原始錯誤。
+錯誤以 `PERFORM public.api_fail('<類別>', '<代碼>', '<給使用者看的中文>')` 拋出（2026-10-09 起；原本為 `RAISE ... USING ERRCODE, HINT`）。透過 PostgREST（前端 `supabase.rpc`、AI tools）收到的錯誤內容為 `{ code: 類別, message: 中文訊息, hint: 代碼 }`；前端與 AI 直接顯示 `message`，依 `hint` 判斷情況，不顯示資料庫原始錯誤。
 
-| 類別（SQLSTATE） | 意義 | 代碼範例 |
-|------------------|------|----------|
-| `42501` | 沒有登入或沒有權限 | `forbidden` |
-| `P0002` | 找不到（含屬於其他組織） | `customer_not_found`、`product_not_found` |
-| `22023` | 輸入不正確 | `name_required`、`phone_required`、`invalid_email` |
-| `23505` | 重複 | `customer_name_taken` |
-| `55000` | 目前狀態不允許（例如已出貨不可取消） | `order_has_shipments` |
+| 類別（`code`） | HTTP 狀態 | 意義 | 代碼範例 |
+|----------------|-----------|------|----------|
+| `42501` | 403 | 沒有登入或沒有權限 | `forbidden` |
+| `P0002` | 404 | 找不到（含屬於其他組織） | `customer_not_found`、`product_not_found` |
+| `22023` | 400 | 輸入不正確 | `name_required`、`phone_required`、`invalid_email` |
+| `23505` | 409 | 重複 | `customer_name_taken` |
+| `55000` | 409 | 目前狀態不允許（例如已出貨不可取消） | `order_has_shipments` |
+
+`api_fail()` 以 PostgREST 的自訂錯誤（SQLSTATE `PGRST`）實作，才能指定 HTTP 狀態；直接用一般的 SQLSTATE 時，`P0002`、`55000` 會變成 500。在資料庫內（SQL 測試、其他函式）攔截時看到的 SQLSTATE 是 `PGRST`，`code`、`message`、`hint` 在錯誤訊息的 JSON 中（`supabase/tests/_helpers.sql` 的 `check_api_error_as` 會自動拆開）。新增 API 時一律使用 `api_fail()`。
 
 屬於其他組織的資料一律回報「找不到」，不透露它存在。
 
