@@ -55,8 +55,9 @@ begin
   values (v_order, v_product, 100, 10) returning id into v_order_product;
 
   insert into public.factories (name, organization_id) values ('測試工廠', v_org) returning id into v_factory;
-  insert into public.purchase_orders (factory_id, user_id, organization_id, order_id)
-  values (v_factory, v_user, v_org, v_order) returning id into v_po;
+  insert into public.purchase_orders (factory_id, user_id, organization_id)
+  values (v_factory, v_user, v_org) returning id into v_po;
+  insert into public.purchase_order_relations (purchase_order_id, order_id) values (v_po, v_order);
   insert into public.purchase_order_items (purchase_order_id, product_id, ordered_quantity, unit_price)
   values (v_po, v_product, 100, 5) returning id into v_po_item;
 
@@ -123,7 +124,7 @@ begin
 end $$;
 
 -- Run a statement as the given user and require it to fail with the business-API error contract
--- (docs/BUSINESS_API.md §2.3): the given SQLSTATE and HINT code
+-- (docs/API.md §2.3): the given SQLSTATE and HINT code
 create or replace function pg_temp.check_api_error_as(user_id uuid, statement text, expected_state text, expected_hint text, description text)
 returns void language plpgsql as $$
 declare

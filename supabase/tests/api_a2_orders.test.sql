@@ -1,4 +1,4 @@
--- 業務 API A2：訂單（docs/BUSINESS_API.md）。先載入 _helpers.sql 再執行本檔。
+-- 業務 API A2：訂單（docs/API.md）。先載入 _helpers.sql 再執行本檔。
 
 -- Add an active factory to an organization (test setup)
 create or replace function pg_temp.add_factory(org_id uuid, factory_name text, active boolean default true)
@@ -204,7 +204,8 @@ begin
     '55000', 'order_has_shipments', 'an order with shipments cannot be cancelled');
 
   v_po_order := (pg_temp.call_as(v_editor, format('select public.create_order(%L, %L, %L)', v_org, fx->>'customer_id', v_line))->>'id')::uuid;
-  insert into public.purchase_orders (factory_id, user_id, organization_id, order_id) values ((fx->>'factory_id')::uuid, v_editor, v_org, v_po_order);
+  with po as (insert into public.purchase_orders (factory_id, user_id, organization_id) values ((fx->>'factory_id')::uuid, v_editor, v_org) returning id)
+  insert into public.purchase_order_relations (purchase_order_id, order_id) select id, v_po_order from po;
   perform pg_temp.check_api_error_as(v_editor, format('select public.cancel_order(%L, %L)', v_org, v_po_order),
     '55000', 'order_has_purchase_orders', 'an order with a live purchase order cannot be cancelled');
 

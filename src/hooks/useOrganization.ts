@@ -7,7 +7,6 @@ export interface Organization {
   id: string;
   name: string;
   description?: string;
-  settings: Record<string, any>;
   owner_id: string;
   is_active: boolean;
   created_at: string;
@@ -66,7 +65,6 @@ export const useOrganization = () => {
             id,
             name,
             description,
-            settings,
             owner_id,
             is_active,
             created_at,

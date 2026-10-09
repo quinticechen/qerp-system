@@ -10,8 +10,6 @@
 | 使用中（組織與權限） | `organizations`、`user_organizations`、`role_permissions`、`profiles`、`user_operation_logs` |
 | 使用中（紀錄） | `record_audit_logs` |
 | 使用中（AI 查詢，AI Session 負責） | `query_sessions`、`query_messages`、`query_pending_actions`、`query_traces` |
-| 已棄用（移除中，見 §5） | `organization_roles`、`user_organization_roles` |
-| 從未使用（移除中，見 §5） | `shipment_history` |
 
 唯讀 view：`product_catalog`、`inventory_summary`、`inventory_summary_enhanced`（皆為 `security_invoker`，依呼叫者的權限讀取）。
 
@@ -91,35 +89,20 @@
 
 ## 4. 棄用與未使用
 
-### 4.1 資料表
-
-| 資料表 | 筆數 | 狀況 | 建議 |
-|--------|------|------|------|
-| `organization_roles` | 18 | R1 改為固定角色後不再讀寫（最後寫入 2026-10-07）。前端只在顯示舊的編輯紀錄時用它把角色 id 轉成名稱；AI 伺服器只在註解中提到 | 保留到不再需要顯示 R1 之前的編輯紀錄，之後可移除 |
-| `user_organization_roles` | 6 | 同上，R1 之前的成員角色指派；已無任何程式讀寫 | 同上 |
-| `shipment_history` | 0 | 從建立以來沒有任何資料，也沒有程式讀寫；出貨紀錄實際存在 `shipping_items` | 可移除 |
-
-### 4.2 欄位
+### 4.1 欄位
 
 | 欄位 | 狀況 |
 |------|------|
-| `purchase_orders.order_id` | 舊的「一張採購單對一張訂單」欄位，現在全部是空值，改用 `purchase_order_relations`。部分函式為相容仍會一併檢查它；前端的訂單編輯視窗原本用它找關聯採購單，因此一直找不到，已於 2026-10-09 修正 |
-| `user_organizations.invited_role_id` | R1 之前邀請時指定的自訂角色；現在邀請直接寫 `role` |
-| `products_new.name`、`category`、`unit_of_measure` | 兩層產品之後由 `product_groups` 同步過來的副本，供尚未改讀母表的查詢使用；以 `product_groups` 為準 |
-| `organizations.settings` | 沒有任何功能讀寫；組織設定頁的設定卡片尚未實作（正式環境不顯示）。`organizations.description` 由建立組織的視窗寫入，仍在使用 |
+| `products_new.name`、`category`、`unit_of_measure` | 兩層產品之後由 `product_groups` 同步過來的副本；以 `product_groups` 為準。AI tools 與 view 仍讀這些欄位，改讀 `product_groups` 後再移除 |
 
-### 4.3 沒有被使用的函式
+### 4.2 沒有被使用的函式
 
-`is_admin`、`create_default_organization_roles`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`：沒有 policy、觸發器、其他函式或程式呼叫。其中多數也是 Supabase 資安建議中「search_path 未固定」「匿名可執行」警告的來源。
+`is_admin`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`：沒有 policy、觸發器、其他函式或程式呼叫，也是 Supabase 資安建議「search_path 未固定」「可被呼叫」警告的來源之一。
 
-## 5. 清理（migration 待套用）
+## 5. 清理紀錄
 
-使用者決定（2026-10-09）：棄用的資料表連同舊的編輯紀錄一起移除，不再顯示 R1 之前的角色編輯紀錄。`supabase/migrations/20261009102350_cleanup_deprecated.sql`（測試 `supabase/tests/cleanup_deprecated.test.sql`）：
+**2026-10-09**（使用者決定，`supabase/migrations/20261009102350_cleanup_deprecated.sql`，測試 `supabase/tests/cleanup_deprecated.test.sql`）：棄用的資料表連同舊的編輯紀錄一起移除，不再顯示 R1 之前的角色編輯紀錄。
 
-1. 改寫仍檢查 `purchase_orders.order_id` 的函式（`order_product_is_purchased`、`api_release_orders`、`cancel_order`、`cancel_purchase_order`），改為只看 `purchase_order_relations`。
-2. 移除欄位 `purchase_orders.order_id`、`user_organizations.invited_role_id`、`organizations.settings`。
-3. 移除函式 `create_default_organization_roles`，資料表 `shipment_history`、`user_organization_roles`、`organization_roles`，以及這些資料表在 `record_audit_logs` 中的紀錄。
-
-套用後更新本文件 §1、§4。
-
-`products_new.name`、`category`、`unit_of_measure` 暫不移除：AI tools 與 view 仍讀這些欄位，待改讀 `product_groups` 後再移除。§4.3 其餘函式的處理見下一次清理。
+- 移除資料表：`organization_roles`、`user_organization_roles`（R1 改為固定角色後不再讀寫）、`shipment_history`（從未有資料，出貨紀錄在 `shipping_items`），以及它們在 `record_audit_logs` 中的紀錄。
+- 移除欄位：`purchase_orders.order_id`（舊的一對一欄位，全部為空值，改用 `purchase_order_relations`）、`user_organizations.invited_role_id`（邀請直接寫 `role`）、`organizations.settings`（沒有功能讀寫）。
+- 移除函式 `create_default_organization_roles`；`order_product_is_purchased`、`api_release_orders`、`cancel_order`、`cancel_purchase_order` 改為只看 `purchase_order_relations`。

@@ -1,4 +1,4 @@
--- RBAC R0 安全修補測試（docs/MULTI_TENANT_RBAC.md §2.1）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R0 安全修補測試（docs/requirements/MULTI_TENANT_RBAC.md §2.1）。先載入 _helpers.sql 再執行本檔。
 
 -- S1–S3: an outsider cannot join an organization, grant itself a role, or create roles there
 do $$
@@ -7,19 +7,13 @@ declare
   outsider jsonb := pg_temp.seed_fixture();
   v_org uuid := (fx->>'org_id')::uuid;
   v_out uuid := (outsider->>'user_id')::uuid;
-  v_admin_role uuid;
 begin
-  select id into v_admin_role from public.organization_roles where organization_id = v_org and name = 'admin';
-
   perform pg_temp.check_raises_as(v_out,
     format('insert into public.user_organizations (user_id, organization_id, is_active) values (%L, %L, true)', v_out, v_org),
     '成員只能經由邀請加入組織', 'S1: an outsider cannot add itself to another organization');
-  perform pg_temp.check_raises_as(v_out,
-    format('insert into public.user_organization_roles (user_id, organization_id, role_id, granted_by) values (%L, %L, %L, %L)', v_out, v_org, v_admin_role, v_out),
-    'row-level security', 'S2: an outsider cannot grant itself a role in another organization');
-  perform pg_temp.check_raises_as(v_out,
-    format('insert into public.organization_roles (organization_id, name, display_name, permissions) values (%L, %L, %L, %L)', v_org, 'x', 'x', '{"canEditUsers": true}'),
-    'row-level security', 'S3: an outsider cannot create a role in another organization');
+  -- S2, S3: the custom role tables an outsider could write to were removed (20261009102350_cleanup_deprecated.sql)
+  perform pg_temp.check(to_regclass('public.organization_roles') is null and to_regclass('public.user_organization_roles') is null,
+    'S2/S3: the custom role tables no longer exist');
 
   perform pg_temp.check(not public.user_has_organization_permission(v_out, v_org, 'canViewOrders'),
     'the outsider has no permission in the organization');
@@ -55,7 +49,7 @@ declare
   v_changed int;
 begin
   insert into public.order_factories (order_id, factory_id) values (v_order, (fx->>'factory_id')::uuid);
-  insert into public.purchase_order_relations (purchase_order_id, order_id) values (v_po, v_order);
+  -- seed_fixture already links the purchase order to the order
   insert into public.factories (name, organization_id) values ('第二工廠', (fx->>'org_id')::uuid) returning id into v_factory2;
 
   -- Anonymous requests see and delete nothing
@@ -122,10 +116,6 @@ begin
   perform pg_temp.check_raises_as(v_out,
     format('insert into public.shipping_items (shipping_id, inventory_roll_id, shipped_quantity) values (%L, %L, 1)', (fx->>'shipping_id')::uuid, (outsider->>'roll_id')::uuid),
     'row-level security', 'S5: an outsider cannot add items to another organization''s shipping');
-  perform pg_temp.check_raises_as(v_out,
-    format('insert into public.shipment_history (shipping_item_id, product_id, customer_id, quantity, date) values (%L, %L, %L, 1, current_date)',
-      (outsider->>'shipping_item_id')::uuid, (outsider->>'product_id')::uuid, (fx->>'customer_id')::uuid),
-    'row-level security', 'S5: an outsider cannot write shipment history for another organization''s customer');
 end $$;
 
 -- S6: no policy relies on the legacy global is_admin()

@@ -190,35 +190,22 @@ describe("RecordAuditHistoryButton for people and permissions", () => {
         },
         {
           id: "log-role",
-          table_name: "user_organization_roles",
-          record_id: "uor-1",
+          table_name: "user_organizations",
+          record_id: "membership-1",
           parent_id: USER_ID,
-          action: "INSERT",
-          old_data: null,
-          new_data: { id: "uor-1", user_id: USER_ID, role_id: "role-sales", is_active: true },
-          changed_fields: [],
+          action: "UPDATE",
+          old_data: { id: "membership-1", user_id: USER_ID, role: "viewer", is_active: true },
+          new_data: { id: "membership-1", user_id: USER_ID, role: "editor", is_active: true },
+          changed_fields: ["role"],
           changed_by: "user-1",
           changed_at: "2026-10-07T02:00:00Z",
         },
-        {
-          id: "log-permissions",
-          table_name: "organization_roles",
-          record_id: USER_ID,
-          parent_id: null,
-          action: "UPDATE",
-          old_data: { permissions: { canEditProducts: false, canViewOrders: true } },
-          new_data: { permissions: { canEditProducts: true, canViewOrders: false } },
-          changed_fields: ["permissions"],
-          changed_by: "user-1",
-          changed_at: "2026-10-07T01:00:00Z",
-        },
       ],
       profiles: [{ id: "user-1", full_name: "王小明" }],
-      organization_roles: [{ id: "role-sales", display_name: "業務" }],
     });
   });
 
-  it("shows profile, role assignment and permission changes in plain words", async () => {
+  it("shows profile and role changes in plain words", async () => {
     const user = userEvent.setup();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -229,15 +216,61 @@ describe("RecordAuditHistoryButton for people and permissions", () => {
 
     await user.click(screen.getByRole("button", { name: "編輯紀錄" }));
     const panel = await screen.findByRole("dialog", { name: "編輯紀錄" });
-    const [profile, role, permissions] = await within(panel).findAllByRole("listitem");
+    const [profile, role] = await within(panel).findAllByRole("listitem");
 
     expect(within(profile).getByText("修改用戶資料「林大華」")).toBeInTheDocument();
     expect(within(profile).getByText("姓名")).toBeInTheDocument();
     expect(within(profile).getByText("林小華 → 林大華")).toBeInTheDocument();
 
-    expect(within(role).getByText("新增成員角色「業務」")).toBeInTheDocument();
+    expect(within(role).getByText("角色")).toBeInTheDocument();
+    expect(within(role).getByText("訪客 → 編輯者")).toBeInTheDocument();
+  });
+});
 
-    expect(within(permissions).getByText("權限")).toBeInTheDocument();
-    expect(within(permissions).getByText("開啟：編輯產品｜關閉：查看訂單")).toBeInTheDocument();
+describe("RecordAuditHistoryButton for coded values", () => {
+  beforeEach(() => {
+    fake.current = createFakeSupabase({
+      record_audit_logs: [
+        {
+          id: "log-line-status",
+          table_name: "order_products",
+          record_id: "op-1",
+          parent_id: ORDER_ID,
+          action: "UPDATE",
+          old_data: { id: "op-1", product_id: "p-1", status: "partial_shipped" },
+          new_data: { id: "op-1", product_id: "p-1", status: "pending" },
+          changed_fields: ["status"],
+          changed_by: "user-1",
+          changed_at: "2026-10-09T01:00:00Z",
+        },
+        {
+          id: "log-order-status",
+          table_name: "orders",
+          record_id: ORDER_ID,
+          parent_id: null,
+          action: "UPDATE",
+          old_data: { id: ORDER_ID, status: "factory_ordered", shipping_status: "partial_shipped" },
+          new_data: { id: ORDER_ID, status: "pending", shipping_status: "not_started" },
+          changed_fields: ["status", "shipping_status"],
+          changed_by: "user-1",
+          changed_at: "2026-10-09T00:00:00Z",
+        },
+      ],
+      profiles: [{ id: "user-1", full_name: "王小明" }],
+      products_new: [{ id: "p-1", name: "棉布", color: "白" }],
+    });
+  });
+
+  it("shows statuses in words, per table", async () => {
+    const user = userEvent.setup();
+    renderButton();
+
+    await user.click(screen.getByRole("button", { name: "編輯紀錄" }));
+    const panel = await screen.findByRole("dialog", { name: "編輯紀錄" });
+    const [line, order] = await within(panel).findAllByRole("listitem");
+
+    expect(within(line).getByText("部分出貨 → 未出貨")).toBeInTheDocument();
+    expect(within(order).getByText("已向工廠下單 → 待確認")).toBeInTheDocument();
+    expect(within(order).getByText("部分出貨 → 未出貨")).toBeInTheDocument();
   });
 });

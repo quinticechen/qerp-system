@@ -1,4 +1,4 @@
--- RBAC R4：業務資料表依權限鍵的 RLS（docs/MULTI_TENANT_RBAC.md §4.4）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R4：業務資料表依權限鍵的 RLS（docs/requirements/MULTI_TENANT_RBAC.md §4.4）。先載入 _helpers.sql 再執行本檔。
 
 -- Run a statement as the given user and return how many rows it touched (or the single integer a query returns)
 create or replace function pg_temp.rows_as(user_id uuid, statement text)
@@ -126,6 +126,7 @@ declare
   other jsonb := pg_temp.seed_fixture();
   v_editor uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'editor');
   v_viewer uuid := pg_temp.add_member((fx->>'org_id')::uuid, 'viewer');
+  v_second_order uuid;
 begin
   perform pg_temp.check_raises_as(v_viewer, format('insert into public.order_factories (order_id, factory_id) values (%L, %L)', fx->>'order_id', fx->>'factory_id'),
     'row-level security', 'a viewer cannot assign a factory to an order');
@@ -138,13 +139,16 @@ begin
   perform pg_temp.check(pg_temp.rows_as(v_editor, format('delete from public.order_factories where order_id = %L', fx->>'order_id')) = 1,
     'an editor can unassign a factory');
 
-  perform pg_temp.check_raises_as(v_viewer, format('insert into public.purchase_order_relations (purchase_order_id, order_id) values (%L, %L)', fx->>'po_id', fx->>'order_id'),
+  -- seed_fixture links its purchase order to its order; link it to a second order here
+  insert into public.orders (customer_id, user_id, organization_id) values ((fx->>'customer_id')::uuid, (fx->>'user_id')::uuid, (fx->>'org_id')::uuid)
+  returning id into v_second_order;
+  perform pg_temp.check_raises_as(v_viewer, format('insert into public.purchase_order_relations (purchase_order_id, order_id) values (%L, %L)', fx->>'po_id', v_second_order),
     'row-level security', 'a viewer cannot link a purchase order to an order');
-  perform pg_temp.check(pg_temp.rows_as(v_editor, format('insert into public.purchase_order_relations (purchase_order_id, order_id) values (%L, %L)', fx->>'po_id', fx->>'order_id')) = 1,
+  perform pg_temp.check(pg_temp.rows_as(v_editor, format('insert into public.purchase_order_relations (purchase_order_id, order_id) values (%L, %L)', fx->>'po_id', v_second_order)) = 1,
     'an editor can link a purchase order to an order');
   perform pg_temp.check_raises_as(v_editor, format('insert into public.purchase_order_relations (purchase_order_id, order_id) values (%L, %L)', fx->>'po_id', other->>'order_id'),
     'row-level security', 'a purchase order cannot be linked to another organization''s order');
-  perform pg_temp.check(pg_temp.rows_as(v_viewer, format('select count(*)::int from public.purchase_order_relations where purchase_order_id = %L', fx->>'po_id')) = 1,
+  perform pg_temp.check(pg_temp.rows_as(v_viewer, format('select count(*)::int from public.purchase_order_relations where purchase_order_id = %L', fx->>'po_id')) = 2,
     'a viewer sees the purchase order''s linked orders');
 end $$;
 

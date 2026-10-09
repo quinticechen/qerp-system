@@ -6,9 +6,9 @@ import {
   AUDIT_FIELD_LABELS,
   AUDIT_SNAPSHOT_HIDDEN_FIELDS,
   AUDIT_TABLE_LABELS,
+  AUDIT_VALUE_LABELS,
   formatAuditValue,
 } from '@/lib/auditLabels';
-import { PERMISSION_LABELS } from '@/lib/permissionLabels';
 import { ROLE_LABELS } from '@/lib/roles';
 
 interface RecordAuditHistoryProps {
@@ -18,30 +18,11 @@ interface RecordAuditHistoryProps {
 
 type Names = Record<string, string>;
 
-const formatFieldValue = (field: string, value: Json | undefined, names: Names) => {
+const formatFieldValue = (table: string, field: string, value: Json | undefined, names: Names) => {
+  const codes = AUDIT_VALUE_LABELS[`${table}.${field}`];
+  if (codes && typeof value === 'string' && codes[value]) return codes[value];
   if (field === 'role' && typeof value === 'string' && value in ROLE_LABELS) return ROLE_LABELS[value as keyof typeof ROLE_LABELS];
   return field in REFERENCE_FIELDS && typeof value === 'string' && names[value] ? names[value] : formatAuditValue(value);
-};
-
-type PermissionMap = Record<string, boolean>;
-
-const asPermissions = (value: Json | undefined): PermissionMap =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as PermissionMap) : {};
-
-// Role permissions are a map of switches; describe which ones were turned on or off
-const describePermissions = (before: Json | undefined, after: Json | undefined) => {
-  const old = asPermissions(before);
-  const next = asPermissions(after);
-  const keys = [...new Set([...Object.keys(old), ...Object.keys(next)])];
-  const label = (key: string) => PERMISSION_LABELS[key] ?? key;
-  const turnedOn = keys.filter((key) => next[key] === true && old[key] !== true).map(label);
-  const turnedOff = keys.filter((key) => next[key] !== true && old[key] === true).map(label);
-  return [
-    turnedOn.length > 0 ? `開啟：${turnedOn.join('、')}` : null,
-    turnedOff.length > 0 ? `關閉：${turnedOff.join('、')}` : null,
-  ]
-    .filter(Boolean)
-    .join('｜') || '無變更';
 };
 
 // What the row is about, e.g. the product of an order line or the roll number of a roll
@@ -49,7 +30,7 @@ const subjectOf = (entry: RecordAuditEntry, names: Names): string | null => {
   const row = entry.action === 'DELETE' ? entry.old_data : entry.new_data;
   if (!row) return null;
   if (typeof row.roll_number === 'string') return row.roll_number;
-  for (const field of ['product_id', 'inventory_roll_id', 'role_id']) {
+  for (const field of ['product_id', 'inventory_roll_id']) {
     const value = row[field];
     if (typeof value === 'string' && names[value]) return names[value];
   }
@@ -75,10 +56,7 @@ const entryFields = (entry: RecordAuditEntry, names: Names) => {
   if (entry.action === 'UPDATE') {
     return entry.changed_fields.map((field) => ({
       label: AUDIT_FIELD_LABELS[field] ?? field,
-      value:
-        field === 'permissions'
-          ? describePermissions(entry.old_data?.[field], entry.new_data?.[field])
-          : `${formatFieldValue(field, entry.old_data?.[field], names)} → ${formatFieldValue(field, entry.new_data?.[field], names)}`,
+      value: `${formatFieldValue(entry.table_name, field, entry.old_data?.[field], names)} → ${formatFieldValue(entry.table_name, field, entry.new_data?.[field], names)}`,
     }));
   }
 
@@ -89,7 +67,7 @@ const entryFields = (entry: RecordAuditEntry, names: Names) => {
     .filter((field) => row[field] !== undefined && row[field] !== null && row[field] !== '')
     .map((field) => ({
       label: AUDIT_FIELD_LABELS[field],
-      value: field === 'permissions' ? describePermissions(undefined, row[field]) : formatFieldValue(field, row[field], names),
+      value: formatFieldValue(entry.table_name, field, row[field], names),
     }));
 };
 

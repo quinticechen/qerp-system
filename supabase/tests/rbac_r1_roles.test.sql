@@ -1,6 +1,6 @@
--- RBAC R1 固定角色測試（docs/MULTI_TENANT_RBAC.md §4）。先載入 _helpers.sql 再執行本檔。
+-- RBAC R1 固定角色測試（docs/requirements/MULTI_TENANT_RBAC.md §4）。先載入 _helpers.sql 再執行本檔。
 
--- Every role holds exactly the permissions of docs/MULTI_TENANT_RBAC.md §4.3; removed keys are granted to nobody
+-- Every role holds exactly the permissions of docs/requirements/MULTI_TENANT_RBAC.md §4.3; removed keys are granted to nobody
 do $$
 declare
   fx jsonb := pg_temp.seed_fixture();
@@ -262,7 +262,7 @@ begin
 
   perform pg_temp.check((select role from public.user_organizations where user_id = v_user and organization_id = v_org and is_active) = 'admin',
     'the creator is an active admin member');
-  perform pg_temp.check((select count(*) from public.organization_roles where organization_id = v_org) = 0, 'no legacy role rows are created');
+  perform pg_temp.check(to_regclass('public.organization_roles') is null, 'the legacy role table is gone');
 end $$;
 
 -- Signed-in users can read the role catalog; anonymous callers can neither read it nor call the permission functions
