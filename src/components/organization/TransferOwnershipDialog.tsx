@@ -67,10 +67,10 @@ export const TransferOwnershipDialog = ({ open, onOpenChange, onSuccess }: Trans
     if (!currentOrganization) return;
 
     try {
-      // 更新 owner_id、新舊擁有者角色調整、寫操作紀錄全部收進一個
+      // 更新 owner_id、新舊擁有者的角色調整、寫操作紀錄全部收進一個
       // transaction 式 RPC：任何一步失敗就整個 rollback，不會讓
-      // organizations.owner_id 跟 user_organization_roles 兩邊對不起來；
-      // 舊擁有者也會自動拿到一個預設角色（admin），不會轉移後變成無角色。
+      // organizations.owner_id 跟 user_organizations.role 兩邊對不起來；
+      // 舊擁有者會改為管理員，不會轉移後變成無角色。
       const { error } = await supabase.rpc('transfer_organization_ownership', {
         _organization_id: currentOrganization.id,
         _new_owner_id: data.new_owner_id,

@@ -55,8 +55,9 @@ begin
   values (v_order, v_product, 100, 10) returning id into v_order_product;
 
   insert into public.factories (name, organization_id) values ('測試工廠', v_org) returning id into v_factory;
-  insert into public.purchase_orders (factory_id, user_id, organization_id, order_id)
-  values (v_factory, v_user, v_org, v_order) returning id into v_po;
+  insert into public.purchase_orders (factory_id, user_id, organization_id)
+  values (v_factory, v_user, v_org) returning id into v_po;
+  insert into public.purchase_order_relations (purchase_order_id, order_id) values (v_po, v_order);
   insert into public.purchase_order_items (purchase_order_id, product_id, ordered_quantity, unit_price)
   values (v_po, v_product, 100, 5) returning id into v_po_item;
 
@@ -120,4 +121,51 @@ begin
   insert into public.user_organizations (user_id, organization_id, is_active, accepted_at, role)
   values (v_user, org_id, true, now(), member_role);
   return v_user;
+end $$;
+
+-- Run a statement as the given user and require it to fail with the business-API error contract
+-- (docs/API.md §2.3): the given SQLSTATE and HINT code
+create or replace function pg_temp.check_api_error_as(user_id uuid, statement text, expected_state text, expected_hint text, description text)
+returns void language plpgsql as $$
+declare
+  v_state text;
+  v_hint text;
+  v_message text;
+begin
+  begin
+    perform set_config('request.jwt.claims', json_build_object('sub', user_id, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    execute statement;
+    execute 'reset role';
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_hint = pg_exception_hint, v_message = message_text;
+  end;
+  execute 'reset role';
+
+  -- Business APIs raise through api_fail(): SQLSTATE PGRST with the real code, hint and message as JSON
+  if v_state = 'PGRST' then
+    v_hint := v_message::json->>'hint';
+    v_state := v_message::json->>'code';
+    v_message := v_message::json->>'message';
+  end if;
+
+  if v_state is null then
+    raise exception 'FAIL: % (no error raised)', description;
+  end if;
+  if v_state <> expected_state or coalesce(v_hint, '') <> expected_hint then
+    raise exception 'FAIL: % (got % / % / %)', description, v_state, coalesce(v_hint, 'no hint'), v_message;
+  end if;
+end $$;
+
+-- Run a statement as the given user and return its single jsonb result
+create or replace function pg_temp.call_as(user_id uuid, statement text)
+returns jsonb language plpgsql as $$
+declare
+  v_result jsonb;
+begin
+  perform set_config('request.jwt.claims', json_build_object('sub', user_id, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  execute statement into v_result;
+  execute 'reset role';
+  return v_result;
 end $$;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineTool, ok, fail } from "./types.js";
+import { defineApiWriteTool } from "./api.js";
 import { applySearch } from "./search.js";
-import { fields } from "./labels.js";
 
 export const customerTools = [
   defineTool({
@@ -38,10 +38,9 @@ export const customerTools = [
     },
   }),
 
-  defineTool({
+  defineApiWriteTool({
     name: "create_customer",
     domain: "customer",
-    kind: "write",
     permission: "canCreateCustomers",
     description: "建立新客戶，手機或市話至少填一個",
     input: z.object({
@@ -54,26 +53,10 @@ export const customerTools = [
       address: z.string().optional().describe("地址"),
       note: z.string().optional().describe("備註"),
     }),
-    summarize: async (_ctx, { name, contact_person, phone, landline_phone, fax, email, address, note }) => {
-      if (!phone && !landline_phone) return { ok: false, error: "建立失敗：手機或市話至少填一個" };
-      return {
-        ok: true,
-        summary: {
-          title: "建立客戶",
-          fields: fields([["公司名稱", name], ["聯絡人", contact_person], ["手機", phone], ["市話", landline_phone],
-            ["傳真", fax], ["電子郵件", email], ["地址", address], ["備註", note]]),
-        },
-      };
-    },
-    execute: async ({ supabase, organizationId }, { name, contact_person, phone, landline_phone, fax, email, address, note }) => {
-      if (!phone && !landline_phone) return fail("建立失敗：手機或市話至少填一個");
-      const { data, error } = await supabase.from("customers").insert({
-        name, contact_person, organization_id: organizationId,
-        phone: phone ?? null, landline_phone: landline_phone ?? null, fax: fax ?? null,
-        email: email ?? null, address: address ?? null, note: note ?? null,
-      }).select().single();
-      if (error) return fail(`建立失敗：${error.message}`);
-      return ok({ message: "客戶建立成功", customer: data });
-    },
+    rpc: "create_customer",
+    toParams: (i) => ({
+      p_name: i.name, p_contact_person: i.contact_person, p_phone: i.phone, p_landline_phone: i.landline_phone,
+      p_fax: i.fax, p_email: i.email, p_address: i.address, p_note: i.note,
+    }),
   }),
 ];

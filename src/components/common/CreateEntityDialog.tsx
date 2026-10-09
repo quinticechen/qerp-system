@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { createPartner, type PartnerFields } from '@/lib/api/partners';
+import { apiErrorMessage } from '@/lib/api/client';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface EntityField {
@@ -24,7 +25,6 @@ interface CreateEntityDialogProps {
   onEntityCreated: () => void;
   entityType: 'customer' | 'factory';
   title: string;
-  tableName: 'customers' | 'factories';
   fields: EntityField[];
 }
 
@@ -34,7 +34,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   onEntityCreated,
   entityType,
   title,
-  tableName,
   fields,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -85,28 +84,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setLoading(true);
     try {
-      const entityData: any = {
-        ...formData,
-        organization_id: organizationId
-      };
-
-      const { error } = await supabase
-        .from(tableName)
-        .insert(entityData);
-
-      if (error) {
-        console.error(`Error creating ${entityType}:`, error);
-        throw error;
-      }
+      // The API applies the same rules again and is the one that decides
+      await createPartner(entityType, organizationId, formData as unknown as PartnerFields);
 
       toast.success(`${entityType === 'customer' ? '客戶' : '工廠'}創建成功`);
       setFormData(initialFormData);
       setFieldErrors({});
       onEntityCreated();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error(`Error creating ${entityType}:`, error);
-      toast.error(`創建${entityType === 'customer' ? '客戶' : '工廠'}失敗`);
+      toast.error(`創建${entityType === 'customer' ? '客戶' : '工廠'}失敗：${apiErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }

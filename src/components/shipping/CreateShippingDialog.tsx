@@ -15,6 +15,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { todayInTaiwan } from '@/lib/dates';
+import { createShipping } from '@/lib/api/shipping';
+import { apiErrorMessage } from '@/lib/api/client';
 
 interface CreateShippingDialogProps {
   open: boolean;
@@ -55,7 +58,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   
   const [customerId, setCustomerId] = useState('');
   const [orderId, setOrderId] = useState('');
-  const [shippingDate, setShippingDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shippingDate, setShippingDate] = useState(todayInTaiwan());
   const [note, setNote] = useState('');
   const [selectedItems, setSelectedItems] = useState<ShippingItem[]>([]);
   
@@ -98,6 +101,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
         .from('orders')
         .select('id, order_number')
         .eq('customer_id', customerId)
+        .neq('status', 'cancelled')
         .in('shipping_status', ['not_started', 'partial_shipped'])
         .order('order_number');
       
@@ -160,31 +164,6 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
     enabled: !!orderId && !!orderProducts && orderProducts.length > 0
   });
 
-  // 生成唯一的出貨單號
-  const generateUniqueShippingNumber = async () => {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const baseNumber = `SHIP-${year}${month}${day}`;
-    
-    // 查詢今天已有的出貨單號
-    const { data: existingShippings } = await supabase
-      .from('shippings')
-      .select('shipping_number')
-      .like('shipping_number', `${baseNumber}%`)
-      .order('shipping_number', { ascending: false });
-    
-    let sequence = 1;
-    if (existingShippings && existingShippings.length > 0) {
-      const lastNumber = existingShippings[0].shipping_number;
-      const lastSequence = parseInt(lastNumber.split('-').pop() || '0');
-      sequence = lastSequence + 1;
-    }
-    
-    return `${baseNumber}-${sequence.toString().padStart(3, '0')}`;
-  };
-
   const createShippingMutation = useMutation({
     mutationFn: async (shippingData: {
       customer_id: string;
@@ -193,62 +172,15 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       note?: string;
       items: ShippingItem[];
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!organizationId) throw new Error('請先選擇組織');
 
-      const allRolls = shippingData.items.flatMap(item => item.rolls);
-      const totalShippedQuantity = allRolls.reduce((sum, roll) => sum + roll.shipped_quantity, 0);
-      const totalShippedRolls = allRolls.length;
-
-      // 生成唯一的出貨單號
-      const uniqueShippingNumber = await generateUniqueShippingNumber();
-
-      const { data: shipping, error: shippingError } = await supabase
-        .from('shippings')
-        .insert({
-          customer_id: shippingData.customer_id,
-          order_id: shippingData.order_id,
-          shipping_date: shippingData.shipping_date,
-          total_shipped_quantity: totalShippedQuantity,
-          total_shipped_rolls: totalShippedRolls,
-          note: shippingData.note || null,
-          user_id: user.id,
-          organization_id: organizationId,
-          shipping_number: uniqueShippingNumber
-        } as any)
-        .select()
-        .single();
-
-      if (shippingError) throw shippingError;
-
-      const itemsToInsert = allRolls.map(roll => ({
-        shipping_id: shipping.id,
-        inventory_roll_id: roll.inventory_roll_id,
-        shipped_quantity: roll.shipped_quantity
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('shipping_items')
-        .insert(itemsToInsert);
-
-      if (itemsError) throw itemsError;
-
-      for (const roll of allRolls) {
-        const inventoryRoll = availableRolls?.find(r => r.id === roll.inventory_roll_id);
-        if (inventoryRoll) {
-          const newQuantity = inventoryRoll.current_quantity - roll.shipped_quantity;
-          
-          const { error: updateError } = await supabase
-            .from('inventory_rolls')
-            .update({ 
-              current_quantity: newQuantity,
-              is_allocated: newQuantity <= 0
-            })
-            .eq('id', roll.inventory_roll_id);
-
-          if (updateError) throw updateError;
-        }
-      }
+      // One call writes the shipping and its rolls, takes the stock and updates the order's progress
+      const result = await createShipping(organizationId, {
+        orderId: shippingData.order_id,
+        shippingDate: shippingData.shipping_date,
+        note: shippingData.note,
+        items: shippingData.items.flatMap((item) => item.rolls),
+      });
 
       // 重新查詢完整的出貨單數據包含所有關聯
       const { data: completeShipping, error: queryError } = await supabase
@@ -266,25 +198,22 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
             )
           )
         `)
-        .eq('id', shipping.id)
+        .eq('id', result.id!)
         .single();
 
-      if (queryError) {
-        console.error('Error fetching complete shipping data:', queryError);
-        // 如果查詢失敗，返回基本數據
-        return shipping;
-      }
-
+      if (queryError) throw queryError;
       return completeShipping;
     },
     onSuccess: (shipping) => {
       toast({
         title: "成功",
-        description: "出貨單已成功建立",
+        description: `出貨單 ${shipping.shipping_number} 已建立`,
       });
       queryClient.invalidateQueries({ queryKey: ['shippings'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-rolls'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      ['available-rolls', 'shippable-rolls', 'order-products', 'inventoryRolls', 'inventory-summary', 'inventory-summary-enhanced', 'product-rolls']
+        .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
       onOpenChange(false);
       resetForm();
       
@@ -297,7 +226,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
       console.error('Error creating shipping:', error);
       toast({
         title: "錯誤",
-        description: "建立出貨單時發生錯誤",
+        description: apiErrorMessage(error, '建立出貨單時發生錯誤'),
         variant: "destructive",
       });
     },
@@ -306,7 +235,7 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
   const resetForm = () => {
     setCustomerId('');
     setOrderId('');
-    setShippingDate(new Date().toISOString().split('T')[0]);
+    setShippingDate(todayInTaiwan());
     setNote('');
     setSelectedItems([]);
     setRollSelectors({});
@@ -650,12 +579,9 @@ export const CreateShippingDialog: React.FC<CreateShippingDialogProps> = ({
                               <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
                                 onClick={() => addRollToItem(product.id)}
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                新增布卷
+                                className="border-gray-300 text-gray-700 hover:bg-gray-50" size="icon" aria-label="新增布卷" title="新增布卷">
+                                <Plus className="h-4 w-4" />
                               </Button>
                             )}
                           </div>

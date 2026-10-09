@@ -1,0 +1,1172 @@
+{
+  "version": 2,
+  "id": "20261009T0544-recheck-r-entity-memory",
+  "label": "recheck-r-entity-memory",
+  "createdAt": "2026-10-09T05:44:27.636Z",
+  "filter": "r-entity-memory",
+  "runs": 5,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "e3637ced",
+      "prompt.commercial": "27cdb85e",
+      "prompt.supply_chain": "76684933",
+      "tools": "81b4ef47",
+      "cases": "44a04257",
+      "fixtures": "7a9e59f2"
+    },
+    "git": {
+      "commit": "e80be04",
+      "dirty": true
+    }
+  },
+  "cases": [
+    {
+      "id": "r-entity-memory",
+      "name": "實體記憶：上一輪已找到客戶，本輪用代名詞建單（P0-4）",
+      "category": "regressions"
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 0.2,
+    "toolSelection": 0.2,
+    "routing": null,
+    "errorRate": 0,
+    "fallbackRate": 0.2,
+    "byCategory": {
+      "regressions": 0.2
+    },
+    "latencyMs": {
+      "avg": 7058,
+      "p50": 7182,
+      "p90": 8583,
+      "max": 8583
+    },
+    "phaseLatencyMs": {
+      "agent:commercial": {
+        "p50": 5891,
+        "p90": 6457
+      },
+      "router": {
+        "p50": 1195,
+        "p90": 2687
+      }
+    },
+    "totalCostUsd": 0.003764,
+    "costPerCompletedTask": 0.003764,
+    "avgInputTokens": 4929,
+    "avgOutputTokens": 709
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "min": 0.85,
+      "value": 0.2,
+      "pass": false
+    }
+  ],
+  "results": [
+    {
+      "caseId": "r-entity-memory",
+      "run": 1,
+      "reply": "已建立待確認的草稿（建立訂單）：客戶：永泰布行；品項 1：雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80。使用者在確認卡片上按「確認」後才會寫入。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱：永泰布行，產品名稱：雲朵眠 test0922 藍0922，數量：20 公斤，單價：80"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80"
+              }
+            ]
+          }
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 5269,
+      "latencyMs": 6322,
+      "startedAt": 1791524667637,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524667639,
+          "durationMs": 1273,
+          "calls": [
+            {
+              "startedAt": 1791524667643,
+              "durationMs": 1269,
+              "inputTokens": 375,
+              "outputTokens": 47,
+              "costUsd": 0.0000563,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524668912,
+          "durationMs": 5045,
+          "calls": [
+            {
+              "startedAt": 1791524668913,
+              "durationMs": 1712,
+              "inputTokens": 974,
+              "outputTokens": 372,
+              "costUsd": 0.0002462,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524670627,
+              "durationMs": 978,
+              "inputTokens": 1063,
+              "outputTokens": 60,
+              "costUsd": 0.00003994,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524671606,
+              "durationMs": 1417,
+              "inputTokens": 1195,
+              "outputTokens": 136,
+              "costUsd": 0.00007976,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524673026,
+              "durationMs": 930,
+              "inputTokens": 1402,
+              "outputTokens": 67,
+              "costUsd": 0.00006665,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1791524670627,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠 test0922 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524671606,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰布行"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524673025,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "customer_id": "c0000000-0000-4000-8000-000000000004",
+                "items": [
+                  {
+                    "product_id": "a0000000-0000-4000-8000-000000000001",
+                    "quantity": 20,
+                    "unit_price": 80
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524673956,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_products, list_customers, create_order"
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": false
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000004\"}",
+          "pass": true,
+          "detail": "{\"customer_id\":\"c0000000-0000-4000-8000-000000000004\",\"items\":[{\"product_id\":\"a0000000-0000-4000-8000-000000000001\",\"quantity\":20,\"unit_price\":80}]}"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "drafts 1 × create_order",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-entity-memory",
+      "run": 2,
+      "reply": "已建立待確認的草稿（建立訂單）：客戶：永泰布行；品項 1：雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80。使用者在確認卡片上按「確認」後才會寫入。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱：永泰布行，產品名稱：雲朵眠 test0922 藍0922，數量：20 公斤，單價：80"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80"
+              }
+            ]
+          }
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 5269,
+      "latencyMs": 8583,
+      "startedAt": 1791524667637,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524667641,
+          "durationMs": 2687,
+          "calls": [
+            {
+              "startedAt": 1791524667657,
+              "durationMs": 2671,
+              "inputTokens": 375,
+              "outputTokens": 47,
+              "costUsd": 0.0000563,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524670329,
+          "durationMs": 5891,
+          "calls": [
+            {
+              "startedAt": 1791524670329,
+              "durationMs": 2204,
+              "inputTokens": 974,
+              "outputTokens": 372,
+              "costUsd": 0.0002462,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524672534,
+              "durationMs": 960,
+              "inputTokens": 1063,
+              "outputTokens": 60,
+              "costUsd": 0.00003994,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524673498,
+              "durationMs": 966,
+              "inputTokens": 1195,
+              "outputTokens": 136,
+              "costUsd": 0.00007976,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524674465,
+              "durationMs": 1755,
+              "inputTokens": 1402,
+              "outputTokens": 67,
+              "costUsd": 0.00006665,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1791524672534,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠 test0922 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524673497,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰布行"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524674465,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "customer_id": "c0000000-0000-4000-8000-000000000004",
+                "items": [
+                  {
+                    "product_id": "a0000000-0000-4000-8000-000000000001",
+                    "quantity": 20,
+                    "unit_price": 80
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524676220,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_products, list_customers, create_order"
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": false
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000004\"}",
+          "pass": true,
+          "detail": "{\"customer_id\":\"c0000000-0000-4000-8000-000000000004\",\"items\":[{\"product_id\":\"a0000000-0000-4000-8000-000000000001\",\"quantity\":20,\"unit_price\":80}]}"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "drafts 1 × create_order",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-entity-memory",
+      "run": 3,
+      "reply": "已為永泰布行建立訂單草稿：\n\n* **客戶**：永泰布行\n* **品項**：雲朵眠 test0922 藍0922，20 公斤，單價 80 元\n\n請在下方的確認卡片確認訂單內容。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱：永泰布行，產品名稱：雲朵眠 test0922 藍0922，數量：20 公斤，單價：80"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80"
+              }
+            ]
+          }
+        }
+      ],
+      "modelErrors": [
+        "agent:commercial google/gemini-2.5-flash-lite: Model returned an empty response (finishReason: stop)"
+      ],
+      "tokens": 5002,
+      "latencyMs": 7182,
+      "startedAt": 1791524667637,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524667642,
+          "durationMs": 1074,
+          "calls": [
+            {
+              "startedAt": 1791524667658,
+              "durationMs": 1055,
+              "inputTokens": 375,
+              "outputTokens": 47,
+              "costUsd": 0.0000563,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524668717,
+          "durationMs": 2514,
+          "calls": [
+            {
+              "startedAt": 1791524668719,
+              "durationMs": 2511,
+              "inputTokens": 974,
+              "outputTokens": 593,
+              "costUsd": 0.0003346,
+              "provider": "Google"
+            }
+          ],
+          "error": "Model returned an empty response (finishReason: stop)"
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash",
+          "startedAt": 1791524671231,
+          "durationMs": 3588,
+          "calls": [
+            {
+              "startedAt": 1791524671232,
+              "durationMs": 943,
+              "inputTokens": 974,
+              "outputTokens": 18,
+              "costUsd": 0.0003372,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524672177,
+              "durationMs": 1180,
+              "inputTokens": 1063,
+              "outputTokens": 88,
+              "costUsd": 0.0005389,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524673360,
+              "durationMs": 1458,
+              "inputTokens": 1222,
+              "outputTokens": 70,
+              "costUsd": 0.0005416,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1791524671231,
+          "toolCalls": []
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524672176,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠 test0922 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524673359,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "customer_id": "c0000000-0000-4000-8000-000000000004",
+                "items": [
+                  {
+                    "product_id": "a0000000-0000-4000-8000-000000000001",
+                    "quantity": 20,
+                    "unit_price": 80
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524674819,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_products, create_order"
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": true
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000004\"}",
+          "pass": true,
+          "detail": "{\"customer_id\":\"c0000000-0000-4000-8000-000000000004\",\"items\":[{\"product_id\":\"a0000000-0000-4000-8000-000000000001\",\"quantity\":20,\"unit_price\":80}]}"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "drafts 1 × create_order",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "r-entity-memory",
+      "run": 4,
+      "reply": "已建立待確認的草稿（建立訂單）：客戶：永泰布行；品項 1：雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80。使用者在確認卡片上按「確認」後才會寫入。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱：永泰布行，產品名稱：雲朵眠 test0922 藍0922，數量：20 公斤，單價：80"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80"
+              }
+            ]
+          }
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 5269,
+      "latencyMs": 7657,
+      "startedAt": 1791524667637,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524667642,
+          "durationMs": 1195,
+          "calls": [
+            {
+              "startedAt": 1791524667659,
+              "durationMs": 1177,
+              "inputTokens": 375,
+              "outputTokens": 47,
+              "costUsd": 0.0000563,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524668837,
+          "durationMs": 6457,
+          "calls": [
+            {
+              "startedAt": 1791524668837,
+              "durationMs": 3010,
+              "inputTokens": 974,
+              "outputTokens": 372,
+              "costUsd": 0.0002462,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524671848,
+              "durationMs": 1438,
+              "inputTokens": 1063,
+              "outputTokens": 60,
+              "costUsd": 0.00003994,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524673289,
+              "durationMs": 1037,
+              "inputTokens": 1195,
+              "outputTokens": 136,
+              "costUsd": 0.00007976,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524674327,
+              "durationMs": 966,
+              "inputTokens": 1402,
+              "outputTokens": 67,
+              "costUsd": 0.00006665,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1791524671847,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠 test0922 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524673288,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰布行"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524674326,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "customer_id": "c0000000-0000-4000-8000-000000000004",
+                "items": [
+                  {
+                    "product_id": "a0000000-0000-4000-8000-000000000001",
+                    "quantity": 20,
+                    "unit_price": 80
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524675294,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_products, list_customers, create_order"
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": false
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000004\"}",
+          "pass": true,
+          "detail": "{\"customer_id\":\"c0000000-0000-4000-8000-000000000004\",\"items\":[{\"product_id\":\"a0000000-0000-4000-8000-000000000001\",\"quantity\":20,\"unit_price\":80}]}"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "drafts 1 × create_order",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "r-entity-memory",
+      "run": 5,
+      "reply": "已建立待確認的草稿（建立訂單）：客戶：永泰布行；品項 1：雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80。使用者在確認卡片上按「確認」後才會寫入。",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱：永泰布行，產品名稱：雲朵眠 test0922 藍0922，數量：20 公斤，單價：80"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠 test0922 藍0922"
+          }
+        },
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80"
+              }
+            ]
+          }
+        }
+      ],
+      "modelErrors": [],
+      "tokens": 5269,
+      "latencyMs": 5545,
+      "startedAt": 1791524673961,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524673961,
+          "durationMs": 1073,
+          "calls": [
+            {
+              "startedAt": 1791524673961,
+              "durationMs": 1073,
+              "inputTokens": 375,
+              "outputTokens": 47,
+              "costUsd": 0.0000563,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524675034,
+          "durationMs": 4472,
+          "calls": [
+            {
+              "startedAt": 1791524675035,
+              "durationMs": 1590,
+              "inputTokens": 974,
+              "outputTokens": 372,
+              "costUsd": 0.0002462,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524676628,
+              "durationMs": 820,
+              "inputTokens": 1063,
+              "outputTokens": 60,
+              "costUsd": 0.00003994,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524677450,
+              "durationMs": 1156,
+              "inputTokens": 1195,
+              "outputTokens": 136,
+              "costUsd": 0.00007976,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524678607,
+              "durationMs": 898,
+              "inputTokens": 1402,
+              "outputTokens": 67,
+              "costUsd": 0.00006665,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1791524676627,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠 test0922 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524677450,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰布行"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524678607,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "customer_id": "c0000000-0000-4000-8000-000000000004",
+                "items": [
+                  {
+                    "product_id": "a0000000-0000-4000-8000-000000000001",
+                    "quantity": 20,
+                    "unit_price": 80
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1791524679506,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_products, list_customers, create_order"
+        },
+        {
+          "check": "does not call list_customers",
+          "pass": false
+        },
+        {
+          "check": "create_order args ⊇ {\"customer_id\":\"c0000000-0000-4000-8000-000000000004\"}",
+          "pass": true,
+          "detail": "{\"customer_id\":\"c0000000-0000-4000-8000-000000000004\",\"items\":[{\"product_id\":\"a0000000-0000-4000-8000-000000000001\",\"quantity\":20,\"unit_price\":80}]}"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "drafts 1 × create_order",
+          "pass": true,
+          "detail": "actual: 1"
+        }
+      ],
+      "pass": false
+    }
+  ]
+}

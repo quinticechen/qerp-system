@@ -25,7 +25,6 @@ export const CreateFactoryDialog: React.FC<CreateFactoryDialogProps> = (props) =
       onEntityCreated={props.onFactoryCreated}
       entityType="factory"
       title="新增工廠"
-      tableName="factories"
       fields={factoryFields}
     />
   );

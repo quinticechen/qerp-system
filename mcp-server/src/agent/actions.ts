@@ -110,9 +110,9 @@ async function expireIfDue(supabase: SupabaseClient, row: ActionRow): Promise<bo
 }
 
 function resultLine(summary: ActionSummary, data: unknown): string {
+  // Business APIs return the document number (order, purchase order, receipt, shipment) as `number`.
   const d = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
-  const ref = [d.order_number && `訂單編號 ${d.order_number}`, d.po_number && `採購單號 ${d.po_number}`].filter(Boolean).join("，");
-  return `✅ ${summary.title}已完成${ref ? `：${ref}` : ""}`;
+  return `✅ ${summary.title}已完成${d.number ? `：編號 ${d.number}` : ""}`;
 }
 
 /** Posts the outcome to the conversation, marked so the model's history can tell it from its own replies. */

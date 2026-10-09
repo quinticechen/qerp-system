@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { APICallError } from "ai";
 import { MockLanguageModelV1 } from "ai/test";
 import type { LanguageModelV1, LanguageModelV1CallOptions } from "@ai-sdk/provider";
-import { aiGenerateText, EmptyResponseError, DeadlineExceededError, type GatewayModel } from "../src/agent/ai-gateway.js";
+import { aiGenerateText, EmptyResponseError, DeadlineExceededError, modelIdsFor, type GatewayModel } from "../src/agent/ai-gateway.js";
 import { runSubAgent } from "../src/agent/sub-agents.js";
 import type { ObservedAttempt } from "../src/agent/observer.js";
 import { TOOL_GROUPS } from "../src/agent/permissions.js";
@@ -142,7 +142,7 @@ test("`default_api.` tool names are repaired instead of aliased (F4)", async () 
   assert.equal((result.steps[0].toolResults as { toolName: string }[])[0].toolName, "list_factories");
 });
 
-const CREATE_ORDER = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003" });
+const CREATE_ORDER = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
 const businessInserts = (writes: { op: string; table: string }[]) =>
   writes.filter((w) => w.op === "insert" && !w.table.startsWith("query_"));
 
@@ -173,7 +173,7 @@ test("a failed attempt's drafts are discarded; only the answering attempt's draf
 test("an invalid draft is reported to the model and not collected", async () => {
   const { ctx } = setup();
   const drafts: Draft[] = [];
-  const foreign = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000099" });
+  const foreign = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000099", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
   const a = scripted("a", foreign, reply("找不到此客戶"));
   await runSubAgent("commercial", "建立訂單", ALL_TOOLS, ctx, [], { models: [a], drafts });
   assert.equal(drafts.length, 0, "another organization's customer cannot be drafted");
@@ -207,4 +207,56 @@ test("a model that stops silently after drafting still gets the card and a stand
   const text = await runSubAgent("commercial", "建立訂單", ALL_TOOLS, ctx, [], { models: [silent], drafts });
   assert.equal(drafts.length, 1);
   assert.match(text, /確認卡片/);
+});
+
+// ── Model policy and cost recording ──────────────────────────────────────────
+
+test("a phase without its own models uses the default list", () => {
+  const policy = { default: ["lite", "flash"], "agent:commercial": ["flash", "lite"] };
+  assert.deepEqual(modelIdsFor(policy, "agent:commercial"), ["flash", "lite"]);
+  assert.deepEqual(modelIdsFor(policy, "router"), ["lite", "flash"]);
+});
+
+test("each provider call's tokens, billed cost and (when asked) messages are recorded on the attempt", async (t) => {
+  process.env.OPENROUTER_API_KEY ??= "test-key";
+  const completion = {
+    id: "gen-1",
+    model: "test/policy-model",
+    provider: "Google AI Studio",
+    choices: [{ index: 0, message: { role: "assistant", content: "你好" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 120, completion_tokens: 8, total_tokens: 128, cost: 0.0000152 },
+  };
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(completion), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+  const attempts: ObservedAttempt[] = [];
+  const result = await aiGenerateText(PROMPT, {
+    phase: "router",
+    modelPolicy: { default: ["test/other-model"], router: ["test/policy-model"] },
+    captureModelIO: true,
+    observer: { onModelAttempt: (x) => attempts.push(x) },
+  });
+
+  assert.equal(result.text, "你好");
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].modelId, "test/policy-model", "the router phase uses its own model");
+  assert.equal(attempts[0].calls.length, 1);
+  const [call] = attempts[0].calls;
+  assert.deepEqual([call.inputTokens, call.outputTokens, call.costUsd, call.provider], [120, 8, 0.0000152, "Google AI Studio"]);
+  assert.deepEqual(call.input, [{ role: "user", content: "hi" }]);
+  assert.deepEqual(call.output, { role: "assistant", content: "你好" });
+});
+
+test("without captureModelIO, calls keep usage and cost only", async (t) => {
+  process.env.OPENROUTER_API_KEY ??= "test-key";
+  const completion = {
+    id: "gen-2", model: "test/m", choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+    usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+  };
+  t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify(completion), { status: 200, headers: { "Content-Type": "application/json" } }));
+  const attempts: ObservedAttempt[] = [];
+  await aiGenerateText(PROMPT, { phase: "router", modelPolicy: { default: ["test/m"] }, observer: { onModelAttempt: (x) => attempts.push(x) } });
+  const [call] = attempts[0].calls;
+  assert.equal(call.costUsd, null, "no cost reported");
+  assert.equal(call.input, undefined);
+  assert.equal(call.output, undefined);
 });

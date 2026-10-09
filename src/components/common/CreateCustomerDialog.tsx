@@ -25,7 +25,6 @@ export const CreateCustomerDialog: React.FC<CreateCustomerDialogProps> = (props)
       onEntityCreated={props.onCustomerCreated}
       entityType="customer"
       title="新增客戶"
-      tableName="customers"
       fields={customerFields}
     />
   );

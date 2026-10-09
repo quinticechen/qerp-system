@@ -6,7 +6,7 @@ import type { QueryRun } from "./observer.js";
 import { redactIds } from "./output-guard.js";
 import type { ToolContext } from "../tools/types.js";
 
-const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負責分析使用者意圖並決定調用哪個子 Agent。
+export const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負責分析使用者意圖並決定調用哪個子 Agent。
 
 可用的子 Agent：
 - commercial：負責客戶管理、訂單管理、產品查詢

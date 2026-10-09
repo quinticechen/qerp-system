@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Pencil } from 'lucide-react';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
 interface ViewPurchaseDialogProps {
@@ -21,6 +22,7 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
       pending: { label: '待確認', variant: 'secondary' as const },
       confirmed: { label: '已下單', variant: 'default' as const },
       partial_arrived: { label: '部分到貨', variant: 'outline' as const },
+      partial_received: { label: '部分入庫', variant: 'outline' as const },
       completed: { label: '已完成', variant: 'default' as const },
       cancelled: { label: '已取消', variant: 'destructive' as const }
     };
@@ -91,6 +93,12 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
                   }
                 </p>
               </div>
+              {purchase.status === 'cancelled' && (
+                <div className="col-span-2">
+                  <p className="text-sm text-gray-500">取消原因</p>
+                  <p className="font-medium text-gray-900">{purchase.cancel_reason || '未填寫'}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-gray-500">總金額</p>
                 <p className="font-medium text-gray-900">${totalAmount.toFixed(2)}</p>
@@ -182,7 +190,11 @@ export const ViewPurchaseDialog = ({ purchase, open, onOpenChange, onEdit }: Vie
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
-          {onEdit && <Button onClick={onEdit}>編輯</Button>}
+          {onEdit && (
+            <Button size="icon" onClick={onEdit} aria-label="編輯" title="編輯">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

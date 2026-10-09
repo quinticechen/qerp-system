@@ -1,5 +1,5 @@
 
-// Permission keys grouped by feature, in sidebar order (docs/MULTI_TENANT_RBAC.md §4.3).
+// Permission keys grouped by feature, in sidebar order (docs/requirements/MULTI_TENANT_RBAC.md §4.3).
 // Which role holds which key is stored in the database table role_permissions.
 // `action` is the short name shown in the role overview, e.g. 查看、新增、編輯.
 export const PERMISSION_GROUPS = {

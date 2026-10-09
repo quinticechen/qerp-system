@@ -70,7 +70,7 @@
   {
     "id": "pp-create-order",
     "name": "改寫：開一張新訂單",
-    "message": "替永泰布行開一張新訂單",
+    "message": "替永泰布行開一張新訂單，棉麻平織 米白 30 公斤，單價 120",
     "expect": {
       "tools_include": [
         "create_order"
@@ -103,16 +103,10 @@
   },
   {
     "id": "pp-order-with-product",
-    "name": "跨領域：客戶要訂某產品（只能建立訂單本身）",
+    "name": "★ 跨領域：客戶要訂某產品（只能建立訂單本身）",
     "message": "Chen 要訂雲朵眠 藍0922，幫我開單",
-    "expect": {
-      "tools_include": [
-        "list_customers"
-      ],
-      "drafts": {
-        "create_order": 1
-      }
-    }
+    "expect": {},
+    "note": "★ 資訊不足（缺少產品、數量或單價）：期望回覆待 TPM 回覆政策定義（QUERY_AGENT_PHASE1.md §4.2）；目前只檢查不寫入、不洩漏、不出錯"
   },
   {
     "id": "pp-multi-turn-answer",
@@ -120,7 +114,7 @@
     "history": [
       {
         "role": "user",
-        "content": "幫我建一張訂單"
+        "content": "幫我建一張訂單：棉麻平織 米白 30 公斤，單價 120"
       },
       {
         "role": "assistant",

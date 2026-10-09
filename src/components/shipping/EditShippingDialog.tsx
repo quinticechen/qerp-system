@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   EditableShippingItem,
@@ -17,7 +16,19 @@ import {
   useShippableRolls,
   useShippingItems,
 } from '@/hooks/useShippingItems';
-import { saveShippingItems } from '@/lib/documentItemsService';
+import { cancelShipping, updateShipping } from '@/lib/api/shipping';
+import { apiErrorMessage } from '@/lib/api/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Ban } from 'lucide-react';
 import { ShippingItemsEditor } from './ShippingItemsEditor';
 
 interface EditShippingDialogProps {
@@ -38,6 +49,10 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
   const [note, setNote] = useState('');
   const [items, setItems] = useState<EditableShippingItem[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Cancelled shippings are frozen; nobody can edit them
+  const isCancelled = shipping?.status === 'cancelled';
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { data: itemRows } = useShippingItems(shipping?.id, open);
   const { data: shippableRolls } = useShippableRolls(shipping?.order_id, open);
@@ -74,15 +89,8 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
       shipping_date: string;
       note: string;
     }) => {
-      // Items first: stock checks are the likely reason a save is rejected
-      await saveShippingItems(supabase, shipping.id, toShippingItemsPayload(items));
-
-      const { error } = await supabase
-        .from('shippings')
-        .update(updateData)
-        .eq('id', shipping.id);
-
-      if (error) throw error;
+      // One call saves the rolls, date and note together; the database checks the stock again
+      await updateShipping(shipping.organization_id, shipping.id, { ...updateData, items: toShippingItemsPayload(items) });
     },
     onSuccess: () => {
       toast({
@@ -96,7 +104,24 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
     },
     onError: (error: Error) => {
       console.error('Error updating shipping:', error);
-      setSaveError(error.message || '更新出貨單時發生錯誤');
+      setSaveError(apiErrorMessage(error, '更新出貨單時發生錯誤'));
+    },
+  });
+
+  // Cancelling puts the shipped weight back on each roll and recalculates the order
+  const cancelShippingMutation = useMutation({
+    mutationFn: () => cancelShipping(shipping.organization_id, shipping.id, cancelReason),
+    onSuccess: () => {
+      toast({ title: '成功', description: `出貨單 ${shipping.shipping_number} 已取消，庫存已歸還` });
+      ['shippings', 'shipping-items', 'shippable-rolls', 'orders', 'inventories', 'inventoryRolls',
+        'inventory-summary', 'inventory-summary-enhanced', 'product-rolls', 'record-audit-logs']
+        .forEach((key) => queryClient.invalidateQueries({ queryKey: [key] }));
+      setCancelDialogOpen(false);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      setCancelDialogOpen(false);
+      setSaveError(apiErrorMessage(error, '取消出貨單時發生錯誤'));
     },
   });
 
@@ -135,7 +160,14 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
+        {isCancelled && (
+          <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            此出貨單已取消{shipping.cancel_reason ? `，原因：${shipping.cancel_reason}` : ''}，不能再修改。
+          </p>
+        )}
+
         <div className="space-y-4">
+          <fieldset disabled={isCancelled} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="shipping_date" className="text-gray-800">出貨日期</Label>
             <Input
@@ -162,6 +194,7 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
             <Label className="text-gray-800">出貨布卷</Label>
             <ShippingItemsEditor items={items} onChange={setItems} rolls={rolls} capacityOf={capacityOf} />
           </div>
+          </fieldset>
 
           {saveError && (
             <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -171,18 +204,66 @@ export const EditShippingDialog: React.FC<EditShippingDialogProps> = ({
         </div>
 
         <DialogFooter>
+          {!isCancelled && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="mr-auto border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={cancelShippingMutation.isPending}
+              aria-label="取消出貨單"
+              title="取消出貨單"
+            >
+              <Ban className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)} className="text-gray-700 border-gray-300 hover:bg-gray-50">
-            取消
+            {isCancelled ? '關閉' : '取消'}
           </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={updateShippingMutation.isPending}
-            className="bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {updateShippingMutation.isPending ? '更新中...' : '更新出貨單'}
-          </Button>
+          {!isCancelled && (
+            <Button
+              onClick={handleSubmit}
+              disabled={updateShippingMutation.isPending}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {updateShippingMutation.isPending ? '更新中...' : '更新出貨單'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消出貨單 {shipping?.shipping_number}？</AlertDialogTitle>
+            <AlertDialogDescription>
+              取消後出貨的重量會加回各布卷的庫存，訂單的出貨進度會重新計算，出貨單不能再修改。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="shipping-cancel-reason">取消原因</Label>
+            <Textarea
+              id="shipping-cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="選填"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>返回</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.preventDefault();
+                cancelShippingMutation.mutate();
+              }}
+              disabled={cancelShippingMutation.isPending}
+            >
+              {cancelShippingMutation.isPending ? '取消中...' : '確認取消'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

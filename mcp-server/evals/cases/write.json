@@ -2,8 +2,8 @@
   {
     "id": "w-create-order",
     "name": "為既有客戶建立訂單",
-    "note": "P0-5：建立草稿而非直接寫入；不應先追問選填的備註（F6）",
-    "message": "幫 Client name test0922 建立一張新訂單",
+    "note": "Phase 1：訂單 API 需要品項；草稿由 create_order API 的試算模式產生",
+    "message": "幫 Client name test0922 建立一張新訂單：雲朵眠 test0922 藍0922 100 公斤，單價 50",
     "expect": {
       "tools_include": [
         "list_customers",
@@ -55,18 +55,45 @@
   },
   {
     "id": "w-cross-domain-order",
-    "name": "跨領域建單：客戶＋工廠＋產品（2026-10-07 事故原句）",
-    "known_gap": "create_order 無法帶入品項與工廠，需 Phase 1 訂單主流程的 tools",
-    "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922",
+    "name": "跨領域建單：客戶＋指定工廠＋產品（2026-10-07 事故原句，補上數量與單價）",
+    "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922 100 公斤，單價 50",
     "expect": {
       "tools_include": [
         "list_customers",
         "list_factories",
-        "list_products"
+        "list_products",
+        "create_order"
+      ],
+      "tool_args": [
+        {
+          "tool": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000003",
+            "factory_ids": [
+              "f0000000-0000-4000-8000-000000000001"
+            ]
+          }
+        }
       ],
       "drafts": {
-        "create_order": 1
+        "create_order": 1,
+        "create_purchase_order": 0
       }
-    }
+    },
+    "note": "Phase 1 起 create_order 可帶入品項與指定工廠，此缺口已補上；「給工廠」指訂單的指定工廠，不是採購單"
+  },
+  {
+    "id": "w-create-order-no-items",
+    "name": "★ 建單但沒有提供品項",
+    "note": "★ 資訊不足（缺少產品、數量或單價）：期望回覆待 TPM 回覆政策定義（QUERY_AGENT_PHASE1.md §4.2）；目前只檢查不寫入、不洩漏、不出錯",
+    "message": "幫 Client name test0922 建立一張新訂單",
+    "expect": {}
+  },
+  {
+    "id": "w-cross-domain-incomplete",
+    "name": "★ 跨領域建單，缺少數量與單價（2026-10-07 事故原句）",
+    "note": "★ 資訊不足（缺少產品、數量或單價）：期望回覆待 TPM 回覆政策定義（QUERY_AGENT_PHASE1.md §4.2）；目前只檢查不寫入、不洩漏、不出錯",
+    "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922",
+    "expect": {}
   }
 ]

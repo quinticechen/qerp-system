@@ -30,20 +30,19 @@ export interface RecordAuditHistory {
 }
 
 // Columns holding ids worth showing by name, and where to look the name up
-type ReferenceTable = 'products_new' | 'warehouses' | 'factories' | 'customers' | 'inventory_rolls' | 'organization_roles' | 'profiles';
+type ReferenceTable = 'product_groups' | 'products_new' | 'warehouses' | 'factories' | 'customers' | 'inventory_rolls' | 'profiles';
 
-const ROLE_REFERENCE = { table: 'organization_roles', select: 'id, display_name' } as const;
 const PERSON_REFERENCE = { table: 'profiles', select: 'id, full_name' } as const;
 
 export const REFERENCE_FIELDS: Record<string, { table: ReferenceTable; select: string }> = {
   product_id: { table: 'products_new', select: 'id, name, color' },
+  group_id: { table: 'product_groups', select: 'id, name' },
   warehouse_id: { table: 'warehouses', select: 'id, name' },
   factory_id: { table: 'factories', select: 'id, name' },
   customer_id: { table: 'customers', select: 'id, name' },
   inventory_roll_id: { table: 'inventory_rolls', select: 'id, roll_number' },
-  role_id: ROLE_REFERENCE,
-  invited_role_id: ROLE_REFERENCE,
   user_id: PERSON_REFERENCE,
+  created_by: PERSON_REFERENCE,
   owner_id: PERSON_REFERENCE,
   invited_by: PERSON_REFERENCE,
   granted_by: PERSON_REFERENCE,

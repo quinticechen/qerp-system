@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
   EditablePurchaseOrderItem,
@@ -16,8 +15,22 @@ import {
   usePurchaseOrderItems,
 } from '@/hooks/usePurchaseOrderItems';
 import { useProductOptions } from '@/hooks/useProductOptions';
-import { savePurchaseOrderItems } from '@/lib/documentItemsService';
+import { cancelPurchaseOrder, updatePurchaseOrder, type PurchaseOrderChanges } from '@/lib/api/purchases';
+import { apiErrorMessage } from '@/lib/api/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Ban } from 'lucide-react';
 import { PurchaseLineItemsEditor } from './PurchaseLineItemsEditor';
+
+type EditableStatus = NonNullable<PurchaseOrderChanges['status']>;
 
 interface EditPurchaseDialogProps {
   purchase: any;
@@ -32,8 +45,12 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
   const [formData, setFormData] = useState({
     expected_arrival_date: '',
     note: '',
-    status: 'pending' as 'pending' | 'confirmed' | 'partial_arrived' | 'partial_received' | 'completed' | 'cancelled'
+    status: 'pending' as EditableStatus,
   });
+  // Cancelled purchase orders are frozen; nobody can edit them
+  const isCancelled = purchase?.status === 'cancelled';
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [items, setItems] = useState<EditablePurchaseOrderItem[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -52,27 +69,21 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
       setFormData({
         expected_arrival_date: purchase.expected_arrival_date || '',
         note: purchase.note || '',
-        status: purchase.status || 'pending'
+        status: (purchase.status === 'cancelled' || purchase.status === 'partial_arrived' ? 'confirmed' : purchase.status || 'pending') as EditableStatus,
       });
     }
   }, [purchase]);
 
   const updatePurchaseMutation = useMutation({
     mutationFn: async () => {
-      // Items first: their lock rules are the likely reason a save is rejected
-      await savePurchaseOrderItems(supabase, purchase.id, toPurchaseOrderItemsPayload(items));
-
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({
-          expected_arrival_date: formData.expected_arrival_date || null,
-          note: formData.note || null,
-          // The item save recalculates status; only override it when the user changed it here
-          ...(formData.status !== purchase.status ? { status: formData.status } : {})
-        })
-        .eq('id', purchase.id);
-
-      if (error) throw error;
+      // One call saves the items, dates, note and status together; the database checks the lock rules
+      await updatePurchaseOrder(purchase.organization_id, purchase.id, {
+        items: toPurchaseOrderItemsPayload(items),
+        expected_arrival_date: formData.expected_arrival_date,
+        note: formData.note,
+        // The item save recalculates status; only override it when the user changed it here
+        ...(formData.status !== purchase.status ? { status: formData.status } : {}),
+      });
     },
     onSuccess: () => {
       toast({
@@ -80,14 +91,33 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
         description: "採購單已更新"
       });
       queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
       queryClient.invalidateQueries({ queryKey: ['purchase-order-items', purchase.id] });
       queryClient.invalidateQueries({ queryKey: ['record-audit-logs', purchase.id] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
       console.error('Error updating purchase:', error);
-      setSaveError(error.message || '更新採購單失敗');
+      setSaveError(apiErrorMessage(error, '更新採購單失敗'));
     }
+  });
+
+  // Cancelling is refused once goods have been received against the purchase order
+  const cancelPurchaseMutation = useMutation({
+    mutationFn: () => cancelPurchaseOrder(purchase.organization_id, purchase.id, cancelReason),
+    onSuccess: () => {
+      toast({ title: '成功', description: `採購單 ${purchase.po_number} 已取消` });
+      queryClient.invalidateQueries({ queryKey: ['purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['record-audit-logs', purchase.id] });
+      setCancelDialogOpen(false);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      setCancelDialogOpen(false);
+      setSaveError(apiErrorMessage(error, '取消採購單失敗'));
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -120,20 +150,25 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
           </DialogDescription>
         </DialogHeader>
 
+        {isCancelled && (
+          <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            此採購單已取消{purchase.cancel_reason ? `，原因：${purchase.cancel_reason}` : ''}，不能再修改。
+          </p>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={isCancelled} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="status" className="text-gray-700">狀態</Label>
-            <Select value={formData.status} onValueChange={(value: 'pending' | 'confirmed' | 'partial_arrived' | 'partial_received' | 'completed' | 'cancelled') => setFormData({...formData, status: value})}>
+            <Select value={formData.status} onValueChange={(value: EditableStatus) => setFormData({...formData, status: value})}>
               <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pending">待確認</SelectItem>
                 <SelectItem value="confirmed">已下單</SelectItem>
-                <SelectItem value="partial_arrived">部分到貨</SelectItem>
                 <SelectItem value="partial_received">部分入庫</SelectItem>
                 <SelectItem value="completed">已完成</SelectItem>
-                <SelectItem value="cancelled">已取消</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -164,6 +199,7 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
             <Label className="text-gray-700">採購產品</Label>
             <PurchaseLineItemsEditor items={items} onChange={setItems} products={products} />
           </div>
+          </fieldset>
 
           {saveError && (
             <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -172,14 +208,29 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
           )}
 
           <div className="flex justify-end gap-3 pt-4">
+            {!isCancelled && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="mr-auto border-red-300 text-red-700 hover:bg-red-50"
+                onClick={() => setCancelDialogOpen(true)}
+                disabled={cancelPurchaseMutation.isPending}
+                aria-label="取消採購單"
+                title="取消採購單"
+              >
+                <Ban className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               className="border-gray-300 text-gray-700 hover:bg-gray-50"
             >
-              取消
+              {isCancelled ? '關閉' : '取消'}
             </Button>
+            {!isCancelled && (
             <Button
               type="submit"
               disabled={updatePurchaseMutation.isPending}
@@ -187,9 +238,43 @@ export const EditPurchaseDialog = ({ purchase, open, onOpenChange }: EditPurchas
             >
               {updatePurchaseMutation.isPending ? '更新中...' : '更新'}
             </Button>
+            )}
           </div>
         </form>
       </DialogContent>
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消採購單 {purchase.po_number}？</AlertDialogTitle>
+            <AlertDialogDescription>
+              取消後採購單不能再修改；關聯訂單若沒有其他進行中的採購單，會改回「已確認」。已有入庫紀錄的採購單無法取消。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="purchase-cancel-reason">取消原因</Label>
+            <Textarea
+              id="purchase-cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="選填"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>返回</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.preventDefault();
+                cancelPurchaseMutation.mutate();
+              }}
+              disabled={cancelPurchaseMutation.isPending}
+            >
+              {cancelPurchaseMutation.isPending ? '取消中...' : '確認取消'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

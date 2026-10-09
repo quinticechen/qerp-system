@@ -13,7 +13,19 @@ import { useToast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 import { EditableOrderItem, toEditableOrderItem, toOrderItemsPayload, useOrderItems } from '@/hooks/useOrderItems';
 import { useProductOptions } from '@/hooks/useProductOptions';
-import { saveOrderItems } from '@/lib/documentItemsService';
+import { cancelOrder, updateOrder } from '@/lib/api/orders';
+import { apiErrorMessage } from '@/lib/api/client';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Ban } from 'lucide-react';
 import { OrderItemsEditor } from './OrderItemsEditor';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 
@@ -35,10 +47,15 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   open,
   onOpenChange,
   onOrderUpdated,
-  readOnly = false,
+  readOnly: readOnlyProp = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Cancelled orders are frozen; nobody can edit them
+  const isCancelled = order.status === 'cancelled';
+  const readOnly = readOnlyProp || isCancelled;
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(order.payment_status);
@@ -68,20 +85,23 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
   const { data: relatedData } = useQuery({
     queryKey: ['order-related-data', order.id],
     queryFn: async () => {
-      // Fetch purchase orders related to this order
-      const { data: purchaseOrders, error: poError } = await supabase
-        .from('purchase_orders')
+      // Purchase orders linked to this order (purchase_order_relations; purchase_orders.order_id is no longer filled)
+      const { data: links, error: poError } = await supabase
+        .from('purchase_order_relations')
         .select(`
-          *,
-          factories (name),
-          purchase_order_items (
+          purchase_orders (
             *,
-            products_new (name, color)
+            factories (name),
+            purchase_order_items (
+              *,
+              products_new (name, color)
+            )
           )
         `)
         .eq('order_id', order.id);
 
       if (poError) throw poError;
+      const purchaseOrders = (links ?? []).map((link) => link.purchase_orders).filter((po) => po !== null);
 
       // Fetch shipping records for this order
       const { data: shippings, error: shippingError } = await supabase
@@ -121,20 +141,13 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
 
   const updateOrderMutation = useMutation({
     mutationFn: async (updateData: {
-      status: OrderStatus;
+      status: Exclude<OrderStatus, 'cancelled'>;
       payment_status: PaymentStatus;
       shipping_status?: ShippingStatus;
       note: string;
     }) => {
-      // Items first: their lock rules are the likely reason a save is rejected
-      await saveOrderItems(supabase, order.id, toOrderItemsPayload(items));
-
-      const { error } = await supabase
-        .from('orders')
-        .update(updateData)
-        .eq('id', order.id);
-
-      if (error) throw error;
+      // One call saves the lines, statuses and note together; the database checks the lock rules
+      await updateOrder(order.organization_id, order.id, { ...updateData, items: toOrderItemsPayload(items) });
     },
     onSuccess: () => {
       toast({
@@ -150,7 +163,24 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     },
     onError: (error: Error) => {
       console.error('Error updating order:', error);
-      setSaveError(error.message || '更新訂單時發生錯誤');
+      setSaveError(apiErrorMessage(error, '更新訂單時發生錯誤'));
+    },
+  });
+
+  // Cancelling is refused once the order has shipments or live purchase orders
+  const cancelOrderMutation = useMutation({
+    mutationFn: () => cancelOrder(order.organization_id, order.id, cancelReason),
+    onSuccess: () => {
+      toast({ title: '成功', description: `訂單 ${order.order_number} 已取消` });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['record-audit-logs', order.id] });
+      setCancelDialogOpen(false);
+      onOrderUpdated();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      setCancelDialogOpen(false);
+      setSaveError(apiErrorMessage(error, '取消訂單時發生錯誤'));
     },
   });
 
@@ -169,7 +199,7 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
     }
     setSaveError(null);
     updateOrderMutation.mutate({
-      status,
+      status: status as Exclude<OrderStatus, 'cancelled'>,
       payment_status: paymentStatus,
       // The item save recalculates shipping status; only override it when the user changed it here
       ...(shippingStatus !== order.shipping_status ? { shipping_status: shippingStatus } : {}),
@@ -236,6 +266,12 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
             訂單編號: {order.order_number}
           </DialogDescription>
         </DialogHeader>
+
+        {isCancelled && (
+          <p className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            此訂單已取消{order.cancel_reason ? `，原因：${order.cancel_reason}` : ''}，不能再修改。
+          </p>
+        )}
 
         <fieldset disabled={readOnly} className="space-y-6">
           {/* Order Information */}
@@ -330,7 +366,6 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
                   <SelectItem value="confirmed">已確認</SelectItem>
                   <SelectItem value="factory_ordered">已向工廠下單</SelectItem>
                   <SelectItem value="completed">已完成</SelectItem>
-                  <SelectItem value="cancelled">已取消</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -384,6 +419,19 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
         )}
 
         <DialogFooter>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="mr-auto border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={cancelOrderMutation.isPending}
+              aria-label="取消訂單"
+              title="取消訂單"
+            >
+              <Ban className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {readOnly ? '關閉' : '取消'}
           </Button>
@@ -397,6 +445,39 @@ export const EditOrderDialog: React.FC<EditOrderDialogProps> = ({
           )}
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>取消訂單 {order.order_number}？</AlertDialogTitle>
+            <AlertDialogDescription>
+              取消後訂單不能再修改。已有出貨紀錄或進行中採購單的訂單無法取消。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="cancel-reason">取消原因</Label>
+            <Textarea
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="選填"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>返回</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.preventDefault();
+                cancelOrderMutation.mutate();
+              }}
+              disabled={cancelOrderMutation.isPending}
+            >
+              {cancelOrderMutation.isPending ? '取消中...' : '確認取消'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };

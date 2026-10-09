@@ -1,7 +1,7 @@
 /**
  * 權限層：工具分組
  *
- * 誰可以用哪個工具由資料庫決定（organization_roles.permissions，見 auth-guard.ts），
+ * 誰可以用哪個工具由資料庫決定（role_permissions，經 user_has_organization_permission()，見 auth-guard.ts），
  * 每個工具在 src/tools/ 宣告自己需要的權限鍵。這裡只定義工具名稱與子 Agent 的分組。
  */
 

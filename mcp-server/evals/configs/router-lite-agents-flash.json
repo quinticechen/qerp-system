@@ -1,0 +1,8 @@
+{
+  "arch": "router",
+  "models": {
+    "default": ["google/gemini-2.5-flash-lite", "google/gemini-2.5-flash", "anthropic/claude-haiku-4.5"],
+    "agent:commercial": ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "anthropic/claude-haiku-4.5"],
+    "agent:supply_chain": ["google/gemini-2.5-flash", "google/gemini-2.5-flash-lite", "anthropic/claude-haiku-4.5"]
+  }
+}

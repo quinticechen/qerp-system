@@ -1,4 +1,4 @@
-// Fixed organization roles (docs/MULTI_TENANT_RBAC.md §4.2). What each role may do lives in the
+// Fixed organization roles (docs/requirements/MULTI_TENANT_RBAC.md §4.2). What each role may do lives in the
 // database table role_permissions; this file only holds what the UI shows for each role.
 
 // Roles a member can be given; the owner is decided by organizations.owner_id instead

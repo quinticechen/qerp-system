@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { defineTool, ok, fail, embeddedName, allInOrganization } from "./types.js";
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, SHIPPING_STATUS_LABELS, fields } from "./labels.js";
+import { defineTool, ok, fail } from "./types.js";
+import { defineApiWriteTool } from "./api.js";
 
 const ORDER_STATUS = z.enum(["pending", "confirmed", "factory_ordered", "completed", "cancelled"]);
 const PAYMENT_STATUS = z.enum(["unpaid", "partial_paid", "paid"]);
@@ -46,75 +46,41 @@ export const orderTools = [
     },
   }),
 
-  defineTool({
+  defineApiWriteTool({
     name: "create_order",
     domain: "order",
-    kind: "write",
     permission: "canCreateOrders",
     description: "建立新銷售訂單",
     input: z.object({
       customer_id: z.string().uuid().describe("客戶 UUID"),
+      items: z.array(z.object({
+        product_id: z.string().uuid().describe("產品 UUID"),
+        quantity: z.number().positive().describe("數量（公斤）"),
+        unit_price: z.number().nonnegative().describe("單價"),
+      })).min(1).describe("訂單品項，至少一筆"),
+      factory_ids: z.array(z.string().uuid()).optional().describe("指定工廠 UUID 列表"),
       note: z.string().optional().describe("備註"),
     }),
-    summarize: async ({ supabase, organizationId }, { customer_id, note }) => {
-      const { data } = await supabase.from("customers").select("name").eq("id", customer_id).eq("organization_id", organizationId).maybeSingle();
-      if (!data) return { ok: false, error: "建立失敗：找不到此客戶" };
-      return { ok: true, summary: { title: "建立銷售訂單", fields: fields([["客戶", (data as { name: string }).name], ["備註", note]]) } };
-    },
-    execute: async (ctx, { customer_id, note }) => {
-      const { supabase, organizationId } = ctx;
-      if (!(await allInOrganization(ctx, "customers", [customer_id]))) return fail("建立失敗：找不到此客戶");
-      const { data, error } = await supabase.from("orders").insert({
-        order_number: `ORD-${Date.now()}`, customer_id, organization_id: organizationId, status: "pending",
-        payment_status: "unpaid", shipping_status: "not_started", note: note ?? null,
-      }).select("order_number, customers(name)").single();
-      if (error) return fail(`建立失敗：${error.message}`);
-      return ok({ message: "訂單建立成功", order_number: data.order_number, customer: embeddedName(data.customers) });
-    },
+    rpc: "create_order",
+    toParams: (i) => ({ p_customer_id: i.customer_id, p_items: i.items, p_factory_ids: i.factory_ids, p_note: i.note }),
   }),
 
-  defineTool({
+  // Name and description kept from Phase 0 (wording is fragile — F7); backed by update_order.
+  defineApiWriteTool({
     name: "update_order_status",
     domain: "order",
-    kind: "write",
     permission: "canEditOrders",
     description: "更新訂單狀態、付款狀態或出貨狀態",
     input: z.object({
       order_id: z.string().uuid().describe("訂單 UUID"),
-      status: ORDER_STATUS.optional(),
+      status: z.enum(["pending", "confirmed", "factory_ordered", "completed"]).optional(),
       payment_status: PAYMENT_STATUS.optional(),
       shipping_status: SHIPPING_STATUS.optional(),
     }),
-    summarize: async ({ supabase, organizationId }, { order_id, status, payment_status, shipping_status }) => {
-      if (!status && !payment_status && !shipping_status) return { ok: false, error: "請至少指定一個要更新的欄位" };
-      const { data } = await supabase.from("orders").select("order_number, status, payment_status, shipping_status")
-        .eq("id", order_id).eq("organization_id", organizationId).maybeSingle();
-      if (!data) return { ok: false, error: "更新失敗：找不到此訂單" };
-      const order = data as { order_number: string; status: string; payment_status: string; shipping_status: string };
-      const change = (labels: Record<string, string>, from: string, to?: string) =>
-        to ? `${labels[from] ?? from} → ${labels[to] ?? to}` : null;
-      return {
-        ok: true,
-        summary: {
-          title: "更新訂單狀態",
-          fields: fields([
-            ["訂單", order.order_number],
-            ["訂單狀態", change(ORDER_STATUS_LABELS, order.status, status)],
-            ["付款狀態", change(PAYMENT_STATUS_LABELS, order.payment_status, payment_status)],
-            ["出貨狀態", change(SHIPPING_STATUS_LABELS, order.shipping_status, shipping_status)],
-          ]),
-        },
-      };
-    },
-    execute: async ({ supabase, organizationId }, { order_id, status, payment_status, shipping_status }) => {
-      const updates: Record<string, string> = {};
-      if (status) updates.status = status;
-      if (payment_status) updates.payment_status = payment_status;
-      if (shipping_status) updates.shipping_status = shipping_status;
-      if (!Object.keys(updates).length) return fail("請至少指定一個要更新的欄位");
-      const { data, error } = await supabase.from("orders").update(updates).eq("id", order_id).eq("organization_id", organizationId).select("order_number").single();
-      if (error) return fail(`更新失敗：${error.message}`);
-      return ok({ message: "訂單已更新", order_number: (data as { order_number: string }).order_number, updates });
-    },
+    rpc: "update_order",
+    toParams: ({ order_id, ...changes }) => ({
+      p_order_id: order_id,
+      p_changes: Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)),
+    }),
   }),
 ];

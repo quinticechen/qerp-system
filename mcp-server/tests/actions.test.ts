@@ -27,7 +27,7 @@ function action(overrides: Record<string, unknown> = {}) {
     organization_id: ORG_ID,
     session_id: SESSION_ID,
     tool: "create_order",
-    payload: { customer_id: "c0000000-0000-4000-8000-000000000003" },
+    payload: { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] },
     summary: { title: "建立銷售訂單", fields: [{ label: "客戶", value: "Client name test0922" }] },
     status: "pending",
     result: null,
@@ -59,7 +59,7 @@ test("confirm executes the write once and posts the result to the session", asyn
   assert.equal(outcome.status, "confirmed");
   assert.equal(orderInserts(writes), 1);
   assert.equal((writes.find((w) => w.table === "orders")?.values as { organization_id: string }).organization_id, ORG_ID);
-  assert.match(sessionMessages(writes)[0], /✅ 建立銷售訂單已完成：訂單編號/);
+  assert.match(sessionMessages(writes)[0], /✅ 建立銷售訂單已完成：編號 B\d+/);
 });
 
 test("confirming again returns the same outcome without writing again", async () => {
@@ -104,14 +104,14 @@ test("a confirmed action cannot be cancelled", async () => {
 });
 
 test("permission removed since drafting: confirm is refused and the draft stays pending", async () => {
-  const { client, writes } = setup({}, "accounting");
+  const { client, writes } = setup({}, "viewer");
   await assert.rejects(confirmAction(client, ACTION_ID), isAccessError(403));
   assert.equal(orderInserts(writes), 0);
   assert.ok(!writes.some((w) => w.op === "update" && w.table === "query_pending_actions"));
 });
 
 test("a write that fails is recorded as failed, reported, and not retried by confirming again", async () => {
-  const { client, writes } = setup({ payload: { customer_id: "c0000000-0000-4000-8000-000000000099" } });
+  const { client, writes } = setup({ payload: { customer_id: "c0000000-0000-4000-8000-000000000099", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] } });
   const outcome = await confirmAction(client, ACTION_ID);
 
   assert.equal(outcome.status, "failed");

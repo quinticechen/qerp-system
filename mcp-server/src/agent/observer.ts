@@ -6,7 +6,7 @@
  */
 
 import type { AgentGroup } from "./permissions.js";
-import type { GatewayModel } from "./ai-gateway.js";
+import type { GatewayModel, ModelPolicy } from "./ai-gateway.js";
 import type { Entity } from "./memory.js";
 import type { Draft } from "../tools/types.js";
 
@@ -32,11 +32,31 @@ export interface RouteDecision {
   tasks: Partial<Record<AgentGroup, string>>;
 }
 
+/** One HTTP call to the provider, with what it billed. An attempt makes one call per tool-loop step. */
+export interface ModelCall {
+  /** Epoch ms. */
+  startedAt: number;
+  durationMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** US$ as reported by OpenRouter; null when the provider reported none (e.g. mock models). */
+  costUsd: number | null;
+  /** The upstream provider OpenRouter routed the call to (e.g. "Google AI Studio", "Google Vertex"). */
+  provider?: string;
+  /** Request messages and the returned message — only when QueryRun.captureModelIO is set. */
+  input?: unknown;
+  output?: unknown;
+}
+
 export interface ObservedAttempt {
   /** "router" or "agent:<group>". */
   phase: string;
   modelId: string;
+  /** Epoch ms. */
+  startedAt: number;
   durationMs: number;
+  /** Provider calls made during the attempt, including those of an attempt that later failed. */
+  calls: ModelCall[];
   /** Set when the attempt failed. */
   error?: unknown;
 }
@@ -53,8 +73,12 @@ export interface QueryRun {
   observer?: QueryObserver;
   /** Epoch ms. No model attempt starts after it, and a running one is aborted at it. */
   deadline?: number;
-  /** Overrides the provider list — tests pass mock models. */
+  /** Overrides the provider list for every phase — tests pass mock models. */
   models?: GatewayModel[];
+  /** Model IDs per phase (ai-gateway.ts ModelPolicy); evals use it to compare configurations. */
+  modelPolicy?: ModelPolicy;
+  /** Keep each provider call's request messages and reply in ModelCall (evals only: fake data). */
+  captureModelIO?: boolean;
   /** Records found earlier in the conversation (memory.ts); listed in sub-agent prompts. */
   entities?: Entity[];
   /** Collects the writes the model asked for, from successful attempts only. */

@@ -1,82 +1,51 @@
 /**
  * Query Agent eval runner — replays cases against the real agent pipeline and real models,
- * with an in-memory fake database (evals/fake-supabase.ts). See docs/QUERY_AGENT_PHASE0.md §4.7.
+ * with an in-memory fake database (evals/fake-supabase.ts). See docs/QUERY_AGENT_EVALS.md.
  *
- *   bun run eval                          # all cases, 3 runs each
- *   bun run eval -- --filter q- --runs 1  # only ids containing "q-", single run
+ *   bun run eval                                       # all cases, 3 runs each, production models
+ *   bun run eval -- --filter q- --runs 1               # only ids containing "q-", single run
  *   bun run eval -- --label baseline-router
+ *   bun run eval -- --config evals/configs/x.json      # architecture and models per phase
+ *   bun run eval -- --arch single --primary google/gemini-2.5-flash
+ *   bun run eval -- --compare 20261007T0757-p0-7-router-lite   # baseline (default: latest full run)
+ *   bun run eval -- --no-langfuse                      # don't upload to Langfuse
  *
- * Exit code is 1 when any case without `known_gap` has a pass rate below --min-pass.
+ * Exit code is 1 when any case without `known_gap` has a pass rate below --min-pass, or a gate
+ * (report.ts GATES) fails.
  */
 
-import { readFileSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { appendFileSync, existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { answerQuery, type AgentMode } from "../src/agent/answer.js";
-import { MODEL_PRIORITY, modelsFor, type GatewayModel } from "../src/agent/ai-gateway.js";
+import { MODEL_POLICY, MODEL_PRIORITY, describeError, type ModelPolicy } from "../src/agent/ai-gateway.js";
 import { authGuard } from "../src/agent/auth-guard.js";
 import type { QueryObserver, ObservedToolCall, RouteDecision } from "../src/agent/observer.js";
 import { entitiesFromHistory, toModelHistory, type StoredMessage } from "../src/agent/memory.js";
 import type { Draft } from "../src/tools/types.js";
-import { createFakeSupabase, type FakeAccess, type RecordedWrite, type Tables } from "./fake-supabase.js";
+import { createFakeSupabase, type FakeAccess, type Tables } from "./fake-supabase.js";
+import { buildManifest } from "./manifest.js";
+import {
+  buildMarkdown, caseStatuses, compareReports, computeMetrics, evaluateGates, findBaseline, loadCases, loadReport, logRow,
+  type CheckResult, type EvalCase, type EvalReport, type RunAttempt, type RunResult, type RunStep,
+} from "./report.js";
+import { langfuseConfigured, uploadReport } from "./langfuse.js";
 
 const EVALS_DIR = dirname(fileURLToPath(import.meta.url));
+const REPORTS_DIR = join(EVALS_DIR, "reports");
+/** Experiment log: each full run adds a row; the TPM fills in the decision. */
+const EVAL_LOG = join(EVALS_DIR, "..", "..", "docs", "QUERY_AGENT_EVALS.md");
 const EVAL_USER_ID = "0a000000-0000-4000-8000-000000000001";
 const EVAL_ORG_ID = "0e000000-0000-4000-8000-000000000001";
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface EvalExpect {
-  tools_include?: string[];
-  tools_exclude?: string[];
-  tool_args?: { tool: string; args: Record<string, unknown> }[];
-  agents_include?: string[];
-  /** Drafts (pending writes) per tool, exact. The agent loop itself never writes business data. */
-  drafts?: Record<string, number>;
-  no_drafts?: boolean;
-  no_writes?: boolean;
-  reply_matches?: string[];
-  reply_not_matches?: string[];
-}
-
-interface EvalCase {
-  id: string;
-  name: string;
-  note?: string;
-  known_gap?: string;
-  fixtures?: string;
-  role?: string;
-  /** May carry metadata.entities, as replies saved by the server do. */
-  history?: StoredMessage[];
-  message: string;
-  expect: EvalExpect;
-}
-
-interface CheckResult {
-  check: string;
-  pass: boolean;
-  detail?: string;
-}
-
-interface RunResult {
-  caseId: string;
-  run: number;
-  pass: boolean;
-  checks: CheckResult[];
-  reply: string;
-  error?: string;
-  route?: RouteDecision;
-  routeFromFallback: boolean;
-  toolCalls: ObservedToolCall[];
-  writes: RecordedWrite[];
-  drafts: Draft[];
-  modelErrors: string[];
-  tokens: number;
-  latencyMs: number;
-}
-
 // ── CLI args ──────────────────────────────────────────────────────────────────
+
+/** evals/configs/*.json: a configuration to compare. Missing fields use production settings. */
+interface EvalConfig {
+  arch?: AgentMode;
+  models?: ModelPolicy;
+}
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -84,34 +53,31 @@ function parseArgs() {
     const i = args.indexOf(flag);
     return i >= 0 ? args[i + 1] : undefined;
   };
+  const configPath = get("--config");
+  const config: EvalConfig = configPath ? JSON.parse(readFileSync(resolve(configPath), "utf8")) : {};
+  const archFlag = get("--arch");
+  const arch: AgentMode = archFlag === "single" || archFlag === "router" ? archFlag : config.arch ?? "router";
+
+  // --primary moves one model to the front of every phase's list, as before per-phase policies.
+  const primary = get("--primary");
+  let policy: ModelPolicy = config.models ?? MODEL_POLICY;
+  if (primary) policy = { default: [primary, ...MODEL_PRIORITY.filter((id) => id !== primary)] };
+
   return {
     runs: Number(get("--runs") ?? 3),
     filter: get("--filter"),
     label: get("--label") ?? "run",
     concurrency: Number(get("--concurrency") ?? 4),
     minPass: Number(get("--min-pass") ?? 0.66), // 2 of 3 runs
-    arch: (get("--arch") === "single" ? "single" : "router") as AgentMode,
-    /** Model to try first; the rest of MODEL_PRIORITY follows as fallbacks. */
-    primary: get("--primary"),
+    arch,
+    policy,
+    compare: get("--compare"),
+    langfuse: !args.includes("--no-langfuse"),
     verbose: args.includes("--verbose"),
   };
 }
 
 // ── Loading ───────────────────────────────────────────────────────────────────
-
-function loadCases(filter?: string): EvalCase[] {
-  const dir = join(EVALS_DIR, "cases");
-  const cases = readdirSync(dir)
-    .filter((f) => f.endsWith(".json"))
-    .sort()
-    .flatMap((f) => JSON.parse(readFileSync(join(dir, f), "utf8")) as EvalCase[]);
-  const ids = new Set<string>();
-  for (const c of cases) {
-    if (ids.has(c.id)) throw new Error(`Duplicate eval case id: ${c.id}`);
-    ids.add(c.id);
-  }
-  return filter ? cases.filter((c) => c.id.includes(filter)) : cases;
-}
 
 const fixtureCache = new Map<string, Tables>();
 function loadFixtures(name: string): Tables {
@@ -178,46 +144,56 @@ function evaluate(c: EvalCase, r: Omit<RunResult, "pass" | "checks">, arch: Agen
 
 const ROLES: Record<string, FakeAccess> = JSON.parse(readFileSync(join(EVALS_DIR, "fixtures", "roles.json"), "utf8"));
 
-async function runOnce(c: EvalCase, run: number, arch: AgentMode, models?: GatewayModel[]): Promise<RunResult> {
+async function runOnce(c: EvalCase, run: number, arch: AgentMode, modelPolicy: ModelPolicy): Promise<RunResult> {
   const role = ROLES[c.role ?? "owner"];
   if (!role) throw new Error(`Unknown role "${c.role}" in case ${c.id} (see evals/fixtures/roles.json)`);
   const { client, writes } = createFakeSupabase(loadFixtures(c.fixtures ?? "basic"), EVAL_USER_ID, role);
   const toolCalls: ObservedToolCall[] = [];
   const drafts: Draft[] = [];
   const modelErrors: string[] = [];
+  const attempts: RunAttempt[] = [];
+  const steps: RunStep[] = [];
   let route: RouteDecision | undefined;
   let routeFromFallback = false;
   let tokens = 0;
 
   const observer: QueryObserver = {
     onRoute: (decision, fromFallback) => { route = decision; routeFromFallback = fromFallback; },
-    onModelAttempt: ({ phase, modelId, error }) => { if (error) modelErrors.push(`${phase} ${modelId}: ${(error as Error).message}`); },
-    onStep: (_agent, step) => {
+    onModelAttempt: ({ phase, modelId, startedAt, durationMs, calls, error }) => {
+      if (error) modelErrors.push(`${phase} ${modelId}: ${(error as Error).message}`);
+      attempts.push({ phase, modelId, startedAt, durationMs, calls, ...(error ? { error: describeError(error).slice(0, 500) } : {}) });
+    },
+    onStep: (agent, step) => {
       toolCalls.push(...step.toolCalls);
+      steps.push({ agent, at: Date.now(), toolCalls: step.toolCalls });
       tokens += step.promptTokens + step.completionTokens;
     },
   };
 
-  const started = Date.now();
+  const startedAt = Date.now();
   let reply = "";
   let error: string | undefined;
   try {
     // Same permission path as production: the real authGuard against the fake database.
     const access = await authGuard(client, EVAL_ORG_ID);
     const ctx = { supabase: client, userId: access.userId, organizationId: access.organizationId };
-    const history = c.history ?? [];
+    const history = (c.history ?? []) as StoredMessage[];
     reply = await answerQuery(c.message, ctx, access.allowedTools, toModelHistory(history), {
       observer,
       deadline: Date.now() + 90_000,
       entities: entitiesFromHistory(history),
       drafts,
-      models,
+      modelPolicy,
+      captureModelIO: true,
     }, arch);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
 
-  const partial = { caseId: c.id, run, reply, error, route, routeFromFallback, toolCalls, writes, drafts, modelErrors, tokens, latencyMs: Date.now() - started };
+  const partial = {
+    caseId: c.id, run, reply, error, route, routeFromFallback, toolCalls, writes, drafts, modelErrors, tokens,
+    latencyMs: Date.now() - startedAt, startedAt, attempts, steps,
+  };
   const checks = evaluate(c, partial, arch);
   return { ...partial, checks, pass: checks.every((ch) => ch.pass) };
 }
@@ -236,92 +212,27 @@ async function runPool<T>(tasks: (() => Promise<T>)[], concurrency: number, onDo
   return results;
 }
 
-// ── Reporting ─────────────────────────────────────────────────────────────────
-
-function pct(n: number, d: number): string {
-  return d === 0 ? "—" : `${Math.round((n / d) * 100)}%`;
-}
-
-const TOOL_CHECK_RE = /^(calls |does not call |\S+ args ⊇ )/;
-
-function buildReport(label: string, cases: EvalCase[], results: RunResult[], runs: number, minPass: number, arch: AgentMode, primary: string) {
-  const byCase = new Map(cases.map((c) => [c.id, results.filter((r) => r.caseId === c.id)]));
-  const gated = results.filter((r) => !cases.find((c) => c.id === r.caseId)?.known_gap);
-
-  const toolRuns = gated.filter((r) => r.checks.some((ch) => TOOL_CHECK_RE.test(ch.check)));
-  const toolPass = toolRuns.filter((r) => r.checks.filter((ch) => TOOL_CHECK_RE.test(ch.check)).every((ch) => ch.pass));
-  const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : 0);
-
-  const metrics = {
-    taskCompletion: pct(gated.filter((r) => r.pass).length, gated.length),
-    toolSelection: pct(toolPass.length, toolRuns.length),
-    errorRate: pct(gated.filter((r) => r.error).length, gated.length),
-    fallbackRate: pct(gated.filter((r) => r.modelErrors.length > 0).length, gated.length),
-    avgLatencyMs: avg(gated.map((r) => r.latencyMs)),
-    avgSubAgentTokens: avg(gated.map((r) => r.tokens)),
+/** The report as saved to disk: model inputs and outputs stay in Langfuse only, to keep reports small. */
+function withoutModelIO(report: EvalReport): EvalReport {
+  return {
+    ...report,
+    results: report.results.map((r) => ({
+      ...r,
+      attempts: r.attempts?.map((a) => ({ ...a, calls: a.calls.map(({ input: _input, output: _output, ...call }) => call) })),
+    })),
   };
-
-  const failing = cases.filter((c) => {
-    const rs = byCase.get(c.id)!;
-    return !c.known_gap && rs.filter((r) => r.pass).length / rs.length < minPass;
-  });
-
-  const lines: string[] = [
-    `# Query Agent Eval — ${label}`,
-    "",
-    `- 時間：${new Date().toISOString()}`,
-    `- 案例：${cases.length}（每案 ${runs} 次）；通過門檻 ${Math.round(minPass * 100)}%`,
-    `- 架構：${arch}；主模型：${primary}`,
-    "",
-    "## 指標（不含 known_gap 案例）",
-    "",
-    "| 指標 | 數值 |",
-    "|------|------|",
-    `| 任務完成率（全部檢查通過） | ${metrics.taskCompletion} |`,
-    `| Tool 選擇正確率 | ${metrics.toolSelection} |`,
-    `| 錯誤率（請求拋出例外） | ${metrics.errorRate} |`,
-    `| 降級率（至少一個模型失敗） | ${metrics.fallbackRate} |`,
-    `| 平均延遲 | ${metrics.avgLatencyMs} ms |`,
-    `| 平均 token（僅子 Agent） | ${metrics.avgSubAgentTokens} |`,
-    "",
-    "## 各案例",
-    "",
-    "| 案例 | 通過 | 路由 | 呼叫的 tools |",
-    "|------|------|------|--------------|",
-  ];
-  for (const c of cases) {
-    const rs = byCase.get(c.id)!;
-    const passed = rs.filter((r) => r.pass).length;
-    const mark = c.known_gap ? "🚧" : passed / rs.length >= minPass ? "✅" : "❌";
-    const routes = [...new Set(rs.map((r) => (r.route?.agents.join("+") ?? "—") + (r.routeFromFallback ? "(fallback)" : "")))].join(" / ");
-    const tools = [...new Set(rs.flatMap((r) => r.toolCalls.map((t) => t.toolName)))].join(", ") || "—";
-    lines.push(`| ${mark} \`${c.id}\` ${c.name} | ${passed}/${rs.length} | ${routes} | ${tools} |`);
-  }
-
-  lines.push("", "## 失敗明細", "");
-  for (const c of cases) {
-    const failedRuns = byCase.get(c.id)!.filter((r) => !r.pass);
-    if (!failedRuns.length) continue;
-    lines.push(`### \`${c.id}\` ${c.name}${c.known_gap ? `（known gap：${c.known_gap}）` : ""}`, "");
-    for (const r of failedRuns) {
-      const failed = r.checks.filter((ch) => !ch.pass).map((ch) => `${ch.check}${ch.detail ? `（${ch.detail}）` : ""}`);
-      lines.push(`- run ${r.run}：${failed.join("；")}`);
-      if (r.modelErrors.length) lines.push(`  - 模型錯誤：${r.modelErrors.join("；")}`);
-      lines.push(`  - 回覆：${r.reply.replace(/\s+/g, " ").slice(0, 200) || "（無）"}`);
-    }
-    lines.push("");
-  }
-
-  return { markdown: lines.join("\n"), metrics, failing };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+
+const pct = (v: number | null) => (v === null ? "—" : `${Math.round(v * 100)}%`);
 
 async function main() {
   const opts = parseArgs();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is required (run via `bun run eval`, which loads .env)");
 
-  const cases = loadCases(opts.filter);
+  const allCases = loadCases(join(EVALS_DIR, "cases"));
+  const cases = opts.filter ? allCases.filter((c) => c.id.includes(opts.filter!)) : allCases;
   if (!cases.length) throw new Error(`No eval cases match filter "${opts.filter}"`);
 
   // The gateway and router log every model failure; keep the eval output readable.
@@ -331,27 +242,56 @@ async function main() {
     console.error = () => {};
   }
 
-  const models = opts.primary ? modelsFor([opts.primary, ...MODEL_PRIORITY.filter((id) => id !== opts.primary)]) : undefined;
-  console.log(`Running ${cases.length} cases × ${opts.runs} runs (arch ${opts.arch}, primary ${opts.primary ?? MODEL_PRIORITY[0]}, concurrency ${opts.concurrency})…`);
-  const tasks = cases.flatMap((c) => Array.from({ length: opts.runs }, (_, i) => () => runOnce(c, i + 1, opts.arch, models)));
+  const manifest = buildManifest(opts.arch, opts.policy, cases, EVALS_DIR);
+  const createdAt = new Date().toISOString();
+  console.log(`Running ${cases.length} cases × ${opts.runs} runs (arch ${opts.arch}, concurrency ${opts.concurrency})…`);
+  for (const [phase, ids] of Object.entries(manifest.models)) console.log(`  ${phase}: ${ids.join(" → ")}`);
+  const tasks = cases.flatMap((c) => Array.from({ length: opts.runs }, (_, i) => () => runOnce(c, i + 1, opts.arch, opts.policy)));
   const results = await runPool(tasks, opts.concurrency, (r) => process.stdout.write(r.pass ? "." : "F"));
   process.stdout.write("\n");
   Object.assign(console, restore);
 
-  const { markdown, metrics, failing } = buildReport(opts.label, cases, results, opts.runs, opts.minPass, opts.arch, opts.primary ?? MODEL_PRIORITY[0]);
-  const reportsDir = join(EVALS_DIR, "reports");
-  mkdirSync(reportsDir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13);
-  const base = join(reportsDir, `${stamp}-${opts.label}`);
-  writeFileSync(`${base}.md`, markdown);
-  writeFileSync(`${base}.json`, JSON.stringify({ label: opts.label, arch: opts.arch, primary: opts.primary ?? MODEL_PRIORITY[0], metrics, results }, null, 2));
+  const id = `${createdAt.replace(/[-:]/g, "").slice(0, 13)}-${opts.label}`;
+  const caseInfos = cases.map(({ id: caseId, name, category, known_gap }) => ({ id: caseId, name, category, ...(known_gap ? { known_gap } : {}) }));
+  const metrics = computeMetrics(caseInfos, results);
+  const report: EvalReport = {
+    version: 2, id, label: opts.label, createdAt, ...(opts.filter ? { filter: opts.filter } : {}),
+    runs: opts.runs, minPass: opts.minPass, manifest, cases: caseInfos, metrics, gates: evaluateGates(metrics), results,
+  };
 
-  console.log(`\n任務完成率 ${metrics.taskCompletion}｜Tool 選擇 ${metrics.toolSelection}｜錯誤率 ${metrics.errorRate}｜降級率 ${metrics.fallbackRate}｜平均 ${metrics.avgLatencyMs} ms`);
-  console.log(`報告：${base}.md`);
-  if (failing.length) {
-    console.log(`未達門檻：${failing.map((c) => c.id).join(", ")}`);
-    process.exit(1);
+  const baseline = opts.compare
+    ? loadReport(join(REPORTS_DIR, opts.compare.endsWith(".json") ? opts.compare : `${opts.compare}.json`), allCases)
+    : findBaseline(REPORTS_DIR, allCases, { id, manifest });
+  const comparison = baseline ? compareReports(baseline, report) : null;
+
+  mkdirSync(REPORTS_DIR, { recursive: true });
+  const base = join(REPORTS_DIR, id);
+  writeFileSync(`${base}.md`, buildMarkdown(report, comparison));
+  writeFileSync(`${base}.json`, JSON.stringify(withoutModelIO(report), null, 2));
+  // The log table is the last section of the document, so a row is appended at the end.
+  if (!opts.filter && existsSync(EVAL_LOG)) appendFileSync(EVAL_LOG, `${logRow(report, comparison)}\n`);
+
+  const cost = metrics.costPerCompletedTask === null ? "—" : `US$${metrics.costPerCompletedTask.toFixed(5)}`;
+  console.log(`\n任務完成率 ${pct(metrics.taskCompletion)}｜Router 分派 ${pct(metrics.routing)}｜每個完成任務 ${cost}｜P50 ${metrics.latencyMs.p50} ms｜P90 ${metrics.latencyMs.p90} ms`);
+  for (const g of report.gates) console.log(`${g.pass ? "✅" : "❌"} ${g.label} ${pct(g.value)}（≥ ${pct(g.min)}）`);
+  if (comparison) {
+    console.log(`與基準 ${comparison.baselineId} 比較：退步 ${comparison.regressed.join(", ") || "無"}｜修好 ${comparison.fixed.join(", ") || "無"}`);
   }
+  console.log(`報告：${base}.md`);
+
+  if (opts.langfuse && langfuseConfigured()) {
+    try {
+      const url = await uploadReport(report, allCases);
+      console.log(`Langfuse：${url}`);
+    } catch (err) {
+      console.log(`Langfuse 上傳失敗（報告已存在本機）：${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const failing = [...caseStatuses(report)].filter(([, status]) => status === "❌").map(([caseId]) => caseId);
+  const failedGates = report.gates.filter((g) => !g.pass);
+  if (failing.length) console.log(`未達門檻的案例：${failing.join(", ")}`);
+  if (failing.length || failedGates.length) process.exit(1);
 }
 
 main().catch((err) => {

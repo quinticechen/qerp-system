@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { Pencil } from 'lucide-react';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 import { MEMBER_ROLES, ROLE_BADGE_CLASSES, ROLE_LABELS } from '@/lib/roles';
 import type { OrganizationMember } from '@/types/organizationMember';
@@ -108,7 +109,11 @@ export const ViewUserDialog = ({ open, onOpenChange, user, onEdit }: ViewUserDia
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             關閉
           </Button>
-          {onEdit && <Button onClick={onEdit}>編輯</Button>}
+          {onEdit && (
+            <Button size="icon" onClick={onEdit} aria-label="編輯" title="編輯">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

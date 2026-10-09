@@ -17,14 +17,13 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   inventory_rolls: '布卷',
   shippings: '出貨單',
   shipping_items: '出貨布卷',
-  products_new: '產品',
+  product_groups: '產品',
+  products_new: '產品顏色',
   customers: '客戶',
   factories: '工廠',
   warehouses: '貨架',
   organizations: '組織設定',
-  organization_roles: '角色',
   user_organizations: '組織成員',
-  user_organization_roles: '成員角色',
   profiles: '用戶資料',
 };
 
@@ -65,6 +64,8 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   category: '類別',
   color: '顏色',
   color_code: '色號',
+  color_hex: '色值',
+  group_id: '所屬產品',
   stock_thresholds: '安全庫存',
   unit_of_measure: '單位',
   contact_person: '聯絡人',
@@ -77,11 +78,9 @@ export const AUDIT_FIELD_LABELS: Record<string, string> = {
   // People, roles and permissions
   full_name: '姓名',
   display_name: '顯示名稱',
-  permissions: '權限',
   role: '角色',
-  role_id: '角色',
-  invited_role_id: '邀請角色',
   user_id: '用戶',
+  created_by: '建立者',
   owner_id: '擁有者',
   invited_by: '邀請者',
   granted_by: '授權者',
@@ -92,6 +91,21 @@ export const formatAuditValue = (value: unknown): string => {
   if (typeof value === 'boolean') return value ? '是' : '否';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+};
+
+// Coded values by `table.field`, worded like the database's api_*_label() functions
+const QUALITY_LABELS = { A: 'A 級', B: 'B 級', C: 'C 級', D: 'D 級', defective: '瑕疵' };
+
+export const AUDIT_VALUE_LABELS: Record<string, Record<string, string>> = {
+  'orders.status': { pending: '待確認', confirmed: '已確認', factory_ordered: '已向工廠下單', completed: '已完成', cancelled: '已取消' },
+  'orders.payment_status': { unpaid: '未付款', partial_paid: '部分付款', paid: '已付清' },
+  'orders.shipping_status': { not_started: '未出貨', partial_shipped: '部分出貨', shipped: '已出貨' },
+  'order_products.status': { pending: '未出貨', partial_shipped: '部分出貨', shipped: '已出貨' },
+  'purchase_orders.status': { pending: '待確認', confirmed: '已下單', partial_arrived: '部分到貨', partial_received: '部分入庫', completed: '已完成', cancelled: '已取消' },
+  'purchase_order_items.status': { pending: '未入庫', partial_received: '部分入庫', received: '已入庫' },
+  'shippings.status': { shipped: '已出貨', cancelled: '已取消' },
+  'products_new.status': { Available: '可用', Unavailable: '停用' },
+  'inventory_rolls.quality': QUALITY_LABELS,
 };
 
 // Bookkeeping columns left out when showing the contents of an added or removed row

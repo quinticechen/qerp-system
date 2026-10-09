@@ -11,6 +11,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { useOrganizationPermissions } from '@/hooks/useOrganizationPermissions';
 import { DeleteOrganizationDialog } from '@/components/organization/DeleteOrganizationDialog';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
+import { UnfinishedFeature } from '@/components/common/UnfinishedFeature';
 
 const SystemSettings = () => {
   const { organization, hasOrganization } = useCurrentOrganization();
@@ -42,225 +43,235 @@ const SystemSettings = () => {
         <RecordAuditHistoryButton recordId={organization?.id} />
       </div>
 
-      {/* 沒有編輯權限時只能查看 */}
+      {/* 沒有編輯權限時只能查看；以下設定都還沒有接上功能（UnfinishedFeature：正式環境不顯示） */}
       <fieldset disabled={!canEdit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 通知設定 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Bell className="mr-2" size={20} />
-              通知設定
-            </CardTitle>
-            <CardDescription>
-              管理組織內的通知和警告設定
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">庫存低量警告</Label>
-                <p className="text-sm text-muted-foreground">
-                  當產品庫存低於設定閾值時發送通知
-                </p>
+        <UnfinishedFeature>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Bell className="mr-2" size={20} />
+                通知設定
+              </CardTitle>
+              <CardDescription>
+                管理組織內的通知和警告設定
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">庫存低量警告</Label>
+                  <p className="text-sm text-muted-foreground">
+                    當產品庫存低於設定閾值時發送通知
+                  </p>
+                </div>
+                <Switch />
               </div>
-              <Switch />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">新訂單通知</Label>
-                <p className="text-sm text-muted-foreground">
-                  收到新訂單時即時通知組織成員
-                </p>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">新訂單通知</Label>
+                  <p className="text-sm text-muted-foreground">
+                    收到新訂單時即時通知組織成員
+                  </p>
+                </div>
+                <Switch />
               </div>
-              <Switch />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">出貨提醒</Label>
-                <p className="text-sm text-muted-foreground">
-                  訂單需要出貨時提醒倉庫人員
-                </p>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">出貨提醒</Label>
+                  <p className="text-sm text-muted-foreground">
+                    訂單需要出貨時提醒倉庫人員
+                  </p>
+                </div>
+                <Switch />
               </div>
-              <Switch />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </UnfinishedFeature>
 
         {/* 使用者權限 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Shield className="mr-2" size={20} />
-              權限管理
-            </CardTitle>
-            <CardDescription>
-              管理組織內使用者角色和權限設定
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>預設新使用者角色</Label>
-              <select className="w-full p-2 border border-input rounded-md">
-                <option value="viewer">訪客</option>
-                <option value="editor">編輯者</option>
-              </select>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">自動帳號啟用</Label>
-                <p className="text-sm text-muted-foreground">
-                  新邀請使用者自動啟用帳號
-                </p>
+        <UnfinishedFeature>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Shield className="mr-2" size={20} />
+                權限管理
+              </CardTitle>
+              <CardDescription>
+                管理組織內使用者角色和權限設定
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>預設新使用者角色</Label>
+                <select className="w-full p-2 border border-input rounded-md">
+                  <option value="viewer">訪客</option>
+                  <option value="editor">編輯者</option>
+                </select>
               </div>
-              <Switch />
-            </div>
-          </CardContent>
-        </Card>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">自動帳號啟用</Label>
+                  <p className="text-sm text-muted-foreground">
+                    新邀請使用者自動啟用帳號
+                  </p>
+                </div>
+                <Switch />
+              </div>
+            </CardContent>
+          </Card>
+        </UnfinishedFeature>
 
         {/* 庫存設定 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Database className="mr-2" size={20} />
-              庫存設定
-            </CardTitle>
-            <CardDescription>
-              設定組織的庫存管理相關參數
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="global-threshold">全域庫存閾值 (KG)</Label>
-              <Input
-                id="global-threshold"
-                type="number"
-                placeholder="100"
-                className="w-full"
-              />
-              <p className="text-sm text-muted-foreground">
-                未設定個別閾值的產品將使用此預設值
-              </p>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">自動採購建議</Label>
+        <UnfinishedFeature>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Database className="mr-2" size={20} />
+                庫存設定
+              </CardTitle>
+              <CardDescription>
+                設定組織的庫存管理相關參數
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="global-threshold">全域庫存閾值 (KG)</Label>
+                <Input
+                  id="global-threshold"
+                  type="number"
+                  placeholder="100"
+                  className="w-full"
+                />
                 <p className="text-sm text-muted-foreground">
-                  庫存不足時自動產生採購建議
+                  未設定個別閾值的產品將使用此預設值
                 </p>
               </div>
-              <Switch />
-            </div>
-          </CardContent>
-        </Card>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">自動採購建議</Label>
+                  <p className="text-sm text-muted-foreground">
+                    庫存不足時自動產生採購建議
+                  </p>
+                </div>
+                <Switch />
+              </div>
+            </CardContent>
+          </Card>
+        </UnfinishedFeature>
 
         {/* 郵件設定 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Mail className="mr-2" size={20} />
-              郵件設定
-            </CardTitle>
-            <CardDescription>
-              配置組織的郵件發送設定
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="smtp-server">SMTP 伺服器</Label>
-              <Input
-                id="smtp-server"
-                placeholder="smtp.gmail.com"
-                className="w-full"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+        <UnfinishedFeature>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Mail className="mr-2" size={20} />
+                郵件設定
+              </CardTitle>
+              <CardDescription>
+                配置組織的郵件發送設定
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="smtp-port">連接埠</Label>
+                <Label htmlFor="smtp-server">SMTP 伺服器</Label>
                 <Input
-                  id="smtp-port"
-                  type="number"
-                  placeholder="587"
+                  id="smtp-server"
+                  placeholder="smtp.gmail.com"
+                  className="w-full"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="from-email">寄件者信箱</Label>
-                <Input
-                  id="from-email"
-                  type="email"
-                  placeholder="system@company.com"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="smtp-port">連接埠</Label>
+                  <Input
+                    id="smtp-port"
+                    type="number"
+                    placeholder="587"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="from-email">寄件者信箱</Label>
+                  <Input
+                    id="from-email"
+                    type="email"
+                    placeholder="system@company.com"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">啟用 SSL/TLS</Label>
-                <p className="text-sm text-muted-foreground">
-                  使用安全連線發送郵件
-                </p>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">啟用 SSL/TLS</Label>
+                  <p className="text-sm text-muted-foreground">
+                    使用安全連線發送郵件
+                  </p>
+                </div>
+                <Switch defaultChecked />
               </div>
-              <Switch defaultChecked />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </UnfinishedFeature>
 
         {/* 組織資訊 */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="mr-2" size={20} />
-              組織資訊
-            </CardTitle>
-            <CardDescription>
-              更新組織基本資訊
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="organization-name">組織名稱</Label>
-                <Input
-                  id="organization-name"
-                  placeholder="請輸入組織名稱"
-                  defaultValue={organization?.name || ''}
-                />
+        <UnfinishedFeature className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Users className="mr-2" size={20} />
+                組織資訊
+              </CardTitle>
+              <CardDescription>
+                更新組織基本資訊
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="organization-name">組織名稱</Label>
+                  <Input
+                    id="organization-name"
+                    placeholder="請輸入組織名稱"
+                    defaultValue={organization?.name || ''}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="organization-phone">組織電話</Label>
+                  <Input
+                    id="organization-phone"
+                    placeholder="請輸入組織電話"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="organization-phone">組織電話</Label>
+                <Label htmlFor="organization-address">組織地址</Label>
                 <Input
-                  id="organization-phone"
-                  placeholder="請輸入組織電話"
+                  id="organization-address"
+                  placeholder="請輸入完整地址"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="organization-address">組織地址</Label>
-              <Input
-                id="organization-address"
-                placeholder="請輸入完整地址"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tax-id">統一編號</Label>
-                <Input
-                  id="tax-id"
-                  placeholder="請輸入統一編號"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tax-id">統一編號</Label>
+                  <Input
+                    id="tax-id"
+                    placeholder="請輸入統一編號"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank-account">銀行帳號</Label>
+                  <Input
+                    id="bank-account"
+                    placeholder="請輸入銀行帳號"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="bank-account">銀行帳號</Label>
-                <Input
-                  id="bank-account"
-                  placeholder="請輸入銀行帳號"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </UnfinishedFeature>
       </fieldset>
 
       {/* 危險區域：僅組織擁有者可見 */}
@@ -291,9 +302,10 @@ const SystemSettings = () => {
         </Card>
       )}
 
-      {/* 保存設定按鈕 */}
+      {/* 保存設定按鈕：上面的設定都還沒有儲存功能 */}
       {canEdit && (
-        <div className="flex justify-end space-x-4">
+        <UnfinishedFeature>
+        <div className="flex justify-end space-x-4 rounded-lg p-4 pr-28">
           <Button variant="outline">
             重設為預設值
           </Button>
@@ -301,6 +313,7 @@ const SystemSettings = () => {
             保存設定
           </Button>
         </div>
+        </UnfinishedFeature>
       )}
 
       <DeleteOrganizationDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen} />

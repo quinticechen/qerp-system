@@ -6,7 +6,7 @@ import { entityNote } from "./memory.js";
 import type { CoreMessage } from "ai";
 import { type QueryRun, normalizeToolName } from "./observer.js";
 
-const AGENT_SYSTEM_PROMPTS: Record<AgentGroup, string> = {
+export const AGENT_SYSTEM_PROMPTS: Record<AgentGroup, string> = {
   commercial: `你是 Query 的商務管理子 Agent，專精於客戶關係、訂單處理和產品管理。
 
 職責：
@@ -74,7 +74,7 @@ const AGENT_SYSTEM_PROMPTS: Record<AgentGroup, string> = {
  * 單一 Agent（P0-7 比較用）：一個 Agent 持有使用者被授權的全部工具，直接處理原始訊息，不經 Router
  * 改寫。內容合併自上方兩個子 Agent 的 prompt。
  */
-const SINGLE_AGENT_PROMPT = `你是 Query，紡織業 ERP 的智慧助理，負責客戶、訂單、產品、庫存、採購、出貨與工廠的查詢與操作。
+export const SINGLE_AGENT_PROMPT = `你是 Query，紡織業 ERP 的智慧助理，負責客戶、訂單、產品、庫存、採購、出貨與工廠的查詢與操作。
 
 查詢「最新」資料時的規則：
 - 使用者問「最新的採購單」、「最近的出貨」等，直接呼叫對應的 list 工具、不加額外篩選條件——結果預設已依建立時間新到舊排序，取第一筆回答即可

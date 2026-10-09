@@ -5,12 +5,15 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { PERMISSION_KEYS } from "../src/tools/types.js";
+import { FAKE_API_NAMES, simulateApi } from "./fake-api.js";
 
 type Row = Record<string, unknown>;
 export type Tables = Record<string, Row[]>;
 
 export interface RecordedWrite {
-  op: "insert" | "update" | "delete";
+  /** "rpc" = a business API called for real (not a dry run); its row inserts are recorded too. */
+  op: "insert" | "update" | "delete" | "rpc";
   table: string;
   values: unknown;
   /** Ids of the rows an update or delete matched (empty when the filters matched nothing). */
@@ -71,13 +74,17 @@ function splitSelect(columns: string): string[] {
   return parts;
 }
 
-/** Keeps only the selected columns (and embedded relations), like PostgREST. `*` keeps everything. */
+/**
+ * Keeps only the selected columns (and embedded relations), like PostgREST. `*` keeps everything;
+ * `alias:column` renames.
+ */
 function project(row: Row, columns: string[] | null): Row {
   if (!columns || columns.includes("*")) return row;
   const out: Row = {};
   for (const entry of columns) {
-    const name = entry.replace(/\(.*$/s, "").trim();
-    if (name in row) out[name] = row[name];
+    const spec = entry.replace(/\(.*$/s, "").trim();
+    const [alias, column] = spec.includes(":") ? spec.split(":").map((x) => x.trim()) : [spec, spec];
+    if (column in row) out[alias] = row[column];
   }
   return out;
 }
@@ -189,14 +196,19 @@ export interface FakeAccess {
   grants: readonly string[];
 }
 
-export function createFakeSupabase(fixtures: Tables, userId: string, access: FakeAccess = { isOwner: true, grants: [] }): FakeSupabase {
+/** Default caller: the owner, who holds the whole catalog (RBAC R1: the admin's keys). */
+const OWNER: FakeAccess = { isOwner: true, grants: [...PERMISSION_KEYS] };
+
+export function createFakeSupabase(fixtures: Tables, userId: string, access: FakeAccess = OWNER): FakeSupabase {
   const tables: Tables = structuredClone(fixtures);
   const writes: RecordedWrite[] = [];
   const rpc = async (fn: string, args: Record<string, unknown>) => {
+    if (FAKE_API_NAMES.has(fn)) return simulateApi(fn, args, tables, writes, access.grants);
     if (args._user_id !== userId) return { data: false, error: null };
     if (fn === "is_organization_owner") return { data: access.isOwner, error: null };
     if (fn === "user_has_organization_permission") {
-      return { data: access.isOwner || access.grants.includes(String(args._permission)), error: null };
+      // RBAC R1: permissions come from the role's catalog keys only (the owner's grants are the admin's).
+      return { data: access.grants.includes(String(args._permission)), error: null };
     }
     return { data: null, error: { message: `fake-supabase: unknown rpc ${fn}` } };
   };

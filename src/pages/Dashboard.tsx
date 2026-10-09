@@ -25,6 +25,7 @@ import { CreatePurchaseDialog } from '@/components/purchase/CreatePurchaseDialog
 import { CreateShippingDialog } from '@/components/shipping/CreateShippingDialog';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '@/hooks/usePermissions';
+import { UnfinishedFeature } from '@/components/common/UnfinishedFeature';
 import type { PermissionKey } from '@/lib/permissionLabels';
 import type { LucideIcon } from 'lucide-react';
 
@@ -209,9 +210,12 @@ const Dashboard = () => {
                           <div>
                             <h3 className="text-sm text-slate-600 mb-1">{stat.title}</h3>
                             <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
-                            <p className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                              {stat.change} 較上月
-                            </p>
+                            {/* The month-over-month change is a fixed placeholder, not computed yet */}
+                            <UnfinishedFeature variant="inline">
+                              <span className={`text-sm ${stat.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                                {stat.change} 較上月
+                              </span>
+                            </UnfinishedFeature>
                           </div>
                           <div className={`p-3 rounded-full bg-slate-50 ${stat.color}`}>
                             <stat.icon size={24} />
@@ -230,9 +234,8 @@ const Dashboard = () => {
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">最近訂單</h2>
-                        <Button variant="outline" size="sm" onClick={() => navigate('/order')}>
-                          <Eye size={16} className="mr-2" />
-                          查看全部
+                        <Button variant="outline" onClick={() => navigate('/order')} size="icon" aria-label="查看全部" title="查看全部">
+                          <Eye className="" />
                         </Button>
                       </div>
                       <h3 className="text-sm text-slate-600 mb-4">最新的客戶訂單記錄</h3>

@@ -43,9 +43,9 @@ export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
     <div className="space-y-6">
       {/* Order Number Preview */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <Label className="text-gray-800 font-semibold">訂單編號 (自動生成)</Label>
+        <Label className="text-gray-800 font-semibold">預計訂單編號 (自動生成)</Label>
         <div className="text-lg font-mono text-blue-800 mt-1">{generatedOrderNumber}</div>
-        <div className="text-xs text-gray-600 mt-1">格式：年份K月份日期-流水號</div>
+        <div className="text-xs text-gray-600 mt-1">格式：B＋年月日＋四位流水號；實際編號於建立時產生</div>
       </div>
 
       {/* Customer Selection */}

@@ -53,12 +53,9 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={addItem}
-            className="border-gray-300 text-gray-700 hover:bg-gray-50"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            新增項目
+            className="border-gray-300 text-gray-700 hover:bg-gray-50" size="icon" aria-label="新增項目" title="新增項目">
+            <Plus className="h-4 w-4" />
           </Button>
         </CardTitle>
       </CardHeader>

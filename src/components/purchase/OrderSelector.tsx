@@ -46,9 +46,8 @@ export const OrderSelector: React.FC<OrderSelectorProps> = ({
           關聯訂單 (可選擇多個)
           <Popover open={orderSearchOpen} onOpenChange={setOrderSearchOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="ml-2">
-                <Plus className="h-4 w-4 mr-1" />
-                搜尋並添加訂單
+              <Button variant="outline" className="ml-2" size="icon" aria-label="搜尋並添加訂單" title="搜尋並添加訂單">
+                <Plus className="h-4 w-4" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0 bg-white shadow-lg border border-gray-200 z-50">

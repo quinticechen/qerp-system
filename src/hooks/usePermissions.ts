@@ -1,7 +1,7 @@
 import { useOrganizationPermissions } from './useOrganizationPermissions';
 import { PERMISSION_KEYS, type PermissionKey } from '@/lib/permissionLabels';
 
-// One switch per permission key in docs/MULTI_TENANT_RBAC.md §4.3
+// One switch per permission key in docs/requirements/MULTI_TENANT_RBAC.md §4.3
 export type Permission = Record<PermissionKey, boolean>;
 
 export const usePermissions = () => {
