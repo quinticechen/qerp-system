@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createFakeSupabase } from "@/test/fakeSupabase";
-import { EditShippingDialog } from "./EditShippingDialog";
+import { ShippingDialog } from "./ShippingDialog";
 
 const fake = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeSupabase> | null }));
 
@@ -44,15 +44,31 @@ const renderDialog = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <EditShippingDialog shipping={shipping} open onOpenChange={() => {}} />
+      <ShippingDialog shipping={shipping} open onOpenChange={() => {}} canEdit />
     </QueryClientProvider>,
   );
 };
 
-describe("EditShippingDialog roll editing", () => {
+// Record dialogs open in view mode; editing starts from the 編輯 button
+const startEditing = async (user: ReturnType<typeof userEvent.setup>) => {
+  await screen.findByText("R-001");
+  await user.click(screen.getByRole("button", { name: "編輯" }));
+};
+
+describe("ShippingDialog", () => {
+  it("opens read-only with the shipped rolls", async () => {
+    renderDialog();
+
+    const row = (await screen.findByText("R-001")).closest("tr")!;
+    expect(within(row).getByText("40")).toBeInTheDocument();
+    expect(screen.queryByLabelText("第 1 卷出貨重量（公斤）")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "編輯" })).toBeInTheDocument();
+  });
+
   it("saves changed and added shipped rolls in one call", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
     const weight = await screen.findByLabelText("第 1 卷出貨重量（公斤）");
     await user.clear(weight);
@@ -63,7 +79,7 @@ describe("EditShippingDialog roll editing", () => {
     await user.click(await screen.findByRole("option", { name: /R-002/ }));
     await user.type(screen.getByLabelText("第 2 卷出貨重量（公斤）"), "10");
 
-    await user.click(screen.getByRole("button", { name: "更新出貨單" }));
+    await user.click(screen.getByRole("button", { name: "更新" }));
 
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
@@ -91,6 +107,7 @@ describe("EditShippingDialog roll editing", () => {
   it("shows how much each roll can ship and blocks more than that", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
     // 60kg left on the roll plus the 40kg this shipping already holds
     const row = (await screen.findByLabelText("第 1 卷出貨重量（公斤）")).closest("tr")!;
@@ -99,7 +116,7 @@ describe("EditShippingDialog roll editing", () => {
     const weight = within(row).getByLabelText("第 1 卷出貨重量（公斤）");
     await user.clear(weight);
     await user.type(weight, "120");
-    await user.click(screen.getByRole("button", { name: "更新出貨單" }));
+    await user.click(screen.getByRole("button", { name: "更新" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("布卷「R-001」最多可出貨 100 公斤");
     expect(fake.current!.rpcCalls).toEqual([]);
@@ -108,6 +125,7 @@ describe("EditShippingDialog roll editing", () => {
   it("only offers rolls of products on the order", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
     await screen.findByLabelText("第 1 卷出貨重量（公斤）");
     await user.click(screen.getByRole("button", { name: "新增出貨布卷" }));
@@ -117,18 +135,18 @@ describe("EditShippingDialog roll editing", () => {
     expect(screen.queryByRole("option", { name: /R-003/ })).not.toBeInTheDocument();
   });
 
-  it("shows a cancelled shipping read-only, without save or cancel buttons", async () => {
+  it("shows a cancelled shipping read-only, without edit or cancel buttons", async () => {
     fake.current = createFakeSupabase(seedTables());
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}>
-        <EditShippingDialog shipping={{ ...shipping, status: "cancelled", cancel_reason: "客戶退回" }} open onOpenChange={() => {}} />
+        <ShippingDialog shipping={{ ...shipping, status: "cancelled", cancel_reason: "客戶退回" }} open onOpenChange={() => {}} canEdit />
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByText("此出貨單已取消，原因：客戶退回，不能再修改。")).toBeInTheDocument();
-    expect(await screen.findByLabelText("第 1 卷出貨重量（公斤）")).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "更新出貨單" })).not.toBeInTheDocument();
+    expect(await screen.findByText("此出貨單已取消，原因：客戶退回；出貨的重量已歸還庫存，不能再修改。")).toBeInTheDocument();
+    expect(await screen.findByText("R-001")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "編輯" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "取消出貨單" })).not.toBeInTheDocument();
   });
 });

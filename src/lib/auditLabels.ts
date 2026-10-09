@@ -1,3 +1,11 @@
+import {
+  ORDER_SHIPPING_STATUS_LABELS,
+  ORDER_STATUS_LABELS,
+  PAYMENT_STATUS_LABELS,
+  PURCHASE_STATUS_LABELS,
+  SHIPPING_STATUS_LABELS,
+} from './statusLabels';
+
 // Display labels for record_audit_logs entries
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
@@ -93,17 +101,17 @@ export const formatAuditValue = (value: unknown): string => {
   return String(value);
 };
 
-// Coded values by `table.field`, worded like the database's api_*_label() functions
+// Coded values by `table.field`, worded as on the pages
 const QUALITY_LABELS = { A: 'A 級', B: 'B 級', C: 'C 級', D: 'D 級', defective: '瑕疵' };
 
 export const AUDIT_VALUE_LABELS: Record<string, Record<string, string>> = {
-  'orders.status': { pending: '待確認', confirmed: '已確認', factory_ordered: '已向工廠下單', completed: '已完成', cancelled: '已取消' },
-  'orders.payment_status': { unpaid: '未付款', partial_paid: '部分付款', paid: '已付清' },
-  'orders.shipping_status': { not_started: '未出貨', partial_shipped: '部分出貨', shipped: '已出貨' },
+  'orders.status': ORDER_STATUS_LABELS,
+  'orders.payment_status': PAYMENT_STATUS_LABELS,
+  'orders.shipping_status': ORDER_SHIPPING_STATUS_LABELS,
   'order_products.status': { pending: '未出貨', partial_shipped: '部分出貨', shipped: '已出貨' },
-  'purchase_orders.status': { pending: '待確認', confirmed: '已下單', partial_arrived: '部分到貨', partial_received: '部分入庫', completed: '已完成', cancelled: '已取消' },
+  'purchase_orders.status': PURCHASE_STATUS_LABELS,
   'purchase_order_items.status': { pending: '未入庫', partial_received: '部分入庫', received: '已入庫' },
-  'shippings.status': { shipped: '已出貨', cancelled: '已取消' },
+  'shippings.status': SHIPPING_STATUS_LABELS,
   'products_new.status': { Available: '可用', Unavailable: '停用' },
   'inventory_rolls.quality': QUALITY_LABELS,
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { todayInTaiwan } from '@/lib/dates';
 import { receiveInventory } from '@/lib/api/inventory';
 import { apiErrorMessage } from '@/lib/api/client';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface CreateInventoryDialogProps {
   open: boolean;
@@ -369,14 +370,18 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-gray-900">新增入庫</DialogTitle>
-            <DialogDescription className="text-gray-700">
-              選擇採購單並確認要入庫的產品項目
-            </DialogDescription>
-          </DialogHeader>
+      <RecordDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        mode="create"
+        title="新增入庫"
+        description="選擇採購單並確認要入庫的產品項目"
+        size="2xl"
+        onSubmit={handleSubmit}
+        submitting={createInventoryMutation.isPending}
+        submitDisabled={!selectedPurchaseOrderId || selectedProducts.length === 0}
+        submitLabel="確認入庫"
+      >
           
           <div className="space-y-6">
             <div className="space-y-2">
@@ -540,13 +545,10 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
                                 <div key={rollIndex} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-3 border border-gray-100 rounded">
                                   <div className="space-y-2">
                                     <Label className="text-gray-800">重量 (kg) *</Label>
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={roll.quantity || 0}
-                                      onChange={(e) => {
-                                        const value = parseFloat(e.target.value) || 0;
+                                    <NumberInput
+                                      value={roll.quantity}
+                                      onValueChange={(text) => {
+                                        const value = parseFloat(text) || 0;
                                         updateRoll(item.id, rollIndex, 'quantity', value);
                                       }}
                                       className={cn(
@@ -641,24 +643,7 @@ export const CreateInventoryDialog: React.FC<CreateInventoryDialogProps> = ({
             )}
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              className="text-gray-700 border-gray-300 hover:bg-gray-50"
-            >
-              取消
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={createInventoryMutation.isPending || !selectedPurchaseOrderId || selectedProducts.length === 0}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              {createInventoryMutation.isPending ? '處理中...' : '確認入庫'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </RecordDialog>
 
       <AlertDialog open={showWeightWarning} onOpenChange={setShowWeightWarning}>
         <AlertDialogContent>

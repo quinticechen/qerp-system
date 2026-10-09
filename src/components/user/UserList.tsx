@@ -3,10 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { UserX, UserCheck, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { ViewUserDialog } from './ViewUserDialog';
-import { EditUserDialog } from './EditUserDialog';
+import { UserDialog } from './UserDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { toast } from 'sonner';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
@@ -20,9 +19,7 @@ import type { OrganizationMember } from '@/types/organizationMember';
 const INVITATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const UserList = () => {
-  const [selectedUser, setSelectedUser] = useState<OrganizationMember | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { organizationId, organization, hasOrganization } = useCurrentOrganization();
   const { user: currentUser } = useAuth();
@@ -116,6 +113,7 @@ export const UserList = () => {
     enabled: hasOrganization
   });
 
+  // Throws so the dialog stays in edit mode when the change is refused
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     if (!organizationId || !currentUserId) return;
 
@@ -146,15 +144,12 @@ export const UserList = () => {
       queryClient.invalidateQueries({ queryKey: ['organization_users'] });
       toast.success(currentStatus ? '使用者已停用' : '使用者已啟用');
     } catch (error) {
-      console.error('Error toggling user status:', error);
       toast.error(`操作失敗: ${(error as { message?: string }).message ?? '未知錯誤'}`);
+      throw error;
     }
   };
 
-  const handleView = (user: OrganizationMember) => {
-    setSelectedUser(user);
-    setViewDialogOpen(true);
-  };
+  const handleView = (user: OrganizationMember) => setSelectedId(user.id);
 
   const handleResendInvitation = async (user: { id: string; email: string; email_confirmed: boolean }) => {
     if (!organizationId) return;
@@ -287,23 +282,6 @@ export const UserList = () => {
               重新發送邀請
             </Button>
           )}
-          {/* 組織擁有者與自己不能被停用 */}
-          {canEditUsers && !row.is_pending && !row.is_owner && row.id !== currentUserId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleUserStatus(row.id, row.is_active);
-              }}
-              className={row.is_active
-                ? "border-red-300 text-red-700 hover:bg-red-50"
-                : "border-green-300 text-green-700 hover:bg-green-50"
-              }
-            >
-              {row.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-            </Button>
-          )}
         </div>
       )
     }
@@ -323,6 +301,8 @@ export const UserList = () => {
     return <div className="text-center py-8 text-gray-500">載入中...</div>;
   }
 
+  const selectedUser = (users ?? []).find((user) => user.id === selectedId) ?? null;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -341,26 +321,18 @@ export const UserList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
-      {selectedUser && (
-        <>
-          <ViewUserDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            user={selectedUser}
-            // Anyone can edit their own name and phone; editing others needs canEditUsers
-            onEdit={canEditUsers || selectedUser.id === currentUserId ? () => {
-              setViewDialogOpen(false);
-              setEditDialogOpen(true);
-            } : undefined}
-          />
-          <EditUserDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            user={selectedUser}
-          />
-        </>
-      )}
+      <UserDialog
+        user={selectedUser}
+        open={selectedUser !== null}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+        canEdit={!!selectedUser && (canEditUsers || selectedUser.id === currentUserId)}
+        // The owner, yourself and invitees cannot be disabled
+        onToggleActive={
+          selectedUser && canEditUsers && !selectedUser.is_pending && !selectedUser.is_owner && selectedUser.id !== currentUserId
+            ? () => handleToggleUserStatus(selectedUser.id, selectedUser.is_active)
+            : undefined
+        }
+      />
     </div>
   );
 };

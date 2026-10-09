@@ -270,7 +270,7 @@ describe("RecordAuditHistoryButton for coded values", () => {
     const [line, order] = await within(panel).findAllByRole("listitem");
 
     expect(within(line).getByText("部分出貨 → 未出貨")).toBeInTheDocument();
-    expect(within(order).getByText("已向工廠下單 → 待確認")).toBeInTheDocument();
-    expect(within(order).getByText("部分出貨 → 未出貨")).toBeInTheDocument();
+    expect(within(order).getByText("已向工廠下單 → 待處理")).toBeInTheDocument();
+    expect(within(order).getByText("部分出貨 → 未開始")).toBeInTheDocument();
   });
 });

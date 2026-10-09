@@ -117,6 +117,16 @@ If your change is to:
 - **Owner-run functions live in the `private` schema:** business APIs, member RPCs and the permission functions are implemented as `SECURITY DEFINER` in `private`, which PostgREST does not expose; `public` holds a same-named `SECURITY INVOKER` wrapper that clients call. Change the implementation with `CREATE OR REPLACE FUNCTION private.<name>` — never `CREATE OR REPLACE` the `public` wrapper. A new owner-run function goes in `private`, plus a wrapper only if clients call it (pattern: `supabase/migrations/20261009140512_private_definer_functions.sql`). The security advisor should show no definer function in `public` callable by clients.
 - **The AI never writes directly:** in the agent loop, `write` tools only create drafts (`query_pending_actions`); the write runs when the user confirms the card (`POST /query/actions/:id/confirm`, `mcp-server/src/agent/actions.ts`), which re-checks membership and permission and claims the action atomically. A new write tool needs `summarize()` (card text with names, never IDs); the registry refuses one without it. The eval fails any case where the agent loop writes.
 
+## Record Dialogs
+
+Every record a page lists (customers, factories, products, colors, shelves, orders, purchase orders, receiving batches, rolls, shippings, members) opens in `RecordDialog` (`src/components/common/RecordDialog.tsx`); the full rule is `docs/requirements/UI_CONSISTENCY.md`.
+
+- **View mode first, always.** Top right: 編輯紀錄 + close. Bottom right: 編輯, only when the member may edit and the record is not cancelled. Show every field; `DetailField` prints「-」for empty ones.
+- **Edit mode after 編輯.** Top right: close only. Bottom right: 取消 (back to view, changes discarded) + 更新. Bottom left: `CancelRecordButton` for documents or `ActiveToggleButton` for master data. After saving, stay open in view mode — lists pass the record by id from their latest query data.
+- **Create mode.** Top right: close. Bottom right: 取消 + 建立. Use the same fields as edit mode.
+- Lay out content with `DetailSection`, `DetailField` and `FormField`; never `CardTitle` inside a dialog (its size is a page title). Number fields use `NumberInput`.
+- Confirmation steps (transfer ownership, delete organization), forgot password and password change are not records and keep plain dialogs.
+
 ## Unfinished Features
 
 Users must never meet a control that does nothing. Any UI whose feature is not implemented yet (a setting that is not saved, a button with no handler, a card of placeholders) is wrapped in `UnfinishedFeature` (`src/components/common/UnfinishedFeature.tsx`):

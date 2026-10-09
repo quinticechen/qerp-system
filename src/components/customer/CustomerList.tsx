@@ -3,25 +3,20 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
-import { EditCustomerDialog } from './EditCustomerDialog';
-import { ViewCustomerDialog } from './ViewCustomerDialog';
+import { PartnerDialog } from '@/components/common/PartnerDialog';
+import type { PartnerRow } from '@/lib/partnerForm';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { setPartnerActive } from '@/lib/api/partners';
-import { apiErrorMessage } from '@/lib/api/client';
 
 export const CustomerList = () => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditCustomers');
-  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
-  const { data: customers, isLoading, refetch } = useQuery({
+  const { data: customers, isLoading } = useQuery({
     queryKey: ['customers', organizationId],
     queryFn: async () => {
       if (!organizationId) {
@@ -47,24 +42,7 @@ export const CustomerList = () => {
     enabled: hasOrganization
   });
 
-  // Disabled customers stay on existing documents but are hidden from pickers for new ones
-  const handleToggleActive = async () => {
-    if (!organizationId || !selectedCustomer) return;
-    try {
-      const nextActive = !selectedCustomer.is_active;
-      await setPartnerActive('customer', organizationId, selectedCustomer.id, nextActive);
-      toast.success(nextActive ? '客戶已啟用' : '客戶已停用');
-      setSelectedCustomer({ ...selectedCustomer, is_active: nextActive });
-      refetch();
-    } catch (error) {
-      toast.error(`變更客戶狀態失敗：${apiErrorMessage(error)}`);
-    }
-  };
-
-  const handleView = (customer: any) => {
-    setSelectedCustomer(customer);
-    setViewDialogOpen(true);
-  };
+  const handleView = (row: PartnerRow) => setSelectedId(row.id);
 
   const columns: TableColumn[] = [
     {
@@ -186,27 +164,13 @@ export const CustomerList = () => {
         </CardContent>
       </Card>
 
-      {/* 對話框 */}
-      {selectedCustomer && (
-        <>
-          <ViewCustomerDialog
-            open={viewDialogOpen}
-            onOpenChange={setViewDialogOpen}
-            customer={selectedCustomer}
-            onToggleActive={canEdit ? handleToggleActive : undefined}
-            onEdit={canEdit ? () => {
-              setViewDialogOpen(false);
-              setEditDialogOpen(true);
-            } : undefined}
-          />
-          <EditCustomerDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            customer={selectedCustomer}
-            onCustomerUpdated={refetch}
-          />
-        </>
-      )}
+      <PartnerDialog
+        kind="customer"
+        partner={(customers ?? []).find((row) => row.id === selectedId) ?? null}
+        open={selectedId !== null}
+        onOpenChange={(open) => !open && setSelectedId(null)}
+        canEdit={canEdit}
+      />
     </div>
   );
 };

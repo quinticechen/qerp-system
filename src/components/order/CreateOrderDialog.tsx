@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { OrderBasicInfo, OrderProductSection } from './components';
 import { CreateCustomerDialog } from '../common/CreateCustomerDialog';
 import { CreateFactoryDialog } from '../common/CreateFactoryDialog';
@@ -27,8 +26,8 @@ interface Product {
 interface OrderProduct {
   base_product_name: string;
   product_id: string;
-  quantity: number;
-  unit_price: number;
+  quantity: string;
+  unit_price: string;
   specifications: any;
 }
 
@@ -47,8 +46,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   const [products, setProducts] = useState<OrderProduct[]>([{
     base_product_name: '',
     product_id: '',
-    quantity: 0,
-    unit_price: 0,
+    quantity: '',
+    unit_price: '',
     specifications: {}
   }]);
   
@@ -146,8 +145,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
         customerId: orderData.customer_id,
         items: orderData.products.map((product) => ({
           product_id: product.product_id,
-          quantity: product.quantity,
-          unit_price: product.unit_price,
+          quantity: Number(product.quantity),
+          unit_price: Number(product.unit_price),
           specifications: product.specifications,
         })),
         factoryIds: orderData.factory_ids,
@@ -181,8 +180,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     setProducts([{
       base_product_name: '',
       product_id: '',
-      quantity: 0,
-      unit_price: 0,
+      quantity: '',
+      unit_price: '',
       specifications: {}
     }]);
     setValidationErrors({});
@@ -208,8 +207,8 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
     setProducts([...products, {
       base_product_name: '',
       product_id: '',
-      quantity: 0,
-      unit_price: 0,
+      quantity: '',
+      unit_price: '',
       specifications: {}
     }]);
   };
@@ -250,10 +249,10 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       if (!product.product_id) {
         productError.product_id = "請選擇產品和顏色";
       }
-      if (!product.quantity || product.quantity <= 0) {
+      if (!(Number(product.quantity) > 0)) {
         productError.quantity = "請輸入有效的數量";
       }
-      if (!product.unit_price || product.unit_price <= 0) {
+      if (!(Number(product.unit_price) > 0)) {
         productError.unit_price = "請輸入有效的單價";
       }
       
@@ -284,7 +283,7 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
       return;
     }
 
-    const validProducts = products.filter(p => p.product_id && p.quantity > 0 && p.unit_price > 0);
+    const validProducts = products.filter(p => p.product_id && Number(p.quantity) > 0 && Number(p.unit_price) > 0);
     
     createOrderMutation.mutate({
       customer_id: selectedCustomer,
@@ -295,92 +294,83 @@ export const CreateOrderDialog: React.FC<CreateOrderDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-gray-900">新增訂單</DialogTitle>
-          <DialogDescription className="text-gray-700">
-            建立新的客戶訂單
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          <OrderBasicInfo
-            generatedOrderNumber={generatedOrderNumber}
-            selectedCustomer={selectedCustomer}
-            onCustomerChange={(value) => {
-              setSelectedCustomer(value);
-              if (validationErrors.selectedCustomer) {
-                setValidationErrors(prev => ({ ...prev, selectedCustomer: undefined }));
-              }
-            }}
-            selectedFactoryIds={selectedFactoryIds}
-            onFactoriesChange={setSelectedFactoryIds}
-            customers={customers || []}
-            onCreateCustomer={() => setIsCreateCustomerOpen(true)}
-            onCreateFactory={() => setIsCreateFactoryOpen(true)}
-            customerError={validationErrors.selectedCustomer}
-          />
-
-          <OrderProductSection
-            products={products}
-            allProducts={allProducts || []}
-            onAddProduct={addProduct}
-            onRemoveProduct={removeProduct}
-            onUpdateProduct={(index, field, value) => {
-              updateProduct(index, field, value);
-              // Clear validation errors for this field
-              if (validationErrors.products?.[index]?.[field as keyof OrderProduct]) {
-                setValidationErrors(prev => ({
-                  ...prev,
-                  products: {
-                    ...prev.products,
-                    [index]: {
-                      ...prev.products?.[index],
-                      [field]: undefined
+    <>
+      <RecordDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        mode="create"
+        title="新增訂單"
+        description="建立新的客戶訂單"
+        size="xl"
+        onSubmit={handleSubmit}
+        submitting={createOrderMutation.isPending}
+        submitLabel="建立訂單"
+      >
+          <div className="space-y-6">
+            <OrderBasicInfo
+              generatedOrderNumber={generatedOrderNumber}
+              selectedCustomer={selectedCustomer}
+              onCustomerChange={(value) => {
+                setSelectedCustomer(value);
+                if (validationErrors.selectedCustomer) {
+                  setValidationErrors(prev => ({ ...prev, selectedCustomer: undefined }));
+                }
+              }}
+              selectedFactoryIds={selectedFactoryIds}
+              onFactoriesChange={setSelectedFactoryIds}
+              customers={customers || []}
+              onCreateCustomer={() => setIsCreateCustomerOpen(true)}
+              onCreateFactory={() => setIsCreateFactoryOpen(true)}
+              customerError={validationErrors.selectedCustomer}
+            />
+  
+            <OrderProductSection
+              products={products}
+              allProducts={allProducts || []}
+              onAddProduct={addProduct}
+              onRemoveProduct={removeProduct}
+              onUpdateProduct={(index, field, value) => {
+                updateProduct(index, field, value);
+                // Clear validation errors for this field
+                if (validationErrors.products?.[index]?.[field as keyof OrderProduct]) {
+                  setValidationErrors(prev => ({
+                    ...prev,
+                    products: {
+                      ...prev.products,
+                      [index]: {
+                        ...prev.products?.[index],
+                        [field]: undefined
+                      }
                     }
-                  }
-                }));
-              }
-            }}
-            onCreateProduct={() => setIsCreateProductOpen(true)}
-            note={note}
-            onNoteChange={setNote}
-            productErrors={validationErrors.products}
-          />
-        </div>
+                  }));
+                }
+              }}
+              onCreateProduct={() => setIsCreateProductOpen(true)}
+              note={note}
+              onNoteChange={setNote}
+              productErrors={validationErrors.products}
+            />
+          </div>
+      </RecordDialog>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button 
-            onClick={handleSubmit}
-            disabled={createOrderMutation.isPending}
-          >
-            {createOrderMutation.isPending ? '建立中...' : '建立訂單'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-
-      {/* Create dialogs */}
-      <CreateCustomerDialog
-        open={isCreateCustomerOpen}
-        onOpenChange={setIsCreateCustomerOpen}
-        onCustomerCreated={handleCustomerCreated}
-      />
-      
-      <CreateFactoryDialog
-        open={isCreateFactoryOpen}
-        onOpenChange={setIsCreateFactoryOpen}
-        onFactoryCreated={handleFactoryCreated}
-      />
-      
-      <CreateProductDialog
-        open={isCreateProductOpen}
-        onOpenChange={setIsCreateProductOpen}
-        onProductCreated={handleProductCreated}
-      />
-    </Dialog>
+        {/* Create dialogs */}
+        <CreateCustomerDialog
+          open={isCreateCustomerOpen}
+          onOpenChange={setIsCreateCustomerOpen}
+          onCustomerCreated={handleCustomerCreated}
+        />
+        
+        <CreateFactoryDialog
+          open={isCreateFactoryOpen}
+          onOpenChange={setIsCreateFactoryOpen}
+          onFactoryCreated={handleFactoryCreated}
+        />
+        
+        <CreateProductDialog
+          open={isCreateProductOpen}
+          onOpenChange={setIsCreateProductOpen}
+          onProductCreated={handleProductCreated}
+        />
+    </>
   );
 };

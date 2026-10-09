@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { RecordDialog } from '@/components/common/RecordDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +29,7 @@ interface CreateUserForm {
 const DEFAULT_VALUES: CreateUserForm = { email: '', full_name: '', phone: '', role: 'viewer' };
 
 export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) => {
-  const { register, handleSubmit, reset, setValue, watch } = useForm<CreateUserForm>({ defaultValues: DEFAULT_VALUES });
+  const { register, handleSubmit, reset, setValue, watch, formState: { isSubmitting } } = useForm<CreateUserForm>({ defaultValues: DEFAULT_VALUES });
   const queryClient = useQueryClient();
   const { organizationId } = useCurrentOrganization();
 
@@ -134,16 +133,17 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>新增使用者</DialogTitle>
-          <DialogDescription>
-            輸入使用者資訊，系統將發送邀請郵件讓用戶完成註冊
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <RecordDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      mode="create"
+      title="新增使用者"
+      description="輸入使用者資訊，系統將發送邀請郵件讓用戶完成註冊"
+      formId="create-user-form"
+      submitting={isSubmitting}
+      submitLabel="建立使用者"
+    >
+        <form id="create-user-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">電子信箱 *</Label>
             <Input
@@ -190,21 +190,7 @@ export const CreateUserDialog = ({ open, onOpenChange }: CreateUserDialogProps) 
               {MEMBER_ROLES.find((role) => role.value === selectedRole)?.description}
             </p>
           </div>
-
-          <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              取消
-            </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              創建使用者
-            </Button>
-          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </RecordDialog>
   );
 };

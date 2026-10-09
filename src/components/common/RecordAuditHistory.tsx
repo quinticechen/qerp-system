@@ -10,6 +10,7 @@ import {
   formatAuditValue,
 } from '@/lib/auditLabels';
 import { ROLE_LABELS } from '@/lib/roles';
+import { RecordIdButton } from './RecordIdButton';
 
 interface RecordAuditHistoryProps {
   recordId: string | null | undefined;
@@ -85,8 +86,9 @@ export const RecordAuditHistory = ({ recordId, creation }: RecordAuditHistoryPro
       {data.entries.map((entry) => {
         const subject = subjectOf(entry, names);
         return (
-          <li key={entry.id} className="rounded-lg border border-gray-200 p-3">
-            <div className="font-medium text-gray-900">
+          <li key={entry.id} className="group relative rounded-lg border border-gray-200 p-3">
+            <RecordIdButton recordId={entry.record_id} />
+            <div className="pr-8 font-medium text-gray-900">
               {`${AUDIT_ACTION_LABELS[entry.action] ?? entry.action}${AUDIT_TABLE_LABELS[entry.table_name] ?? entry.table_name}${subject ? `「${subject}」` : ''}`}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-gray-600">
@@ -95,7 +97,6 @@ export const RecordAuditHistory = ({ recordId, creation }: RecordAuditHistoryPro
               <time dateTime={entry.changed_at}>{new Date(entry.changed_at).toLocaleString('zh-TW')}</time>
             </div>
             <FieldList rows={entryFields(entry, names)} />
-            <div className="mt-2 break-all text-xs text-gray-400">記錄 ID：{entry.record_id}</div>
           </li>
         );
       })}

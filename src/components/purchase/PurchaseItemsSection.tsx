@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { PurchaseItemForm } from './PurchaseItemForm';
@@ -42,26 +42,20 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
   setColorOpens,
   itemErrors,
 }) => {
-  console.log('PurchaseItemsSection - items state:', items);
-  console.log('PurchaseItemsSection - items length:', items.length);
-  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-gray-900 flex items-center justify-between">
-          採購項目
-          <Button
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="text-gray-800">採購項目 *</Label>
+        <Button
             type="button"
             variant="outline"
             onClick={addItem}
             className="border-gray-300 text-gray-700 hover:bg-gray-50" size="icon" aria-label="新增項目" title="新增項目">
             <Plus className="h-4 w-4" />
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </Button>
+      </div>
+      <div className="space-y-4">
         {items.map((item, index) => {
-          console.log(`PurchaseItemsSection - Rendering item ${index}:`, item);
           const itemFieldErrors = itemErrors?.[index];
           return (
             <PurchaseItemForm
@@ -76,19 +70,17 @@ export const PurchaseItemsSection: React.FC<PurchaseItemsSectionProps> = ({
               canRemove={items.length > 1}
               productNameOpen={productNameOpens[index] || false}
               setProductNameOpen={(open) => {
-                console.log(`Setting productNameOpen for index ${index} to:`, open);
                 setProductNameOpens({ ...productNameOpens, [index]: open });
               }}
               colorOpen={colorOpens[index] || false}
               setColorOpen={(open) => {
-                console.log(`Setting colorOpen for index ${index} to:`, open);
                 setColorOpens({ ...colorOpens, [index]: open });
               }}
               errors={itemFieldErrors}
             />
           );
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

@@ -1,11 +1,11 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ProductOption, productLabel } from '@/hooks/useProductOptions';
+import { NumberInput } from '@/components/common/NumberInput';
 
 // Form state shared by order and purchase lines; numbers stay strings while the user types
 export interface ProductLineItem {
@@ -100,35 +100,27 @@ export const ProductLineItemsEditor = <T extends ProductLineItem>({
                   )}
                 </TableCell>
                 <TableCell>
-                  <Input
-                    type="number"
-                    min={lock.minQuantity}
-                    step="0.01"
+                  <NumberInput
                     aria-label={`第 ${position} 項${quantityLabel}`}
                     value={item.quantity}
-                    onChange={(e) => updateItem(item.key, { quantity: e.target.value } as Partial<T>)}
+                    onValueChange={(value) => updateItem(item.key, { quantity: value } as Partial<T>)}
                   />
                 </TableCell>
                 {showRolls && (
                   <TableCell>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="1"
+                    <NumberInput
+                      decimals={0}
                       aria-label={`第 ${position} 項卷數`}
                       value={item.rolls ?? ''}
-                      onChange={(e) => updateItem(item.key, { rolls: e.target.value } as Partial<T>)}
+                      onValueChange={(value) => updateItem(item.key, { rolls: value } as Partial<T>)}
                     />
                   </TableCell>
                 )}
                 <TableCell>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <NumberInput
                     aria-label={`第 ${position} 項單價`}
                     value={item.unit_price}
-                    onChange={(e) => updateItem(item.key, { unit_price: e.target.value } as Partial<T>)}
+                    onValueChange={(value) => updateItem(item.key, { unit_price: value } as Partial<T>)}
                   />
                 </TableCell>
                 <TableCell className="text-right text-gray-900">${subtotal.toLocaleString()}</TableCell>

@@ -1,12 +1,12 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditableShippingItem, ShippableRoll, newShippingItem } from '@/hooks/useShippingItems';
 import { productLabel } from '@/hooks/useProductOptions';
 import { QUALITY_OPTIONS } from '@/lib/fabricQuality';
+import { NumberInput } from '@/components/common/NumberInput';
 
 interface ShippingItemsEditorProps {
   items: EditableShippingItem[];
@@ -57,14 +57,10 @@ export const ShippingItemsEditor = ({ items, onChange, rolls, capacityOf }: Ship
                   </Select>
                 </TableCell>
                 <TableCell className="space-y-1">
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    max={item.inventory_roll_id ? capacityOf(item.inventory_roll_id) : undefined}
+                  <NumberInput
                     aria-label={`第 ${position} 卷出貨重量（公斤）`}
                     value={item.shipped_quantity}
-                    onChange={(e) => updateItem(item.key, { shipped_quantity: e.target.value })}
+                    onValueChange={(value) => updateItem(item.key, { shipped_quantity: value })}
                   />
                   {item.inventory_roll_id && (
                     <span className="block text-xs text-gray-500">最多 {capacityOf(item.inventory_roll_id)} 公斤</span>

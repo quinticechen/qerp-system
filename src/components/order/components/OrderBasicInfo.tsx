@@ -55,11 +55,13 @@ export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
+            className="h-8 w-8"
             onClick={onCreateCustomer}
+            aria-label="新增客戶"
+            title="新增客戶"
           >
-            <Plus className="h-4 w-4 mr-1" />
-            新增客戶
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
         <Combobox
@@ -83,11 +85,13 @@ export const OrderBasicInfo: React.FC<OrderBasicInfoProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            size="icon"
+            className="h-8 w-8"
             onClick={onCreateFactory}
+            aria-label="新增工廠"
+            title="新增工廠"
           >
-            <Plus className="h-4 w-4 mr-1" />
-            新增工廠
+            <Plus className="h-4 w-4" />
           </Button>
         </div>
         <FactorySelector 

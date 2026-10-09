@@ -6,20 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { ShippingList } from './shipping/ShippingList';
 import { CreateShippingDialog } from './shipping/CreateShippingDialog';
-import { ViewShippingDialog } from './shipping/ViewShippingDialog';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { PermissionGate } from '@/components/PermissionGate';
 
 const ShippingManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedShipping, setSelectedShipping] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
 
-  const handleCreateSuccess = (shipping: any) => {
-    // 設置新創建的出貨單並打開預覽
-    setSelectedShipping(shipping);
-    setViewDialogOpen(true);
-  };
+  // A newly created shipping opens in the list's dialog
+  const handleCreateSuccess = (shipping: { id: string }) => setSelectedShippingId(shipping.id);
 
   return (
     <div className="space-y-6">
@@ -43,7 +38,7 @@ const ShippingManagement = () => {
         </TabsList>
         
         <TabsContent value="shippings">
-          <ShippingList />
+          <ShippingList selectedId={selectedShippingId} onSelectedIdChange={setSelectedShippingId} />
         </TabsContent>
         
         <TabsContent value="pending-shipping">
@@ -56,15 +51,7 @@ const ShippingManagement = () => {
         onOpenChange={setIsCreateDialogOpen}
         onSuccess={handleCreateSuccess}
       />
-      
-      {/* 新創建出貨單的預覽對話框 */}
-      {selectedShipping && (
-        <ViewShippingDialog
-          open={viewDialogOpen}
-          onOpenChange={setViewDialogOpen}
-          shipping={selectedShipping}
-        />
-      )}
+
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createFakeSupabase } from "@/test/fakeSupabase";
-import { EditPurchaseDialog } from "./EditPurchaseDialog";
+import { PurchaseDialog } from "./PurchaseDialog";
 
 const fake = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeSupabase> | null }));
 
@@ -57,15 +57,50 @@ const renderDialog = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <EditPurchaseDialog purchase={purchase} open onOpenChange={() => {}} />
+      <PurchaseDialog purchase={purchase} open onOpenChange={() => {}} canEdit />
     </QueryClientProvider>,
   );
 };
 
-describe("EditPurchaseDialog product editing", () => {
+// Record dialogs open in view mode; editing starts from the 編輯 button
+const startEditing = async (user: ReturnType<typeof userEvent.setup>) => {
+  await screen.findByText("棉布 - 白");
+  await user.click(screen.getByRole("button", { name: "編輯" }));
+};
+
+describe("PurchaseDialog", () => {
+  it("opens read-only and shows what was received and when", async () => {
+    fake.current = createFakeSupabase(seedTables());
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <PurchaseDialog
+          purchase={{
+            ...purchase,
+            inventories: [
+              { receipt_number: "I202610050001", arrival_date: "2026-10-05", inventory_rolls: [{ product_id: "p-1" }] },
+              { receipt_number: "I202610090001", arrival_date: "2026-10-09", inventory_rolls: [{ product_id: "p-1" }] },
+            ],
+          }}
+          open
+          onOpenChange={() => {}}
+          canEdit
+        />
+      </QueryClientProvider>,
+    );
+
+    const row = (await screen.findByText("棉布 - 白")).closest("tr")!;
+    expect(within(row).getByText("已入庫 100 公斤")).toBeInTheDocument();
+    expect(within(row).getByText(`入庫 ${new Date("2026-10-05").toLocaleDateString("zh-TW")}`)).toBeInTheDocument();
+    expect(within(row).getByText(`入庫 ${new Date("2026-10-09").toLocaleDateString("zh-TW")}`)).toBeInTheDocument();
+    expect(screen.getByText("I202610090001")).toBeInTheDocument();
+    expect(screen.queryByLabelText("第 1 項採購數量（公斤）")).not.toBeInTheDocument();
+  });
+
   it("saves changed, added and removed purchase items in one call, keeping untouched fields", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
     const quantity = await screen.findByLabelText("第 1 項採購數量（公斤）");
     await user.clear(quantity);
@@ -109,7 +144,9 @@ describe("EditPurchaseDialog product editing", () => {
   });
 
   it("locks the product and removal of an item that has been received", async () => {
+    const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
     const row = (await screen.findByLabelText("第 1 項採購數量（公斤）")).closest("tr")!;
     expect(within(row).getByText("已入庫 100 公斤")).toBeInTheDocument();
@@ -117,17 +154,18 @@ describe("EditPurchaseDialog product editing", () => {
     expect(within(row).getByLabelText("第 1 項產品")).toBeDisabled();
   });
 
-  it("shows a cancelled purchase order read-only, without save or cancel buttons", async () => {
+  it("shows a cancelled purchase order read-only, without edit or cancel buttons", async () => {
     fake.current = createFakeSupabase(seedTables());
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={queryClient}>
-        <EditPurchaseDialog purchase={{ ...purchase, status: "cancelled", cancel_reason: "工廠缺料" }} open onOpenChange={() => {}} />
+        <PurchaseDialog purchase={{ ...purchase, status: "cancelled", cancel_reason: "工廠缺料" }} open onOpenChange={() => {}} canEdit />
       </QueryClientProvider>,
     );
 
     expect(await screen.findByText("此採購單已取消，原因：工廠缺料，不能再修改。")).toBeInTheDocument();
-    expect(await screen.findByLabelText("第 1 項採購數量（公斤）")).toBeDisabled();
+    expect(await screen.findByText("棉布 - 白")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "編輯" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "更新" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "取消採購單" })).not.toBeInTheDocument();
   });

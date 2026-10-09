@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { OrderProduct, InventoryInfo } from './types';
 
 interface OrderProductsDisplayProps {
@@ -17,11 +17,9 @@ export const OrderProductsDisplay: React.FC<OrderProductsDisplayProps> = ({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-gray-900">關聯訂單產品資訊</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-2">
+      <Label className="text-gray-800">關聯訂單產品資訊</Label>
+      <div>
         <div className="space-y-3">
           {orderProducts.map((orderProduct) => {
             const inventory = getInventoryInfo(orderProduct.products_new.id);
@@ -70,7 +68,7 @@ export const OrderProductsDisplay: React.FC<OrderProductsDisplayProps> = ({
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

@@ -6,20 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
 import { PurchaseList } from './purchase/PurchaseList';
 import { CreatePurchaseDialog } from './purchase/CreatePurchaseDialog';
-import { ViewPurchaseDialog } from './purchase/ViewPurchaseDialog';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 import { PermissionGate } from '@/components/PermissionGate';
 
 const PurchaseManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<any | null>(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
 
-  const handleCreateSuccess = (purchase: any) => {
-    // 設置新創建的採購單並打開預覽
-    setSelectedPurchase(purchase);
-    setViewDialogOpen(true);
-  };
+  // A newly created purchase order opens in the list's dialog
+  const handleCreateSuccess = (purchase: { id: string }) => setSelectedPurchaseId(purchase.id);
 
   return (
     <div className="space-y-6">
@@ -43,7 +38,7 @@ const PurchaseManagement = () => {
         </TabsList>
         
         <TabsContent value="orders">
-          <PurchaseList />
+          <PurchaseList selectedId={selectedPurchaseId} onSelectedIdChange={setSelectedPurchaseId} />
         </TabsContent>
         
         <TabsContent value="pending-inventory">
@@ -56,15 +51,7 @@ const PurchaseManagement = () => {
         onOpenChange={setIsCreateDialogOpen}
         onSuccess={handleCreateSuccess}
       />
-      
-      {/* 新創建採購單的預覽對話框 */}
-      {selectedPurchase && (
-        <ViewPurchaseDialog
-          open={viewDialogOpen}
-          onOpenChange={setViewDialogOpen}
-          purchase={selectedPurchase}
-        />
-      )}
+
     </div>
   );
 };

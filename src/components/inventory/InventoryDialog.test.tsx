@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createFakeSupabase } from "@/test/fakeSupabase";
-import { ViewInventoryDialog } from "./ViewInventoryDialog";
+import { InventoryDialog } from "./InventoryDialog";
 
 const fake = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeSupabase> | null }));
 
@@ -75,65 +75,55 @@ const renderDialog = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ViewInventoryDialog inventory={inventory} open onOpenChange={() => {}} />
+      <InventoryDialog inventory={inventory} open onOpenChange={() => {}} canEdit />
     </QueryClientProvider>,
   );
 };
 
-describe("ViewInventoryDialog editing", () => {
+// Record dialogs open in view mode; editing starts from the 編輯 button
+const startEditing = async (user: ReturnType<typeof userEvent.setup>) => {
+  await screen.findByText("R-001");
+  await user.click(screen.getByRole("button", { name: "編輯" }));
+};
+
+const unchangedRolls = [
+  { id: "roll-1", product_id: "p-1", warehouse_id: "wh-1", shelf: "A-01", quality: "A", quantity: 100, specifications: { width: 60 } },
+  { id: "roll-2", product_id: "p-1", warehouse_id: "wh-1", shelf: null, quality: "B", quantity: 20, specifications: null },
+];
+
+describe("InventoryDialog", () => {
   beforeEach(() => {
     fake.current = createFakeSupabase(seedTables());
   });
 
-  it("saves an edited batch note", async () => {
-    const user = userEvent.setup();
+  it("opens read-only with the batch and its rolls, without a 負責人 field", async () => {
     renderDialog();
 
-    await user.click(screen.getByRole("button", { name: "編輯批次資料" }));
+    expect(await screen.findByText("R-001")).toBeInTheDocument();
+    expect(screen.getByText("首批")).toBeInTheDocument();
+    expect(screen.queryByText("負責人")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("備註")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "編輯布卷" })).not.toBeInTheDocument();
+  });
+
+  it("saves the date, note and rolls together in one call", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await startEditing(user);
+
     const note = screen.getByLabelText("備註");
     await user.clear(note);
     await user.type(note, "已補齊");
-    await user.click(screen.getByRole("button", { name: "儲存" }));
+    await user.click(screen.getByRole("button", { name: "更新" }));
 
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
         {
           fn: "update_inventory",
-          args: { p_organization_id: "org-1", p_inventory_id: "inv-1", p_changes: { arrival_date: "2026-09-15", note: "已補齊" }, p_dry_run: false },
-        },
-      ]),
-    );
-  });
-
-  it("saves edits to a roll's location, quality and weight", async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    const row = (await screen.findByText("R-001")).closest("tr")!;
-    await user.click(within(row).getByRole("button", { name: "編輯布卷" }));
-
-    const rollDialog = await screen.findByRole("dialog", { name: "編輯布卷 R-001" });
-    await user.click(within(rollDialog).getByLabelText("倉庫"));
-    await user.click(await screen.findByRole("option", { name: "二號倉" }));
-    const shelf = within(rollDialog).getByLabelText("貨架");
-    await user.clear(shelf);
-    await user.type(shelf, "B-02");
-    await user.click(within(rollDialog).getByLabelText("品質"));
-    await user.click(await screen.findByRole("option", { name: "B級" }));
-    const quantity = within(rollDialog).getByLabelText("入庫重量（公斤）");
-    await user.clear(quantity);
-    await user.type(quantity, "90");
-    await user.click(within(rollDialog).getByRole("button", { name: "儲存" }));
-
-    // Only the changed fields go to update_inventory_roll; the database keeps the shipped weight fixed
-    await waitFor(() =>
-      expect(fake.current!.rpcCalls).toEqual([
-        {
-          fn: "update_inventory_roll",
           args: {
             p_organization_id: "org-1",
-            p_roll_id: "roll-1",
-            p_changes: { warehouse_id: "wh-2", shelf: "B-02", quality: "B", quantity: 90 },
+            p_inventory_id: "inv-1",
+            p_changes: { arrival_date: "2026-09-15", note: "已補齊", rolls: unchangedRolls },
             p_dry_run: false,
           },
         },
@@ -141,29 +131,11 @@ describe("ViewInventoryDialog editing", () => {
     );
   });
 
-  it("tells the user when the new weight is below what has been shipped", async () => {
-    const user = userEvent.setup();
-    renderDialog();
-
-    const row = (await screen.findByText("R-001")).closest("tr")!;
-    await user.click(within(row).getByRole("button", { name: "編輯布卷" }));
-    const rollDialog = await screen.findByRole("dialog", { name: "編輯布卷 R-001" });
-    const quantity = within(rollDialog).getByLabelText("入庫重量（公斤）");
-    await user.clear(quantity);
-    await user.type(quantity, "30");
-    await user.click(within(rollDialog).getByRole("button", { name: "儲存" }));
-
-    expect(await within(rollDialog).findByRole("alert")).toHaveTextContent(
-      "入庫重量不可低於已出貨重量 40.00 公斤",
-    );
-    expect(fake.current!.rpcCalls).toEqual([]);
-  });
-
   it("saves changed, added and removed rolls of the batch in one call", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
-    await user.click(await screen.findByRole("button", { name: "編輯布卷明細" }));
     const weight = await screen.findByLabelText("第 1 卷入庫重量（公斤）");
     await user.clear(weight);
     await user.type(weight, "90");
@@ -180,7 +152,7 @@ describe("ViewInventoryDialog editing", () => {
     await user.click(await screen.findByRole("option", { name: "二號倉" }));
     await user.type(screen.getByLabelText("第 2 卷入庫重量（公斤）"), "25");
 
-    await user.click(screen.getByRole("button", { name: "儲存布卷" }));
+    await user.click(screen.getByRole("button", { name: "更新" }));
 
     await waitFor(() =>
       expect(fake.current!.rpcCalls).toEqual([
@@ -190,6 +162,8 @@ describe("ViewInventoryDialog editing", () => {
             p_organization_id: "org-1",
             p_inventory_id: "inv-1",
             p_changes: {
+              arrival_date: "2026-09-15",
+              note: "首批",
               rolls: [
                 { id: "roll-1", product_id: "p-1", warehouse_id: "wh-1", shelf: "A-01", quality: "A", quantity: 90, specifications: { width: 60 } },
                 { roll_number: "R-NEW-1", product_id: "p-2", warehouse_id: "wh-2", shelf: null, quality: "A", quantity: 25, specifications: null },
@@ -205,8 +179,8 @@ describe("ViewInventoryDialog editing", () => {
   it("locks the product and removal of a roll that has been shipped", async () => {
     const user = userEvent.setup();
     renderDialog();
+    await startEditing(user);
 
-    await user.click(await screen.findByRole("button", { name: "編輯布卷明細" }));
     const row = (await screen.findByLabelText("第 1 卷入庫重量（公斤）")).closest("tr")!;
     expect(within(row).getByText("已出貨 40 公斤")).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "刪除第 1 卷" })).toBeDisabled();
