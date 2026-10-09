@@ -94,7 +94,7 @@ const RAW = { rawPrompt: null, rawSettings: {} };
 function rememberingModel(prompts: LanguageModelV1CallOptions["prompt"][]): LanguageModelV1 {
   const script: Generated[] = [
     { text: JSON.stringify({ agents: ["commercial"], tasks: { commercial: "幫永泰布行建立一張訂單" } }), finishReason: "stop", usage: USAGE, rawCall: RAW },
-    { toolCalls: [{ toolCallType: "function", toolCallId: "c1", toolName: "create_order", args: JSON.stringify({ customer_id: YONGTAI.id }) }], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
+    { toolCalls: [{ toolCallType: "function", toolCallId: "c1", toolName: "create_order", args: JSON.stringify({ customer_id: YONGTAI.id, items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }) }], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
     { text: "已為永泰布行建立訂單草稿，請在下方確認。", finishReason: "stop", usage: USAGE, rawCall: RAW },
   ];
   let n = 0;

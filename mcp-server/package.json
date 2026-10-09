@@ -8,6 +8,7 @@
     "start": "node --env-file=.env dist/index.js",
     "dev": "tsx watch --env-file=.env src/index.ts",
     "eval": "tsx --env-file=.env evals/run.ts",
+    "eval:upload": "tsx --env-file=.env evals/langfuse.ts",
     "typecheck:evals": "tsc -p evals --noEmit",
     "test": "tsx --test tests/*.test.ts"
   },

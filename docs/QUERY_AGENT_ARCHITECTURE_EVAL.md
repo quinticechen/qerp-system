@@ -174,7 +174,7 @@ Report files located in `mcp-server/evals/reports/` (`*-p0-7-router-lite`, `*-p0
 **Switching Methods** (No code changes required):
 
 * **Architecture**: Set mcp-server environment variable `QUERY_AGENT_MODE=single` (default is `router`)
-* **Primary Model**: Adjust `MODEL_PRIORITY` order in `mcp-server/src/agent/ai-gateway.ts`
+* **Models**: `MODEL_POLICY` in `mcp-server/src/agent/ai-gateway.ts` — one model list per phase (router, each sub-agent) since 2026-10-09; compare first with an `evals/configs/*.json` (see [QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md) §4)
 
 **Re-running Evaluations** (Inside `mcp-server/`):
 

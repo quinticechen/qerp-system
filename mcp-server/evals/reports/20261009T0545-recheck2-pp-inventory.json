@@ -1,0 +1,659 @@
+{
+  "version": 2,
+  "id": "20261009T0545-recheck2-pp-inventory",
+  "label": "recheck2-pp-inventory",
+  "createdAt": "2026-10-09T05:45:25.049Z",
+  "filter": "pp-inventory",
+  "runs": 5,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "e3637ced",
+      "prompt.commercial": "27cdb85e",
+      "prompt.supply_chain": "76684933",
+      "tools": "bce881b0",
+      "cases": "0756c91e",
+      "fixtures": "7a9e59f2"
+    },
+    "git": {
+      "commit": "e80be04",
+      "dirty": true
+    }
+  },
+  "cases": [
+    {
+      "id": "pp-inventory",
+      "name": "改寫：庫存剩多少（顏色在前）",
+      "category": "paraphrase"
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 1,
+    "toolSelection": 1,
+    "routing": null,
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "paraphrase": 1
+    },
+    "latencyMs": {
+      "avg": 20248,
+      "p50": 15604,
+      "p90": 28374,
+      "max": 28374
+    },
+    "phaseLatencyMs": {
+      "agent:supply_chain": {
+        "p50": 14318,
+        "p90": 27255
+      },
+      "router": {
+        "p50": 1076,
+        "p90": 1458
+      }
+    },
+    "totalCostUsd": 0.0013030200000000002,
+    "costPerCompletedTask": 0.00026060400000000005,
+    "avgInputTokens": 2578,
+    "avgOutputTokens": 104
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "min": 0.85,
+      "value": 1,
+      "pass": true
+    }
+  ],
+  "results": [
+    {
+      "caseId": "pp-inventory",
+      "run": 1,
+      "reply": "目前「雲朵眠」的「藍0922」庫存總數為 320 卷，其中 A 級庫存 280 卷，B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢「藍0922」的「雲朵眠」庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "search": "藍0922 雲朵眠"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 15303,
+      "startedAt": 1791524725051,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524725052,
+          "durationMs": 984,
+          "calls": [
+            {
+              "startedAt": 1791524725057,
+              "durationMs": 978,
+              "inputTokens": 320,
+              "outputTokens": 25,
+              "costUsd": 0.000042,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524726036,
+          "durationMs": 14318,
+          "calls": [
+            {
+              "startedAt": 1791524726036,
+              "durationMs": 13321,
+              "inputTokens": 966,
+              "outputTokens": 24,
+              "costUsd": 0.0001062,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524739358,
+              "durationMs": 995,
+              "inputTokens": 1085,
+              "outputTokens": 50,
+              "costUsd": 0.00003166,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524739358,
+          "toolCalls": [
+            {
+              "toolName": "get_inventory_summary",
+              "args": {
+                "search": "藍0922 雲朵眠"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524740354,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: get_inventory_summary"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "pp-inventory",
+      "run": 2,
+      "reply": "目前「雲朵眠」的「藍0922」庫存總數為 320 卷，其中 A 級庫存 280 卷，B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢「藍0922」的「雲朵眠」庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "search": "藍0922 雲朵眠"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 15205,
+      "startedAt": 1791524725051,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524725055,
+          "durationMs": 949,
+          "calls": [
+            {
+              "startedAt": 1791524725072,
+              "durationMs": 929,
+              "inputTokens": 320,
+              "outputTokens": 25,
+              "costUsd": 0.000042,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524726004,
+          "durationMs": 14251,
+          "calls": [
+            {
+              "startedAt": 1791524726006,
+              "durationMs": 13231,
+              "inputTokens": 966,
+              "outputTokens": 24,
+              "costUsd": 0.0001062,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524739244,
+              "durationMs": 1011,
+              "inputTokens": 1085,
+              "outputTokens": 50,
+              "costUsd": 0.0001285,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524739243,
+          "toolCalls": [
+            {
+              "toolName": "get_inventory_summary",
+              "args": {
+                "search": "藍0922 雲朵眠"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524740255,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: get_inventory_summary"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "pp-inventory",
+      "run": 3,
+      "reply": "查詢「藍0922」的「雲朵眠」庫存，總共有 8 卷，庫存量為 320 公尺。其中 A 級庫存有 280 公尺，B 級庫存有 40 公尺。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢「藍0922」的「雲朵眠」庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "search": "雲朵眠 藍0922"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2655,
+      "latencyMs": 26754,
+      "startedAt": 1791524725051,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524725055,
+          "durationMs": 1076,
+          "calls": [
+            {
+              "startedAt": 1791524725073,
+              "durationMs": 1057,
+              "inputTokens": 320,
+              "outputTokens": 25,
+              "costUsd": 0.000042,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524726131,
+          "durationMs": 25674,
+          "calls": [
+            {
+              "startedAt": 1791524726131,
+              "durationMs": 24541,
+              "inputTokens": 1484,
+              "outputTokens": 25,
+              "costUsd": 0.0001584,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1791524750675,
+              "durationMs": 1129,
+              "inputTokens": 1085,
+              "outputTokens": 61,
+              "costUsd": 0.0001329,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524750674,
+          "toolCalls": [
+            {
+              "toolName": "get_inventory_summary",
+              "args": {
+                "search": "雲朵眠 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524751805,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: get_inventory_summary"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "pp-inventory",
+      "run": 4,
+      "reply": "目前「雲朵眠」的「藍0922」庫存總數為 320 卷，其中 A 級庫存 280 卷，B 級庫存 40 卷。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢「藍0922」的「雲朵眠」庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "search": "藍0922 雲朵眠"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2125,
+      "latencyMs": 15604,
+      "startedAt": 1791524725051,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524725055,
+          "durationMs": 1458,
+          "calls": [
+            {
+              "startedAt": 1791524725074,
+              "durationMs": 1438,
+              "inputTokens": 320,
+              "outputTokens": 25,
+              "costUsd": 0.000042,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524726513,
+          "durationMs": 14142,
+          "calls": [
+            {
+              "startedAt": 1791524726517,
+              "durationMs": 13292,
+              "inputTokens": 966,
+              "outputTokens": 24,
+              "costUsd": 0.0001062,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524739813,
+              "durationMs": 842,
+              "inputTokens": 1085,
+              "outputTokens": 50,
+              "costUsd": 0.00003166,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524739811,
+          "toolCalls": [
+            {
+              "toolName": "get_inventory_summary",
+              "args": {
+                "search": "藍0922 雲朵眠"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524740655,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: get_inventory_summary"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "pp-inventory",
+      "run": 5,
+      "reply": "查詢「藍0922」的「雲朵眠」庫存，總共有 8 卷，庫存量為 320 公尺。其中 A 級庫存有 280 公尺，B 級庫存有 40 公尺。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "查詢「藍0922」的「雲朵眠」庫存"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "get_inventory_summary",
+          "args": {
+            "search": "雲朵眠 藍0922"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2655,
+      "latencyMs": 28374,
+      "startedAt": 1791524740257,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524740257,
+          "durationMs": 1119,
+          "calls": [
+            {
+              "startedAt": 1791524740258,
+              "durationMs": 1118,
+              "inputTokens": 320,
+              "outputTokens": 25,
+              "costUsd": 0.000042,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524741376,
+          "durationMs": 27255,
+          "calls": [
+            {
+              "startedAt": 1791524741376,
+              "durationMs": 24979,
+              "inputTokens": 1484,
+              "outputTokens": 25,
+              "costUsd": 0.0001584,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1791524766359,
+              "durationMs": 2269,
+              "inputTokens": 1085,
+              "outputTokens": 61,
+              "costUsd": 0.0001329,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524766359,
+          "toolCalls": [
+            {
+              "toolName": "get_inventory_summary",
+              "args": {
+                "search": "雲朵眠 藍0922"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524768630,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls get_inventory_summary",
+          "pass": true,
+          "detail": "called: get_inventory_summary"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "check": "reply matches /320/",
+          "pass": true
+        }
+      ],
+      "pass": true
+    }
+  ]
+}

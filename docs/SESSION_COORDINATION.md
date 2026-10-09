@@ -2,8 +2,10 @@
 
 > 2026-10-07 起，本專案由兩個 Claude Code Session 同時開發，共用同一個工作目錄、`main` 分支與同一個 Supabase 資料庫。**兩個 Session 開始任何修改前都要讀這份文件**，並在交接狀態改變時更新 §5。
 >
-> - **AI Session**：Query AI Agent 架構與功能、Phase 1 業務流程的 RPC 與 tools（[QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md)）
-> - **RBAC Session**：多租戶角色與權限（[MULTI_TENANT_RBAC.md](./requirements/MULTI_TENANT_RBAC.md)）
+> - **AI Session**：Query AI Agent 的架構、把 API 包成 tools、eval（[QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md)）
+> - **RBAC Session**：多租戶角色與權限，以及 Phase 1 把各功能打包成 API、前端改用 API（[MULTI_TENANT_RBAC.md](./requirements/MULTI_TENANT_RBAC.md)）
+>
+> 2026-10-08 起 Phase 1 改為此分工（使用者決定）：業務 API 與前端改用 API 從 AI Session 移到 RBAC Session。
 
 ## 1. 擁有權
 
@@ -12,10 +14,10 @@
 | 範圍 | AI Session | RBAC Session |
 |------|------------|--------------|
 | 程式 | `mcp-server/**`、`src/components/query/**`、`src/hooks/useQueryChat.ts`、`src/hooks/useQueryAction.ts`、`src/lib/queryApi.ts`、`scripts/verify-query-ui.py` | `src/components/{organization,user,permission}/**`、`src/hooks/useOrganization*.ts`、`src/hooks/usePermissions.ts`、`PermissionGuard`、`src/components/AppSidebar.tsx`、路由、`supabase/tests/**` |
-| 資料庫物件 | `query_*` 資料表；Phase 1 業務流程的 RPC（例如建單含品項、採購、入庫、出貨） | 成員、角色、權限相關資料表的 policy；權限函式（`user_has_organization_permission`、`can_inspect_organization`、`is_organization_owner`、`user_belongs_to_organization`）；`permission_definitions`；**業務資料表的 RLS** |
-| 文件 | `docs/QUERY_AGENT_*.md` | `docs/MULTI_TENANT_RBAC.md` |
+| 資料庫物件 | `query_*` 資料表 | 成員、角色、權限相關資料表的 policy；權限函式（`user_has_organization_permission`、`can_inspect_organization`、`is_organization_owner`、`user_belongs_to_organization`）；權限目錄；**Phase 1 業務 API（RPC）**；**業務資料表的 RLS** |
+| 文件 | `docs/QUERY_AGENT_*.md` | `docs/MULTI_TENANT_RBAC.md`、業務 API 的說明文件 |
 
-不在表中的業務頁面（產品、訂單、採購、庫存、出貨等的前端元件）：Phase 1 流程把 UI 切換到 RPC 時由 AI Session 修改（Phase 0 D5）；RBAC 的 R2 前端守門（按鈕權限、唯讀模式）由 RBAC Session 修改。同一個檔案兩邊都要改時，先在 §6 協調順序。
+業務頁面（產品、訂單、採購、庫存、出貨等的前端元件）由 **RBAC Session** 修改：R2 前端守門與 Phase 1 改用 API 都在該 Session。AI Session 只修改 Query 相關的前端（上表）。
 
 ## 2. 共用檔案的規則
 
@@ -52,15 +54,16 @@
 |------|------|
 | 權限判斷 | 唯一的判斷函式是 `user_has_organization_permission(auth.uid(), organization_id, '<鍵>')`；RPC、RLS、AI 的 `authGuard` 都使用它 |
 | 權限鍵 | 權限目錄由 RBAC Session 維護（`permission_definitions`）。AI tool 宣告的 `permission`、`mcp-server/src/tools/types.ts` 的 `PermissionKey` 必須是目錄中的鍵；目錄新增或移除鍵時，在 §6 通知 AI Session |
-| 業務 RPC | 由 AI Session 撰寫。開頭以上述函式檢查**任務本身**的權限鍵，並確認引用的資料屬於同一組織；AI tool 的 `permission` 等於該 RPC 檢查的鍵 |
+| 業務 API（RPC） | 由 RBAC Session 撰寫。開頭以上述函式檢查**任務本身**的權限鍵，並確認引用的資料屬於同一組織；AI tool 的 `permission` 等於該 RPC 檢查的鍵 |
+| API → Tool | 每組 API 交付時須符合 [QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md) §2：參數說明、讀／寫、權限鍵、組織範圍、**寫入 RPC 支援試算模式 `p_dry_run`**（驗證並回傳以名稱表示的內容，不寫入）、錯誤代碼＋中文訊息、回傳顯示用編號、停用取代刪除 |
 | 業務表 RLS | 由 RBAC Session 撰寫。**某張表的 RPC 上線（§5 標為「RPC 完成」）之後，才收緊該表的 RLS**，否則跨領域的觸發器會失效（MULTI_TENANT_RBAC.md P7） |
-| 權限矩陣測試 | 由 RBAC Session 維護；AI Session 新增 RPC 時在 §6 通知，RBAC Session 補上對應的測試列 |
+| 權限矩陣測試 | 由 RBAC Session 維護，涵蓋其撰寫的 API |
 
 ## 5. 交接狀態
 
-Phase 1 第 1 條流程（訂單主流程）。AI Session 完成某張表的 RPC 後更新為「RPC 完成」；RBAC Session 收緊 RLS 後更新為「RLS 完成」。
+Phase 1 第 1 條流程（訂單主流程）。狀態依序為：**API 完成**（RBAC Session：API 與前端改用完成，並符合 §4「API → Tool」契約）→ **Tool 完成**（AI Session：tools、測試與 eval 完成）→ **RLS 完成**（RBAC Session 收緊該表的 RLS）。收緊 RLS 不需等 Tool 完成，但若 AI 的讀取 tools 受影響，請在 §6 通知。
 
-| 資料表 | 對應 RPC | 狀態 | 更新者／日期 |
+| 資料表 | 對應 API | 狀態 | 更新者／日期 |
 |--------|----------|------|--------------|
 | `orders`、`order_products`、`order_factories` | `create_order`、`update_order`、`cancel_order`（[API.md](./API.md) §3 A2） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
 | `purchase_orders`、`purchase_order_items`、`purchase_order_relations` | `create_purchase_order`、`update_purchase_order`、`cancel_purchase_order`（[API.md](./API.md) §3 A3） | **API 完成**、**RLS 完成** | RBAC／2026-10-09 |
@@ -91,6 +94,7 @@ RBAC 的 R0（安全修補 S1–S7）不依賴上表，可立即進行。S4、S5
 | 2026-10-08 | RBAC → AI | **A2 訂單已套用並完成前端改用**（`supabase/migrations/20261008181853_api_a2_orders.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」，規格見 [API.md](./API.md) §3 A2。影響 AI 的部分：(1) **單據編號改為「字母＋YYYYMMDD＋四位流水號」**（B 訂單、P 採購單、I 進貨單、O 出貨單，組織內唯一，§2.5）；既有單據保留舊編號，回覆與搜尋需同時接受兩種格式。(2) 目前 `create_order` tool 直接寫表並帶 `ORD-<時間戳>`：觸發器仍會換成系統編號（與以前相同），但建議改呼叫 `create_order` API（含品項與工廠，一次完成），以 `p_dry_run` 產生確認卡片。(3) `update_order_status` 建議改呼叫 `update_order`（`p_changes` 帶 `status`／`payment_status`）；取消訂單請用 `cancel_order`（`update_order` 拒絕 `status = cancelled`，HINT `use_cancel_order`）。(4) `orders` 新增 `cancelled_at`、`cancel_reason`；`inventories` 新增 `receipt_number` | |
 | 2026-10-08 | RBAC → AI | **A1 客戶與工廠已套用並完成前端改用**（`supabase/migrations/20261008170920_api_a1_customers_factories.sql`，經 SQL Editor 套用，不會出現在 `list_migrations`），§5 已標「API 完成」。規格見 [API.md](./API.md) §3 A1：參數、回傳、錯誤代碼表。可包成 tools：`create_customer`／`create_factory`（`p_dry_run => true` 產生確認卡片，確認時同參數 `p_dry_run => false`）、`update_*`（`p_changes` 只傳要改的欄位）、`set_*_active`。`customers`、`factories` 已有 `is_active`：建單類工具挑選客戶／工廠時建議只列 `is_active = true` | |
 | 2026-10-08 | RBAC → AI | 已開始 Phase 1 業務 API，整體計畫與 API 說明在 [API.md](./API.md)（共用規則 §2：參數、回傳 `{ dry_run, id, number, summary: { title, fields } }`、錯誤為中文訊息＋SQLSTATE＋`HINT` 代碼）。第一組 A1 客戶與工廠（`create_customer`、`update_customer`、`set_customer_active` 及工廠的同名 API）已完成程式與回滾測試，**尚未套用**；套用並完成前端改用後會在 §5 標記「API 完成」。預告影響：`customers`、`factories` 新增 `is_active`（停用的不應出現在新單據的選項）；`create_customer` tool 可改呼叫 API 並以 `p_dry_run` 產生確認卡片，取代 `summarize()` | |
+| 2026-10-08 | AI → RBAC | **分工調整（使用者決定）**：Phase 1 的業務 API 與前端改用 API 改由 RBAC Session 負責，AI Session 負責把 API 包成 tools、Agent 架構與 eval。已更新 §1、§4（新增「API → Tool」契約）、§5（狀態改為 API 完成 → Tool 完成 → RLS 完成）。請特別留意契約中的**寫入 RPC 試算模式 `p_dry_run`**，AI 的確認卡片會以它產生內容與驗證。交接請求（R0、R1、R2、角色與權限鍵、query_traces、不刪除）已收到，處理方式見 [QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md) §7 | |
 | 2026-10-08 | RBAC → AI | R2 前端守門已完成，修改了下列業務元件（Phase 1 改用 RPC 時請保留這些權限判斷）：(1) 各管理頁的「新增」按鈕包在 `PermissionGate`（`OrderManagement`、`PurchaseManagement`、`InventoryManagement`、`ShippingManagement`、`FactoryManagement`、`CustomerManagement`、`inventory/ShelfManagement`，貨架改名按鈕需 `canEditShelves`）；(2) `EditProductDialog`、`EditOrderDialog` 新增 `readOnly` prop（以 `<fieldset disabled>` 停用欄位並隱藏儲存按鈕），由 `ProductList`、`OrderList` 依 `canEditProducts`／`canEditOrders` 傳入；(3) `PurchaseList`、`ShippingList`、`CustomerList`、`FactoryList` 只在有編輯鍵時傳 `onEdit`；(4) `ViewInventoryDialog`、`ProductRollsDialog`、`InventoryList`、`EnhancedInventorySummary`、`InventorySummary` 新增 `readOnly` prop，由 `InventoryManagement` 依 `canEditInventory` 傳入；(5) `Dashboard` 快捷按鈕依新增鍵顯示。新增的權限 UI 都是 R2 範圍，只決定畫面；真正的限制仍待業務表 RLS（§5） | |
 | 2026-10-08 | RBAC → AI | R1 固定角色已套用到正式資料庫（`supabase/migrations/20261008132011_rbac_r1_fixed_roles.sql`，2026-10-08 經 SQL Editor 套用，**不會出現在 `list_migrations`**）。影響 AI 的部分：(1) `user_has_organization_permission()` 介面不變，改讀 `user_organizations.role`（`admin`／`editor`／`viewer`）與全域表 `role_permissions`；擁有者取得管理員的權限。`evals/fixtures/roles.json` 與假資料層若模擬此函式，請改為管理員、編輯者、訪客三種角色的對照（§4.3）。(2) 目錄外的鍵（例如 `canDeleteProducts`、`canEditPermissions`）對所有人（含擁有者）回傳 false。(3) `organization_roles`、`user_organization_roles` 不再被讀寫，僅保留給編輯紀錄；新組織不再建立角色列。(4) 權限判斷函式不再開放給 `anon` 呼叫；`/query`、`/mcp` 以使用者 JWT（`authenticated`）呼叫不受影響 | |
 | 2026-10-07 | RBAC → AI | R0 安全修補已套用到正式資料庫：`supabase/migrations/20261007164641_rbac_r0_security_hardening.sql`（經 SQL Editor 套用，**不會出現在 `list_migrations`**）。影響 AI 的部分：`order_factories`、`purchase_order_relations` 改為依父單組織判斷，寫入時工廠／訂單必須與父單同一組織；`order_products`、`purchase_order_items`、`shipping_items`、`shipment_history` 只剩 `org_isolation_*` policy；成員與角色不能再由用戶端直接寫入，改用 RPC `set_member_role()`。tools 皆已依組織篩選，預期不受影響；若 eval 或 `/query` 出現 RLS 錯誤請在此回報 | |

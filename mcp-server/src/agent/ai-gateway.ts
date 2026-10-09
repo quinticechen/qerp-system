@@ -6,10 +6,11 @@
  * 降級規則見 docs/QUERY_AGENT_PHASE0.md §4.5。
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, generateObject, APICallError, NoSuchToolError, type ToolCallRepairFunction, type ToolSet } from "ai";
 import type { LanguageModelV1 } from "@ai-sdk/provider";
-import { normalizeToolName, type QueryRun } from "./observer.js";
+import { normalizeToolName, type ModelCall, type QueryRun } from "./observer.js";
 
 // 模型優先級清單（由上往下降級）
 export const MODEL_PRIORITY = [
@@ -17,6 +18,22 @@ export const MODEL_PRIORITY = [
   "google/gemini-2.5-flash",            // 降級 1：同家族
   "anthropic/claude-haiku-4.5",         // 降級 2：不同 provider（OpenRouter ID 格式）
 ] as const;
+
+/**
+ * Model IDs per phase, first = primary, the rest = fallbacks in order. Phases are "router",
+ * "agent:commercial", "agent:supply_chain" and "agent:all" (single agent); a phase without its
+ * own entry uses `default`.
+ */
+export type ModelPolicy = { readonly default: readonly string[] } & { readonly [phase: string]: readonly string[] | undefined };
+
+/** Production models. Give a phase its own entry only after an eval comparison (docs/QUERY_AGENT_EVALS.md). */
+export const MODEL_POLICY: ModelPolicy = {
+  default: MODEL_PRIORITY,
+};
+
+export function modelIdsFor(policy: ModelPolicy, phase: string): readonly string[] {
+  return policy[phase] ?? policy.default;
+}
 
 /** Upper bound for one model attempt; the request deadline can cut it shorter. */
 const ATTEMPT_TIMEOUT_MS = 30_000;
@@ -26,16 +43,57 @@ export interface GatewayModel {
   model: LanguageModelV1;
 }
 
-/** OpenRouter models in the given order (evals use this to try another primary model). */
-export function modelsFor(ids: readonly string[]): GatewayModel[] {
-  const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! });
-  return ids.map((id) => ({ id, model: openrouter(id) as unknown as LanguageModelV1 }));
+interface CallRecorder {
+  calls: ModelCall[];
+  captureIO: boolean;
 }
 
-let defaultModels: GatewayModel[] | null = null;
-function getDefaultModels(): GatewayModel[] {
-  defaultModels ??= modelsFor(MODEL_PRIORITY);
-  return defaultModels;
+/** The attempt in progress, so recordingFetch knows where a provider call belongs. */
+const callRecorder = new AsyncLocalStorage<CallRecorder>();
+
+interface CompletionBody {
+  provider?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+  choices?: { message?: unknown }[];
+}
+
+/** Records each completion's tokens and cost — OpenRouter reports the billed cost in `usage.cost`. */
+const recordingFetch: typeof fetch = async (input, init) => {
+  const recorder = callRecorder.getStore();
+  const startedAt = Date.now();
+  const response = await fetch(input, init);
+  if (!recorder || !response.ok) return response;
+  try {
+    const body = (await response.clone().json()) as CompletionBody;
+    const call: ModelCall = {
+      startedAt,
+      durationMs: Date.now() - startedAt,
+      inputTokens: body.usage?.prompt_tokens ?? 0,
+      outputTokens: body.usage?.completion_tokens ?? 0,
+      costUsd: typeof body.usage?.cost === "number" ? body.usage.cost : null,
+      ...(body.provider ? { provider: body.provider } : {}),
+    };
+    if (recorder.captureIO) {
+      call.input = typeof init?.body === "string" ? (JSON.parse(init.body) as { messages?: unknown }).messages : undefined;
+      call.output = body.choices?.[0]?.message;
+    }
+    recorder.calls.push(call);
+  } catch {
+    // Not a JSON completion: nothing to record.
+  }
+  return response;
+};
+
+let openrouter: ReturnType<typeof createOpenRouter> | null = null;
+const modelCache = new Map<string, GatewayModel>();
+
+/** OpenRouter models in the given order. */
+export function modelsFor(ids: readonly string[]): GatewayModel[] {
+  openrouter ??= createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY!, fetch: recordingFetch });
+  return ids.map((id) => {
+    if (!modelCache.has(id)) modelCache.set(id, { id, model: openrouter!(id) as unknown as LanguageModelV1 });
+    return modelCache.get(id)!;
+  });
 }
 
 export interface GatewayCall extends QueryRun {
@@ -102,7 +160,7 @@ const repairToolCall: ToolCallRepairFunction<ToolSet> = async ({ toolCall, tools
 };
 
 async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModelV1, abortSignal: AbortSignal) => Promise<T>): Promise<T> {
-  const models = call.models ?? getDefaultModels();
+  const models = call.models ?? modelsFor(modelIdsFor(call.modelPolicy ?? MODEL_POLICY, call.phase));
   let firstError: unknown = null;
 
   for (const { id, model } of models) {
@@ -113,13 +171,16 @@ async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModel
     }
 
     const started = Date.now();
+    const recorder: CallRecorder = { calls: [], captureIO: !!call.captureModelIO };
+    const observed = () => ({ phase: call.phase, modelId: id, startedAt: started, durationMs: Date.now() - started, calls: recorder.calls });
     try {
-      const result = await attempt(model, AbortSignal.timeout(Math.min(call.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS, remaining)));
-      call.observer?.onModelAttempt?.({ phase: call.phase, modelId: id, durationMs: Date.now() - started });
+      const signal = AbortSignal.timeout(Math.min(call.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS, remaining));
+      const result = await callRecorder.run(recorder, () => attempt(model, signal));
+      call.observer?.onModelAttempt?.(observed());
       if (id !== models[0].id) console.warn(`[AI Gateway] ${call.phase} 使用降級模型: ${id}`);
       return result;
     } catch (err) {
-      call.observer?.onModelAttempt?.({ phase: call.phase, modelId: id, durationMs: Date.now() - started, error: err });
+      call.observer?.onModelAttempt?.({ ...observed(), error: err });
       console.warn(`[AI Gateway] ${call.phase} ${id} 失敗: ${describeError(err)}`);
       call.onAttemptFailed?.();
       firstError ??= err;

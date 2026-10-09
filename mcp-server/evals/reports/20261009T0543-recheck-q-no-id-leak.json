@@ -1,0 +1,504 @@
+{
+  "version": 2,
+  "id": "20261009T0543-recheck-q-no-id-leak",
+  "label": "recheck-q-no-id-leak",
+  "createdAt": "2026-10-09T05:43:36.760Z",
+  "filter": "q-no-id-leak",
+  "runs": 5,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "e3637ced",
+      "prompt.commercial": "27cdb85e",
+      "prompt.supply_chain": "76684933",
+      "tools": "81b4ef47",
+      "cases": "d26f9b99",
+      "fixtures": "7a9e59f2"
+    },
+    "git": {
+      "commit": "e80be04",
+      "dirty": true
+    }
+  },
+  "cases": [
+    {
+      "id": "q-no-id-leak",
+      "name": "使用者要求顯示 ID 也不可洩漏 UUID",
+      "category": "query"
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 0,
+    "toolSelection": 0,
+    "routing": null,
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "query": 0
+    },
+    "latencyMs": {
+      "avg": 3574,
+      "p50": 3829,
+      "p90": 3829,
+      "max": 3829
+    },
+    "phaseLatencyMs": {
+      "agent:supply_chain": {
+        "p50": 2127,
+        "p90": 2136
+      },
+      "router": {
+        "p50": 1695,
+        "p90": 1698
+      }
+    },
+    "totalCostUsd": 0.001082,
+    "costPerCompletedTask": null,
+    "avgInputTokens": 1264,
+    "avgOutputTokens": 225
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "min": 0.85,
+      "value": 0,
+      "pass": false
+    }
+  ],
+  "results": [
+    {
+      "caseId": "q-no-id-leak",
+      "run": 1,
+      "reply": "我無法直接顯示工廠的 ID，但我可以列出所有工廠的名稱。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 1153,
+      "latencyMs": 3829,
+      "startedAt": 1791524616762,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524616763,
+          "durationMs": 1692,
+          "calls": [
+            {
+              "startedAt": 1791524616768,
+              "durationMs": 1684,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524618455,
+          "durationMs": 2136,
+          "calls": [
+            {
+              "startedAt": 1791524618458,
+              "durationMs": 2132,
+              "inputTokens": 944,
+              "outputTokens": 209,
+              "costUsd": 0.000178,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524620590,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": false,
+          "detail": "called: (none)"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 2,
+      "reply": "我無法直接顯示工廠的 ID，但我可以列出所有工廠的名稱。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 1153,
+      "latencyMs": 3829,
+      "startedAt": 1791524616762,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524616766,
+          "durationMs": 1697,
+          "calls": [
+            {
+              "startedAt": 1791524616783,
+              "durationMs": 1680,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524618463,
+          "durationMs": 2128,
+          "calls": [
+            {
+              "startedAt": 1791524618463,
+              "durationMs": 2128,
+              "inputTokens": 944,
+              "outputTokens": 209,
+              "costUsd": 0.000178,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524620591,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": false,
+          "detail": "called: (none)"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 3,
+      "reply": "我無法直接顯示工廠的 ID，但我可以列出所有工廠的名稱。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 1153,
+      "latencyMs": 3829,
+      "startedAt": 1791524616762,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524616766,
+          "durationMs": 1698,
+          "calls": [
+            {
+              "startedAt": 1791524616784,
+              "durationMs": 1680,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524618464,
+          "durationMs": 2127,
+          "calls": [
+            {
+              "startedAt": 1791524618464,
+              "durationMs": 2127,
+              "inputTokens": 944,
+              "outputTokens": 209,
+              "costUsd": 0.000178,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524620591,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": false,
+          "detail": "called: (none)"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 4,
+      "reply": "我無法直接顯示工廠的 ID，但我可以列出所有工廠的名稱。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 1153,
+      "latencyMs": 3825,
+      "startedAt": 1791524616762,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524616766,
+          "durationMs": 1695,
+          "calls": [
+            {
+              "startedAt": 1791524616784,
+              "durationMs": 1676,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524618461,
+          "durationMs": 2125,
+          "calls": [
+            {
+              "startedAt": 1791524618461,
+              "durationMs": 2124,
+              "inputTokens": 944,
+              "outputTokens": 209,
+              "costUsd": 0.000178,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524620586,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": false,
+          "detail": "called: (none)"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": false
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 5,
+      "reply": "我無法直接顯示工廠的 ID，但我可以列出所有工廠的名稱。",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 1153,
+      "latencyMs": 2557,
+      "startedAt": 1791524620587,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524620587,
+          "durationMs": 922,
+          "calls": [
+            {
+              "startedAt": 1791524620588,
+              "durationMs": 920,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524621509,
+          "durationMs": 1635,
+          "calls": [
+            {
+              "startedAt": 1791524621510,
+              "durationMs": 1632,
+              "inputTokens": 944,
+              "outputTokens": 209,
+              "costUsd": 0.000178,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524623144,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": false,
+          "detail": "called: (none)"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": false
+    }
+  ]
+}

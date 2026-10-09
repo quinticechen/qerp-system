@@ -102,8 +102,8 @@ sequenceDiagram
 
 | **Component** | **Service** | **Status** | 
 | Frontend | **Vercel** (`https://qerp.qwizai.com`, `vercel.json` configured with SPA rewrite) | ✅ Deployed (confirmed response from Vercel on 2026-10-08) | 
-| Query Backend (`mcp-server`) | **Undecided**. Has `mcp-server/Dockerfile` (Node 22), CORS allows production domain | ⚠️ **No deployment target in repo**, cannot verify from repo if running in production | 
-| Frontend → Backend URL | Frontend reads `VITE_QUERY_API_URL`, defaults to `http://localhost:3100` if unset | ⚠️ Not set in repo; if Vercel environment variables are also unset, **Query will not work in production** | 
+| Query Backend (`mcp-server`) | **Google Cloud Run** — service `query-ai-agent`, region `asia-east1`, GCP project `erp-system-463209`, URL `https://query-ai-agent-189729990634.asia-east1.run.app`; continuous deployment from GitHub, built from `mcp-server/Dockerfile` (Node 22) | ⚠️ **Configured, not yet serving** (checked 2026-10-08): first the Cloud Run placeholder page (no successful build), then a Google `404 Page not found` on every path — requests are not reaching the server. To check: the build settings (Dockerfile `/mcp-server/Dockerfile`, build context `/mcp-server`), environment variables, Ingress = All, and whether the service URL changed | 
+| Frontend → Backend URL | Frontend reads `VITE_QUERY_API_URL`, defaults to `http://localhost:3100` if unset | ✅ Set in Vercel to `https://query-ai-agent-189729990634.asia-east1.run.app` and redeployed (2026-10-08). Works once the backend serves | 
 | Database, Login, RLS | **Supabase** (project `gyiyedvutcbwzpbcsmjc`) | ✅ Running. GitHub Action pings daily to prevent pausing (shown as Free tier) | 
 | Database Migration | **Manually applied** via Supabase MCP or SQL Editor | ⚠️ No automated pipeline; `supabase/config.toml` project ID differs from the actual one used | 
 | LLM | **OpenRouter** (`mcp-server/.env` contains key) | ✅ Running; no spending limit enforced in code | 
@@ -117,7 +117,7 @@ sequenceDiagram
 Ordered by impact. Service selection is a TPM/team decision; engineering can provide comparisons.
 
 | **#** | **Gap** | **Impact** | **Required Decision** | 
-| D1 | Query backend lacks production deployment | Query may not function on the production site | Deployment platform (e.g., Railway, Fly.io, Render, Google Cloud Run; `Dockerfile` can be reused), and Vercel's `VITE_QUERY_API_URL` | 
+| D1 | Query backend production deployment — **in progress** | Query does not work on the production site until the Cloud Run service serves | **Decided: Google Cloud Run** (`asia-east1`); Vercel `VITE_QUERY_API_URL` set. Remaining: a successful build and a reachable service (§2.1). Later: the region — Supabase is in `ap-south-1` (Mumbai), about 20 database round trips per request | 
 | D2 | No staging/test environment | All migrations apply directly to the production database | Whether to create a second Supabase project or use Supabase branching | 
 | D3 | No CI | Rules depend on developers remembering to run tests | Automatically run build, lint, `bun run test` on every push; whether evals run in CI (incurs costs) | 
 | D4 | No LLM spending limit or alert | Abnormal traffic could cause runaway costs | OpenRouter spending cap, rate limits per user/organization | 
@@ -200,10 +200,17 @@ The following are **current actual behaviors**, mostly derived from brief prompt
 
 ### 3.5 Eval Methodology
 
-| **Item** | **Current Provisional Practice** | **Pending TPM Definition** | 
+**Decided by the TPM (2026-10-09)** — details in [QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md):
+
+* **Per-category thresholds**: overall task completion ≥ 85%, router routing ≥ 95%, permission and write cases 100%
+* **Cost metric**: cost per completed task — the billed cost of every model call (router, fallbacks, failed runs) ÷ passing runs
+* **Decisions**: the TPM writes the decision for each run in the experiment log (QUERY_AGENT_EVALS.md §5)
+* **Where to view and compare results**: Langfuse Cloud (dataset `query-agent` → Experiments); production traces go to Langfuse too, with personal and sensitive data masked first (not yet implemented; after D1)
+
+| **Item** | **Current Practice** | **Pending TPM Definition** | 
 | Test Cases | 29 cases, written by engineering (9 queries, 4 writes, 3 permissions, 4 regression, 9 rewrites); mostly sourced from incidents encountered during development | Case sources and representativeness (e.g., compiled from real user issues); required scenarios to cover (including each item in §3.4) | 
 | Definition of "Correct" | Called correct tools, correct parameters, response contains specific text, no IDs, no writes | Whether response quality (wording, completeness, tone) is included; who judges (rules, human, LLM grading) | 
-| Passing Threshold | At least 2 out of 3 runs pass per case; new changes must not break previously passing cases | Overall accuracy threshold (currently 85%); whether different categories have different thresholds (e.g., permissions and writes must be 100%) | 
+| Passing Threshold | At least 2 out of 3 runs pass per case; no case may go from passing to failing against the baseline; the per-category thresholds above | — | 
 | Execution Timing | Executed manually by developers when modifying Agent code | Whether to integrate into CI; pre-release acceptance workflow | 
 | Production Environment | Recorded in `query_traces`, but no evaluation workflow | Whether to sample human grading; user feedback (e.g., thumbs up/down on responses) | 
 | Known Limitations | Output for 3 runs with same settings is nearly identical; 3 runs are not independent samples (F9); accuracy measured by case count leaves small margin (86% vs 85%) | Target case quantity | 
@@ -216,7 +223,9 @@ The following are **current actual behaviors**, mostly derived from brief prompt
 
 3. **Deployment Decision** (§2.2): At least D1 (backend deployment) needs to be decided before Phase 1 features go live
 
-**Does Phase 1 need to wait for definitions to complete?** Order management core workflow RPCs and table permissions belong to infrastructure and do not involve Agent response behavior; they can proceed first. Features involving Agent responses and interactions (response methods for new tools, confirmation card content, follow-up strategies) should be implemented after §3.4 is defined.# Query Agent：Phase 0 現況對齊
+**Does Phase 1 need to wait for definitions to complete?** Order management core workflow RPCs and table permissions belong to infrastructure and do not involve Agent response behavior; they can proceed first. Features involving Agent responses and interactions (response methods for new tools, confirmation card content, follow-up strategies) should be implemented after §3.4 is defined.
+
+# Query Agent：Phase 0 現況對齊
 
 > 日期：2026-10-08
 > 目的：進入 Phase 1 前，釐清 Phase 0 的實作現況，並區分「工程說明的事實」與「由 AI Agent Technical Product Manager（TPM）定義的決策」
@@ -322,8 +331,8 @@ sequenceDiagram
 | 元件 | 服務 | 狀態 |
 |------|------|------|
 | 前端 | **Vercel**（`https://qerp.qwizai.com`，`vercel.json` 設定 SPA rewrite） | ✅ 已部署（2026-10-08 確認回應來自 Vercel） |
-| Query 後端（mcp-server） | **未決定**。有 `mcp-server/Dockerfile`（Node 22），CORS 已允許正式網域 | ⚠️ **repo 中沒有部署目標**，正式環境是否有在運作無法從 repo 確認 |
-| 前端 → 後端的網址 | 前端讀取 `VITE_QUERY_API_URL`，未設定時為 `http://localhost:3100` | ⚠️ repo 中未設定；若 Vercel 環境變數也未設定，**正式環境的 Query 無法使用** |
+| Query 後端（mcp-server） | **Google Cloud Run**：服務 `query-ai-agent`、區域 `asia-east1`、GCP 專案 `erp-system-463209`、網址 `https://query-ai-agent-189729990634.asia-east1.run.app`；由 GitHub 持續部署，以 `mcp-server/Dockerfile`（Node 22）建置 | ⚠️ **已設定，尚未正常回應**（2026-10-08 檢查）：先是 Cloud Run 的預留頁面（沒有成功的建置），之後所有路徑皆回 Google 的 `404 Page not found`，請求沒有到達伺服器。待確認：建置設定（Dockerfile `/mcp-server/Dockerfile`、建置目錄 `/mcp-server`）、環境變數、Ingress 設為 All、服務網址是否改變 |
+| 前端 → 後端的網址 | 前端讀取 `VITE_QUERY_API_URL`，未設定時為 `http://localhost:3100` | ✅ 已在 Vercel 設為 `https://query-ai-agent-189729990634.asia-east1.run.app` 並重新部署（2026-10-08）。後端正常回應後即可使用 |
 | 資料庫、登入、RLS | **Supabase**（專案 `gyiyedvutcbwzpbcsmjc`） | ✅ 運作中。GitHub Action 每天 ping 一次避免暫停（顯示為免費方案） |
 | 資料庫 migration | 透過 Supabase MCP 或 SQL Editor **手動套用** | ⚠️ 沒有自動化流程；`supabase/config.toml` 的專案 ID 與實際使用的不同 |
 | LLM | **OpenRouter**（金鑰在 `mcp-server/.env`） | ✅ 運作中；程式中沒有花費上限 |
@@ -338,7 +347,7 @@ sequenceDiagram
 
 | # | 缺口 | 影響 | 需要的決定 |
 |---|------|------|------------|
-| D1 | Query 後端沒有正式環境的部署 | 正式網站的 Query 可能無法使用 | 部署平台（例如 Railway、Fly.io、Render、Google Cloud Run；`Dockerfile` 皆可沿用），以及 Vercel 的 `VITE_QUERY_API_URL` |
+| D1 | Query 後端的正式環境部署——**進行中** | Cloud Run 服務正常回應前，正式網站的 Query 無法使用 | **已決定：Google Cloud Run**（`asia-east1`）；Vercel 的 `VITE_QUERY_API_URL` 已設定。剩下：成功建置並可連線（§2.1）。之後再評估區域：Supabase 在 `ap-south-1`（孟買），每次請求約 20 次資料庫往返 |
 | D2 | 沒有測試／預備環境 | 所有 migration 直接套用到正式資料庫 | 是否建立第二個 Supabase 專案或使用 Supabase branching |
 | D3 | 沒有 CI | 規則依賴開發者記得執行測試 | 每次 push 自動執行建置、lint、`bun run test`；eval 是否在 CI 執行（會產生費用） |
 | D4 | 沒有 LLM 花費上限與告警 | 異常流量可能造成費用失控 | OpenRouter 的額度上限、每位使用者／組織的請求頻率限制 |

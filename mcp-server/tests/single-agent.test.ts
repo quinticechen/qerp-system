@@ -41,7 +41,7 @@ test("single agent: one model sees the original message and can use tools from b
   const calls: LanguageModelV1CallOptions[] = [];
   const model = recording(calls, [
     { toolCalls: [call("list_customers", { search: "test0922" }, "1"), call("list_factories", { search: "092202" }, "2")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
-    { toolCalls: [call("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003" }, "3")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
+    { toolCalls: [call("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }, "3")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
     { text: "已建立草稿，請在下方的確認卡片確認。", finishReason: "stop", usage: USAGE, rawCall: RAW },
   ]);
   const drafts: Draft[] = [];
@@ -57,13 +57,13 @@ test("single agent: one model sees the original message and can use tools from b
 });
 
 test("single agent: a restricted role gets only its tools, plus the permission note", async () => {
-  const { ctx, allowed } = await setup("warehouse");
+  const { ctx, allowed } = await setup("viewer");
   const calls: LanguageModelV1CallOptions[] = [];
-  const model = recording(calls, [{ text: "目前帳號沒有查看客戶的權限。", finishReason: "stop", usage: USAGE, rawCall: RAW }]);
-  await answerQuery("查詢所有客戶", ctx, allowed, [], { models: [{ id: "mock", model }] }, "single");
+  const model = recording(calls, [{ text: "目前帳號沒有建立訂單的權限。", finishReason: "stop", usage: USAGE, rawCall: RAW }]);
+  await answerQuery("幫 Chen 建立一張訂單", ctx, allowed, [], { models: [{ id: "mock", model }] }, "single");
 
   const offered = (calls[0].mode as { tools?: { name: string }[] }).tools?.map((t) => t.name) ?? [];
-  assert.ok(!offered.includes("list_customers"));
-  assert.ok(offered.includes("get_inventory_summary"));
-  assert.match(JSON.stringify(calls[0].prompt), /本帳號無法使用的工具：[^"]*list_customers/);
+  assert.ok(!offered.includes("create_order"));
+  assert.ok(offered.includes("list_orders"));
+  assert.match(JSON.stringify(calls[0].prompt), /本帳號無法使用的工具：[^"]*create_order/);
 });

@@ -42,6 +42,20 @@ export function QueryFloatButton() {
     return () => window.removeEventListener('popstate', onPopState);
   }, [isOpen]);
 
+  // While the full-screen chat covers the page, the ERP page must not scroll (or show its
+  // scrollbar) underneath — only the conversation scrolls.
+  useEffect(() => {
+    if (!isMobile || !isOpen) return;
+    const html = document.documentElement;
+    const previous = { html: html.style.overflow, body: document.body.style.overflow };
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      html.style.overflow = previous.html;
+      document.body.style.overflow = previous.body;
+    };
+  }, [isMobile, isOpen]);
+
   const swipeHandlers = useSwipeBack(panelRef, close);
 
   if (isMobile) {

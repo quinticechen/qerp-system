@@ -21,15 +21,22 @@ export type ToolDomain =
   | "customer" | "order" | "product" | "purchase" | "receiving"
   | "inventory" | "shipping" | "factory" | "shelf" | "admin";
 
-/** Permission keys stored in organization_roles.permissions (same keys the UI uses). */
+/**
+ * The permission catalog (RBAC R1, docs/PERMISSIONS.md): the keys user_has_organization_permission()
+ * answers for. Keys outside it are false for everyone, including the owner.
+ */
 export const PERMISSION_KEYS = [
   "canViewCustomers", "canCreateCustomers", "canEditCustomers",
-  "canViewOrders", "canCreateOrders", "canEditOrders",
-  "canViewProducts", "canCreateProducts", "canEditProducts", "canDeleteProducts",
-  "canViewInventory", "canCreateInventory", "canEditInventory",
-  "canViewPurchases", "canCreatePurchases", "canEditPurchases",
-  "canViewShipping", "canCreateShipping", "canEditShipping",
   "canViewFactories", "canCreateFactories", "canEditFactories",
+  "canViewProducts", "canCreateProducts", "canEditProducts",
+  "canViewShelves", "canCreateShelves", "canEditShelves",
+  "canViewOrders", "canCreateOrders", "canEditOrders",
+  "canViewPurchases", "canCreatePurchases", "canEditPurchases",
+  "canViewInventory", "canCreateInventory", "canEditInventory",
+  "canViewShipping", "canCreateShipping", "canEditShipping",
+  "canViewUsers", "canCreateUsers", "canEditUsers",
+  "canViewPermissions",
+  "canViewSystemSettings", "canEditSystemSettings",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];

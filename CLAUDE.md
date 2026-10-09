@@ -94,7 +94,7 @@ bun run test                               # deterministic tool/adapter tests �
 bun run eval -- --label <short-change-name>
 ```
 
-The eval replays `evals/cases/*.json` against real models with an in-memory fake database, and writes a report to `evals/reports/`. Not every case passes yet, so the bar is **no regression**: every case that passed in the most recent full run (no `--filter`) under `evals/reports/` must still pass. Tool descriptions and prompts are fragile with the primary model — rerun the eval after any wording change, however small. Compare the two reports' per-case tables and list any case that went from ✅ to ❌. When a change fixes a known failure, add or tighten a case so it stays fixed. Design and case format: `docs/QUERY_AGENT_PHASE0.md` §4.7.
+The eval replays `evals/cases/*.json` against real models with an in-memory fake database, writes a report to `evals/reports/`, uploads it to Langfuse as an experiment, and adds a row to the experiment log in `docs/QUERY_AGENT_EVALS.md` §5 (full runs only). Not every case passes yet, so the bar is **no regression**: the run prints its baseline (the latest full run with the same architecture and primary models) and any case that went from ✅ to ❌ — report those, and the gates (task completion ≥ 85%, routing ≥ 95%, permissions and writes 100%). Tool descriptions and prompts are fragile with the primary model — rerun the eval after any wording change, however small. When a change fixes a known failure, add or tighten a case so it stays fixed. Leave the log's 決定 column to the TPM. To try other models, give a phase its own list in an `evals/configs/*.json` and run with `--config`; change production's `MODEL_POLICY` (`src/agent/ai-gateway.ts`) only after such a comparison. Running, metrics and Langfuse: `docs/QUERY_AGENT_EVALS.md`; harness design and case format: `docs/QUERY_AGENT_PHASE0.md` §4.7.
 
 To debug a specific Query reply, look it up in `query_traces` by the `traceId` that `/query` returns: it records the route, every model attempt (with errors and fallbacks), the tool calls, tokens and latency.
 
@@ -144,6 +144,8 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 |------|-------|
 | Frontend port | 8080 |
 | MCP server port | 3100 |
+| Query backend (production) | Google Cloud Run — service `query-ai-agent`, `asia-east1`, project `erp-system-463209`, `https://query-ai-agent-189729990634.asia-east1.run.app`. Built by continuous deployment from `mcp-server/Dockerfile` (build context `mcp-server/`); env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY` set on the service |
+| Frontend → Query backend | `VITE_QUERY_API_URL` (set in Vercel to the Cloud Run URL; unset locally → `http://localhost:3100`; override locally in `.env.local`) |
 | Supabase project ref | gyiyedvutcbwzpbcsmjc |
 | Test account | quinticechen@gmail.com |
 | Supabase OAuth redirect | Must include `http://localhost:8080/**` in Supabase dashboard allowlist |

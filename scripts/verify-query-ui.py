@@ -413,6 +413,10 @@ def verify_mobile(browser, base_url: str, session: dict) -> None:
     check("Mobile: float button hidden while open",
           page.locator("button[aria-label='開啟 Query 助理']").count() == 0)
 
+    # The ERP page behind the chat must not scroll (its scrollbar would show over the chat)
+    scroll_y = page.evaluate("() => { window.scrollTo(0, 500); return window.scrollY; }")
+    check("Mobile: ERP page behind the chat does not scroll", scroll_y == 0)
+
     back = page.locator("button[aria-label='返回 ERP']")
     back_box = back.bounding_box() or {}
     check("Mobile: back arrow at top-left",
@@ -421,6 +425,11 @@ def verify_mobile(browser, base_url: str, session: dict) -> None:
     back.click()
     page.wait_for_timeout(600)
     check("Mobile: back arrow returns to ERP", not is_open() and page.url == start_url, page, "m02_back_arrow")
+    page_scrolls = page.evaluate(
+        "() => { const el = document.scrollingElement; if (el.scrollHeight <= el.clientHeight) return true;"
+        " window.scrollTo(0, 100); const ok = window.scrollY > 0; window.scrollTo(0, 0); return ok; }"
+    )
+    check("Mobile: ERP page scrolls again after closing", page_scrolls)
 
     open_chat()
     page.go_back()

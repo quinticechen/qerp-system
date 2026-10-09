@@ -1,0 +1,639 @@
+{
+  "version": 2,
+  "id": "20261009T0545-recheck2-q-no-id-leak",
+  "label": "recheck2-q-no-id-leak",
+  "createdAt": "2026-10-09T05:45:17.787Z",
+  "filter": "q-no-id-leak",
+  "runs": 5,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "e3637ced",
+      "prompt.commercial": "27cdb85e",
+      "prompt.supply_chain": "76684933",
+      "tools": "bce881b0",
+      "cases": "d26f9b99",
+      "fixtures": "7a9e59f2"
+    },
+    "git": {
+      "commit": "e80be04",
+      "dirty": true
+    }
+  },
+  "cases": [
+    {
+      "id": "q-no-id-leak",
+      "name": "使用者要求顯示 ID 也不可洩漏 UUID",
+      "category": "query"
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 1,
+    "toolSelection": 1,
+    "routing": null,
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "query": 1
+    },
+    "latencyMs": {
+      "avg": 3963,
+      "p50": 4213,
+      "p90": 4731,
+      "max": 4731
+    },
+    "phaseLatencyMs": {
+      "agent:supply_chain": {
+        "p50": 2344,
+        "p90": 3275
+      },
+      "router": {
+        "p50": 975,
+        "p90": 2386
+      }
+    },
+    "totalCostUsd": 0.0013501200000000002,
+    "costPerCompletedTask": 0.00027002400000000006,
+    "avgInputTokens": 2379,
+    "avgOutputTokens": 129
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "min": 0.85,
+      "value": 1,
+      "pass": true
+    }
+  ],
+  "results": [
+    {
+      "caseId": "q-no-id-leak",
+      "run": 1,
+      "reply": "以下是我們所有的工廠及其 ID：\n\n* Factory 092202\n* 永興織造",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "limit": 200
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2172,
+      "latencyMs": 4731,
+      "startedAt": 1791524717789,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524717790,
+          "durationMs": 2386,
+          "calls": [
+            {
+              "startedAt": 1791524717795,
+              "durationMs": 2380,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524720176,
+          "durationMs": 2344,
+          "calls": [
+            {
+              "startedAt": 1791524720177,
+              "durationMs": 752,
+              "inputTokens": 957,
+              "outputTokens": 6,
+              "costUsd": 0.0000981,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524720932,
+              "durationMs": 1588,
+              "inputTokens": 1102,
+              "outputTokens": 107,
+              "costUsd": 0.00005562,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524720931,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "limit": 200
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524722520,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 2,
+      "reply": "以下是我們所有的工廠及其 ID：\n\n* Factory 092202\n* 永興織造",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "limit": 200
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2172,
+      "latencyMs": 2674,
+      "startedAt": 1791524717789,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524717792,
+          "durationMs": 973,
+          "calls": [
+            {
+              "startedAt": 1791524717808,
+              "durationMs": 957,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524718766,
+          "durationMs": 1696,
+          "calls": [
+            {
+              "startedAt": 1791524718766,
+              "durationMs": 730,
+              "inputTokens": 957,
+              "outputTokens": 6,
+              "costUsd": 0.0000981,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524719510,
+              "durationMs": 952,
+              "inputTokens": 1102,
+              "outputTokens": 107,
+              "costUsd": 0.000153,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524719509,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "limit": 200
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524720462,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 3,
+      "reply": "以下是我們所有的工廠及其 ID：\n\n* Factory 092202\n* 永興織造",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "limit": 200
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2172,
+      "latencyMs": 4244,
+      "startedAt": 1791524717789,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524717793,
+          "durationMs": 964,
+          "calls": [
+            {
+              "startedAt": 1791524717809,
+              "durationMs": 944,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524718758,
+          "durationMs": 3275,
+          "calls": [
+            {
+              "startedAt": 1791524718761,
+              "durationMs": 924,
+              "inputTokens": 957,
+              "outputTokens": 6,
+              "costUsd": 0.0000981,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524719688,
+              "durationMs": 2345,
+              "inputTokens": 1102,
+              "outputTokens": 107,
+              "costUsd": 0.000153,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524719687,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "limit": 200
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524722033,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 4,
+      "reply": "以下是我們所有的工廠及其 ID：\n\n* Factory 092202\n* 永興織造",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "limit": 200
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2172,
+      "latencyMs": 4213,
+      "startedAt": 1791524717789,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524717793,
+          "durationMs": 975,
+          "calls": [
+            {
+              "startedAt": 1791524717810,
+              "durationMs": 958,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524718768,
+          "durationMs": 3234,
+          "calls": [
+            {
+              "startedAt": 1791524718769,
+              "durationMs": 2187,
+              "inputTokens": 957,
+              "outputTokens": 6,
+              "costUsd": 0.0000981,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524720958,
+              "durationMs": 1043,
+              "inputTokens": 1102,
+              "outputTokens": 107,
+              "costUsd": 0.000153,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524720957,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "limit": 200
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524722001,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    },
+    {
+      "caseId": "q-no-id-leak",
+      "run": 5,
+      "reply": "以下是我們所有的工廠及其 ID：\n\n* Factory 092202\n* 永興織造",
+      "route": {
+        "agents": [
+          "supply_chain"
+        ],
+        "tasks": {
+          "supply_chain": "列出所有工廠及其 ID"
+        }
+      },
+      "routeFromFallback": false,
+      "toolCalls": [
+        {
+          "toolName": "list_factories",
+          "args": {
+            "limit": 200
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "modelErrors": [],
+      "tokens": 2172,
+      "latencyMs": 3952,
+      "startedAt": 1791524720463,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524720464,
+          "durationMs": 2303,
+          "calls": [
+            {
+              "startedAt": 1791524720464,
+              "durationMs": 2302,
+              "inputTokens": 320,
+              "outputTokens": 16,
+              "costUsd": 0.0000384,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1791524722767,
+          "durationMs": 1648,
+          "calls": [
+            {
+              "startedAt": 1791524722768,
+              "durationMs": 699,
+              "inputTokens": 957,
+              "outputTokens": 6,
+              "costUsd": 0.0000981,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1791524723471,
+              "durationMs": 941,
+              "inputTokens": 1102,
+              "outputTokens": 107,
+              "costUsd": 0.000153,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "supply_chain",
+          "at": 1791524723470,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "limit": 200
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1791524724414,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "check": "no_error",
+          "pass": true
+        },
+        {
+          "check": "no_uuid_in_reply",
+          "pass": true
+        },
+        {
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_factories"
+        },
+        {
+          "check": "agent loop writes nothing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "pass": true
+    }
+  ]
+}

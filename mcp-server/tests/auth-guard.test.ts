@@ -29,26 +29,21 @@ test("owner gets every tool", async () => {
   assert.equal((await toolsFor("owner")).size, getAllTools().length);
 });
 
-test("accounting is read-only", async () => {
-  const tools = await toolsFor("accounting");
+test("admin gets every tool", async () => {
+  assert.equal((await toolsFor("admin")).size, getAllTools().length);
+});
+
+test("viewer is read-only", async () => {
+  const tools = await toolsFor("viewer");
   for (const write of getAllTools().filter((t) => t.kind === "write")) {
-    assert.ok(!tools.has(write.name), `accounting should not get ${write.name}`);
+    assert.ok(!tools.has(write.name), `viewer should not get ${write.name}`);
   }
-  assert.ok(tools.has("list_orders"));
+  assert.ok(tools.has("list_orders") && tools.has("list_customers") && tools.has("list_factories"));
 });
 
-test("warehouse cannot see customers or factories", async () => {
-  const tools = await toolsFor("warehouse");
-  assert.ok(!tools.has("list_customers"));
-  assert.ok(!tools.has("list_factories"));
-  assert.ok(tools.has("get_inventory_summary"));
-});
-
-test("sales can look up factories but not create purchase orders", async () => {
-  const tools = await toolsFor("sales");
-  assert.ok(tools.has("list_factories"));
-  assert.ok(!tools.has("create_purchase_order"));
-  assert.ok(tools.has("create_order"));
+test("editor gets the business write tools", async () => {
+  const tools = await toolsFor("editor");
+  for (const name of ["create_customer", "create_order", "create_purchase_order"] as const) assert.ok(tools.has(name), name);
 });
 
 test("non-member of the organization is rejected with 403", async () => {
@@ -72,8 +67,11 @@ test("writes are scoped to the selected organization", async () => {
   const createOrder = getAllTools().find((t) => t.name === "create_order")!;
   const result = await createOrder.run(
     { supabase: client, userId: access.userId, organizationId: access.organizationId },
-    { customer_id: "c0000000-0000-4000-8000-000000000003" }
+    { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }
   );
   assert.ok(result.ok);
-  assert.equal((writes[0].values as { organization_id: string }).organization_id, ORG_ID);
+  const call = writes.find((w) => w.op === "rpc" && w.table === "create_order");
+  assert.equal((call?.values as { p_organization_id: string }).p_organization_id, ORG_ID, "API called for the selected organization");
+  const row = writes.find((w) => w.op === "insert" && w.table === "orders");
+  assert.equal((row?.values as { organization_id: string }).organization_id, ORG_ID, "order written to the selected organization");
 });

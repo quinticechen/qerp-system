@@ -41,7 +41,7 @@
     "history": [
       {
         "role": "user",
-        "content": "我要新增訂單"
+        "content": "我要新增訂單：雲朵眠 test0922 藍0922 20 公斤，單價 80"
       },
       {
         "role": "assistant",
@@ -59,7 +59,15 @@
       ],
       "drafts": {
         "create_order": 1
-      }
+      },
+      "tool_args": [
+        {
+          "tool": "create_order",
+          "args": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004"
+          }
+        }
+      ]
     }
   },
   {
@@ -84,7 +92,7 @@
         }
       }
     ],
-    "message": "幫他建立一張訂單",
+    "message": "幫他建立一張訂單：雲朵眠 test0922 藍0922 20 公斤，單價 80",
     "expect": {
       "tools_include": [
         "create_order"
