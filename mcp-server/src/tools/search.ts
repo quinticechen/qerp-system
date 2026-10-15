@@ -44,9 +44,10 @@ export function applySearch<Q extends OrFilterable<Q>>(query: Q, columns: string
 export function matchesNameColor(token: string, name: unknown, color: unknown): boolean {
   const n = String(name ?? "").toLowerCase();
   const c = String(color ?? "").toLowerCase();
-  // "雲朵眠-藍" → "雲朵眠藍"; "藍色" also means the color 藍 (but a color named 米白色 still matches whole).
+  // "雲朵眠-藍" → "雲朵眠藍"; "藍色", "藍的", "藍色的" also mean the color 藍 (a color named 米白色
+  // still matches whole first).
   const whole = token.toLowerCase().replace(SEPARATORS, "");
-  const variants = whole.length > 1 && whole.endsWith("色") ? [whole, whole.slice(0, -1)] : [whole];
+  const variants = [whole, whole.replace(/(色的|色|的)$/, "")].filter((v, i, all) => v && all.indexOf(v) === i);
   return variants.some((t) => {
     if (!t || n.includes(t) || c.includes(t)) return true;
     for (let i = 1; i < t.length; i++) {

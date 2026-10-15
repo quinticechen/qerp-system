@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { InventoryDialog } from './InventoryDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 interface InventoryListProps {
   selectedInventoryId?: string | null;
@@ -17,6 +18,7 @@ interface InventoryListProps {
 
 export const InventoryList: React.FC<InventoryListProps> = ({ selectedInventoryId, onInventorySelected, readOnly = false }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setSelectedId);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 

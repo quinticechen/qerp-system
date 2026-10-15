@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,12 +11,20 @@ import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { CreateInventoryDialog } from './inventory/CreateInventoryDialog';
 import { PermissionGate } from '@/components/PermissionGate';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useSearchParams } from 'react-router-dom';
+import { OPEN_TAB_PARAM } from '@/hooks/useOpenRecordFromUrl';
 
 const InventoryManagement = () => {
   const { hasPermission } = usePermissions();
   const canEditInventory = hasPermission('canEditInventory');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("summary");
+  // ?tab=records&open=<id> (after a Query confirmation): show 入庫記錄; InventoryList opens the record.
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get(OPEN_TAB_PARAM);
+  useEffect(() => {
+    if (requestedTab) setActiveTab(requestedTab);
+  }, [requestedTab]);
   const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
 
   return (

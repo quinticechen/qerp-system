@@ -8,9 +8,11 @@ import { OrderDialog } from './OrderDialog';
 import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 export const OrderList = () => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setSelectedId);
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditOrders');
   const { organizationId, hasOrganization } = useCurrentOrganization();

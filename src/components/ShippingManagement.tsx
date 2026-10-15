@@ -8,10 +8,12 @@ import { ShippingList } from './shipping/ShippingList';
 import { CreateShippingDialog } from './shipping/CreateShippingDialog';
 import { PendingShippingSection } from './inventory/PendingShippingSection';
 import { PermissionGate } from '@/components/PermissionGate';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 const ShippingManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setSelectedShippingId);
 
   // A newly created shipping opens in the list's dialog
   const handleCreateSuccess = (shipping: { id: string }) => setSelectedShippingId(shipping.id);
