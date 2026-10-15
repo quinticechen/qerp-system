@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState, KeyboardEvent, type ReactNode } from 'react';
-import { X, Send, Trash2, Loader2, ChevronDown, ChevronLeft, Pin, Plus, Trash, PanelRight, PictureInPicture2, Maximize2 } from 'lucide-react';
+import { X, Send, Trash2, Loader2, ChevronLeft, Pin, Plus, Trash, PanelRight, PictureInPicture2, Maximize2, History } from 'lucide-react';
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ActionCard } from './ActionCard';
 import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /** Desktop layouts (docs/requirements/QUERY_UI_LAYOUT_AND_RECORD_NAV.md §2). */
 export type QueryLayout = 'floating' | 'sidebar' | 'fullscreen';
@@ -27,6 +37,8 @@ interface QueryChatProps {
   onOpenRecord?: (path: string) => void;
 }
 
+const HEADER_BUTTON = 'p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors';
+
 const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 🐟
 
 我可以幫你：
@@ -46,7 +58,6 @@ export function QueryChat({ onClose, fullScreen = false, layout = 'floating', on
     messages,
     isLoading,
     sendMessage,
-    clearMessages,
     createSession,
     switchSession,
     deleteSession,
@@ -58,6 +69,10 @@ export function QueryChat({ onClose, fullScreen = false, layout = 'floating', on
   const [inputKey, setInputKey] = useState(0);
   const [hasInput, setHasInput] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  // The conversation waiting for the user to confirm its deletion (it cannot be undone).
+  const [pendingDelete, setPendingDelete] = useState<QuerySession | null>(null);
+  const currentLayout = LAYOUTS.find((l) => l.value === layout) ?? LAYOUTS[0];
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -93,7 +108,7 @@ export function QueryChat({ onClose, fullScreen = false, layout = 'floating', on
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Header — actions, left to right: history, layout, new conversation, delete, close */}
       <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0 ${fullScreen ? 'pl-2' : ''} ${rounded ? 'rounded-t-2xl' : ''}`}>
         {fullScreen && (
           <button
@@ -105,76 +120,99 @@ export function QueryChat({ onClose, fullScreen = false, layout = 'floating', on
             <ChevronLeft size={22} />
           </button>
         )}
-        <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-          <PopoverTrigger asChild>
-            <button
-              aria-label="對話紀錄"
-              className="flex items-center gap-3 min-w-0 flex-1 text-left rounded-lg px-1 -mx-1 py-0.5 hover:bg-white/10 transition-colors"
-            >
-              <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 shrink-0">
-                <MantaRayIcon size={24} className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold text-sm leading-none">Query</p>
-                <p className="text-white/70 text-xs mt-0.5 truncate">
-                  {activeSession?.title && messages.length > 0
-                    ? activeSession.title
-                    : 'ERP 智慧助理'}
-                </p>
-              </div>
-              <ChevronDown
-                size={14}
-                className={`text-white/70 shrink-0 transition-transform ${historyOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={8} className="w-80 p-0 overflow-hidden">
-            <SessionHistoryPanel
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              onSelect={(id) => { switchSession(id); setHistoryOpen(false); }}
-              onCreate={() => { createSession(); setHistoryOpen(false); }}
-              onDelete={deleteSession}
-              onTogglePin={togglePin}
-            />
-          </PopoverContent>
-        </Popover>
+        <div className="flex items-center gap-3 min-w-0 flex-1 text-left">
+          <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/20 shrink-0">
+            <MantaRayIcon size={24} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm leading-none">Query</p>
+            <p className="text-white/70 text-xs mt-0.5 truncate">
+              {activeSession?.title && messages.length > 0 ? activeSession.title : 'ERP 智慧助理'}
+            </p>
+          </div>
+        </div>
         <div className="flex items-center gap-1 shrink-0">
-          {onLayoutChange &&
-            LAYOUTS.map(({ value, label, Icon }) => (
-              <button
-                key={value}
-                onClick={() => onLayoutChange(value)}
-                aria-label={label}
-                aria-pressed={layout === value}
-                title={label}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  layout === value ? 'text-white bg-white/20' : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Icon size={15} />
+          <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+            <PopoverTrigger asChild>
+              <button aria-label="歷史紀錄" title="歷史紀錄" className={HEADER_BUTTON}>
+                <History size={15} />
               </button>
-            ))}
+            </PopoverTrigger>
+            <PopoverContent align="end" sideOffset={8} className="w-80 p-0 overflow-hidden">
+              <SessionHistoryPanel
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                onSelect={(id) => { switchSession(id); setHistoryOpen(false); }}
+                onCreate={() => { createSession(); setHistoryOpen(false); }}
+                onDelete={(id) => setPendingDelete(sessions.find((session) => session.id === id) ?? null)}
+                onTogglePin={togglePin}
+              />
+            </PopoverContent>
+          </Popover>
+          {onLayoutChange && (
+            <Popover open={layoutOpen} onOpenChange={setLayoutOpen}>
+              <PopoverTrigger asChild>
+                <button aria-label={`顯示方式：${currentLayout.label}`} title={`顯示方式：${currentLayout.label}`} className={HEADER_BUTTON}>
+                  <currentLayout.Icon size={15} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-auto p-1 flex gap-1">
+                {LAYOUTS.map(({ value, label, Icon }) => (
+                  <button
+                    key={value}
+                    onClick={() => { onLayoutChange(value); setLayoutOpen(false); }}
+                    aria-label={label}
+                    aria-pressed={layout === value}
+                    title={label}
+                    className={`p-2 rounded-md transition-colors ${
+                      layout === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+                    }`}
+                  >
+                    <Icon size={16} />
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+          <button onClick={() => createSession()} aria-label="新增對話" title="新增對話" className={HEADER_BUTTON}>
+            <Plus size={15} />
+          </button>
           <button
-            onClick={clearMessages}
-            aria-label="清除對話"
-            className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-            title="清除對話"
+            onClick={() => setPendingDelete(activeSession)}
+            disabled={!activeSession}
+            aria-label="刪除對話"
+            title="刪除對話"
+            className={`${HEADER_BUTTON} disabled:opacity-40 disabled:pointer-events-none`}
           >
             <Trash2 size={15} />
           </button>
           {!fullScreen && (
-            <button
-              onClick={onClose}
-              aria-label="關閉 Query"
-              title="關閉 Query"
-              className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-            >
+            <button onClick={onClose} aria-label="關閉 Query" title="關閉 Query" className={HEADER_BUTTON}>
               <X size={15} />
             </button>
           )}
         </div>
       </div>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>刪除這段對話？</AlertDialogTitle>
+            <AlertDialogDescription>
+              「{pendingDelete?.title}」的所有訊息都會刪除，無法復原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { if (pendingDelete) deleteSession(pendingDelete.id); setPendingDelete(null); }}
+            >
+              刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4 bg-gray-50/80">
