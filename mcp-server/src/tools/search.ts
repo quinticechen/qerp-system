@@ -16,12 +16,15 @@ interface OrFilterable<Q> {
 
 // Characters that are syntax in PostgREST `or=(...)` filters or LIKE wildcards.
 const UNSAFE_CHARS = /[,()%*\\]/g;
+/** Separators the model writes between a product and its color ("雲朵眠 - 藍"); never a search word. */
+const SEPARATORS = /[-–—_/／|｜·・、，:：]/g;
 
 export function searchTokens(search: string): string[] {
   return search
     .split(/\s+/)
     .map((token) => token.replace(UNSAFE_CHARS, ""))
-    .filter(Boolean);
+    // A token that is only a separator would have to match a column and find nothing.
+    .filter((token) => token.replace(SEPARATORS, "") !== "");
 }
 
 export function applySearch<Q extends OrFilterable<Q>>(query: Q, columns: string[], search?: string): Q {
@@ -39,14 +42,18 @@ export function applySearch<Q extends OrFilterable<Q>>(query: Q, columns: string
  * followed by a part of the color.
  */
 export function matchesNameColor(token: string, name: unknown, color: unknown): boolean {
-  const t = token.toLowerCase();
   const n = String(name ?? "").toLowerCase();
   const c = String(color ?? "").toLowerCase();
-  if (n.includes(t) || c.includes(t)) return true;
-  for (let i = 1; i < t.length; i++) {
-    if (n.includes(t.slice(0, i)) && c.includes(t.slice(i))) return true;
-  }
-  return false;
+  // "雲朵眠-藍" → "雲朵眠藍"; "藍色" also means the color 藍 (but a color named 米白色 still matches whole).
+  const whole = token.toLowerCase().replace(SEPARATORS, "");
+  const variants = whole.length > 1 && whole.endsWith("色") ? [whole, whole.slice(0, -1)] : [whole];
+  return variants.some((t) => {
+    if (!t || n.includes(t) || c.includes(t)) return true;
+    for (let i = 1; i < t.length; i++) {
+      if (n.includes(t.slice(0, i)) && c.includes(t.slice(i))) return true;
+    }
+    return false;
+  });
 }
 
 /** Rows fetched when the column search found nothing: the organization's catalog is small. */

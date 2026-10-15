@@ -26,6 +26,7 @@ export const ROUTER_SYSTEM_PROMPT = `你是 Query ERP 助理的路由器，負�
 - 「新增訂單」「建立訂單」「下訂單」屬於 commercial，不是 supply_chain
 - 「向工廠下單」「採購」屬於 supply_chain；「入庫」「到貨」屬於 supply_chain；「出貨」「庫存」「還有沒有貨」「訂單出貨了沒、還差多少」屬於 warehouse
 - 訂單上的「指定工廠」仍只屬於 commercial；只有使用者要向工廠下採購單時才加上 supply_chain
+- 採購單的「關聯訂單」只屬於 supply_chain（建立採購單時訂單狀態會自動更新），不要另外交給 commercial
 - 工廠的查詢、新增、修改、停用（例如「不要合作了」）屬於 facilities；貨架的新增、修改、停用屬於 facilities，貨架上放了哪些布卷屬於 warehouse
 - 名稱是客戶還是工廠，依下方「訊息中提到的名稱」判斷；不確定時不要當成客戶
 - 一件事只交給一個子 Agent，不要讓兩個子 Agent 做同一件事：建立、修改、停用工廠（例如「建一個代工廠」）只交給 facilities；布卷改放別的貨架、改品級、改重量只交給 warehouse（這是修改布卷，不是修改貨架）
