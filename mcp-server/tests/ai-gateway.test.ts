@@ -1,5 +1,5 @@
 /**
- * AI Gateway fallback rules (docs/QUERY_AGENT_PHASE0.md P0-6), with mock models — no network.
+ * AI Gateway fallback rules (docs/requirements/QUERY_AGENT_PHASE0.md P0-6), with mock models — no network.
  * Run: bun run test
  */
 
@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { APICallError } from "ai";
 import { MockLanguageModelV1 } from "ai/test";
 import type { LanguageModelV1, LanguageModelV1CallOptions } from "@ai-sdk/provider";
-import { aiGenerateText, EmptyResponseError, DeadlineExceededError, modelIdsFor, type GatewayModel } from "../src/agent/ai-gateway.js";
+import { aiGenerateText, TOOL_CALL_AS_TEXT, UNAVAILABLE_REPLY, UNSUPPORTED_REPLY, EmptyResponseError, DeadlineExceededError, modelIdsFor, type GatewayModel } from "../src/agent/ai-gateway.js";
 import { runSubAgent } from "../src/agent/sub-agents.js";
 import type { ObservedAttempt } from "../src/agent/observer.js";
 import { TOOL_GROUPS } from "../src/agent/permissions.js";
@@ -140,6 +140,35 @@ test("`default_api.` tool names are repaired instead of aliased (F4)", async () 
   const result = await aiGenerateText({ ...PROMPT, tools, maxSteps: 3 }, { phase: "test", models: [a] });
   assert.equal(result.text, "找到 2 間工廠");
   assert.equal((result.steps[0].toolResults as { toolName: string }[])[0].toolName, "list_factories");
+});
+
+test("a call to a tool the model was not given ends with a standard reply, not an error (TPM §3.4)", async () => {
+  const { ctx } = setup();
+  const tools = createGroupTools(ctx, ["list_customers"], "commercial", { onDraft: () => {} });
+  // A tool no agent has: an operation Query does not support. No other model is tried.
+  const a = scripted("a", toolCall("delete_all_customers", {}));
+  const b = scripted("b", reply("不該用到"));
+  const unsupported = await aiGenerateText({ ...PROMPT, tools, maxSteps: 3 }, { phase: "test", models: [a, b] });
+  assert.equal(unsupported.text, UNSUPPORTED_REPLY);
+  assert.equal(b.calls(), 0);
+
+  // A real tool this agent was not given (no permission, or another agent's tool).
+  const withheld = await aiGenerateText({ ...PROMPT, tools, maxSteps: 3 }, { phase: "test", models: [scripted("a", toolCall("create_order", {}))] });
+  assert.equal(withheld.text, UNAVAILABLE_REPLY);
+
+  // A caller that knows the user's permissions can say more.
+  const custom = await aiGenerateText({ ...PROMPT, tools, maxSteps: 3 }, {
+    phase: "test", models: [scripted("a", toolCall("create_order", {}))], unavailableToolReply: (name) => `沒有 ${name} 的權限`,
+  });
+  assert.equal(custom.text, "沒有 create_order 的權限");
+});
+
+test("a tool call written as text (Gemini tool_code) falls back to the next model", async () => {
+  const a = scripted("a", reply("tool_code\nprint(default_api.list_orders(payment_status='unpaid'))"));
+  const b = scripted("b", reply("未付款的訂單：ORD-20261001-001"));
+  const result = await aiGenerateText(PROMPT, { phase: "test", models: [a, b] });
+  assert.equal(result.text, "未付款的訂單：ORD-20261001-001");
+  assert.ok(!TOOL_CALL_AS_TEXT.test("default_api 是什麼？"), "mentioning the name alone is fine");
 });
 
 const CREATE_ORDER = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });

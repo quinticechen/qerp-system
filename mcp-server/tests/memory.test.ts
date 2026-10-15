@@ -1,5 +1,5 @@
 /**
- * Conversation memory (docs/QUERY_AGENT_PHASE0.md P0-4): server-side history, entity memory,
+ * Conversation memory (docs/requirements/QUERY_AGENT_PHASE0.md P0-4): server-side history, entity memory,
  * saving the reply. Mock models — no network.
  * Run: bun run test
  */

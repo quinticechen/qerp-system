@@ -1,11 +1,12 @@
 /**
  * Langfuse upload — sends an eval report to Langfuse as an experiment on the "query-agent" dataset:
- * one trace per case (run → model attempt → provider call as a generation, plus tool calls) and a
- * pass_rate / passed score per case. Talks to the public REST API and the OTLP/HTTP endpoint
- * directly, without the SDK. IDs derive from the report and case IDs, so uploading the same report
- * again updates it instead of duplicating it. See docs/QUERY_AGENT_EVALS.md.
+ * one trace per case, linked to its dataset item (run → model attempt → provider call as a
+ * generation, plus tool calls), and scores per case. The dataset itself is the source of the cases
+ * (evals/cases.ts) and is never written here. Talks to the public REST API and the OTLP/HTTP
+ * endpoint directly, without the SDK. IDs derive from the report and case IDs, so uploading the
+ * same report again updates it instead of duplicating it. See docs/QUERY_AGENT_EVALS.md.
  *
- *   bun run eval:upload -- evals/reports/<id>.json [...]   # e.g. reports from before Langfuse
+ *   bun run eval:upload -- evals/reports/<id>.json [...]
  *   bun run eval:upload -- --all
  *
  * Needs LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL in .env.
@@ -15,27 +16,12 @@ import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { caseStatuses, loadCases, loadReport, type CaseInfo, type EvalCase, type EvalReport, type RunResult } from "./report.js";
+import { kindPassed } from "./checks.js";
+import { DATASET_NAME, langfuseApi as api, langfuseConfigured, loadSnapshot, parseItems, type EvalCase } from "./cases.js";
+import { caseStatuses, loadReport, type CaseInfo, type EvalReport, type RunResult } from "./report.js";
 
-export const DATASET_NAME = "query-agent";
 /** What the Langfuse SDK's experiment runner uses; keeps eval traces apart from production ones. */
 const ENVIRONMENT = "sdk-experiment";
-
-export function langfuseConfigured(): boolean {
-  return !!(process.env.LANGFUSE_PUBLIC_KEY && process.env.LANGFUSE_SECRET_KEY && process.env.LANGFUSE_BASE_URL);
-}
-
-async function api<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<{ status: number; data: T | null }> {
-  const auth = Buffer.from(`${process.env.LANGFUSE_PUBLIC_KEY}:${process.env.LANGFUSE_SECRET_KEY}`).toString("base64");
-  const res = await fetch(`${process.env.LANGFUSE_BASE_URL!.replace(/\/$/, "")}${path}`, {
-    method,
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json", ...headers },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok && res.status !== 404) throw new Error(`${method} ${path} → ${res.status} ${text.slice(0, 300)}`);
-  return { status: res.status, data: text ? (JSON.parse(text) as T) : null };
-}
 
 // ── OTLP spans ────────────────────────────────────────────────────────────────
 
@@ -69,33 +55,28 @@ function attributes(values: Record<string, string | number | boolean | string[] 
 const nanos = (ms: number) => (BigInt(Math.round(ms)) * 1_000_000n).toString();
 const json = (v: unknown) => (v === undefined ? undefined : JSON.stringify(v));
 
-/** Run timing; reports from before 2026-10-09 have none, so their runs are laid out back to back. */
-function runWindows(report: EvalReport, runs: RunResult[]): { start: number; end: number }[] {
-  let cursor = Date.parse(report.createdAt);
-  return runs.map((r) => {
-    const start = r.startedAt ?? cursor;
-    cursor = start + r.latencyMs;
-    return { start, end: start + r.latencyMs };
-  });
+function runWindows(runs: RunResult[]): { start: number; end: number }[] {
+  return runs.map((r) => ({ start: r.startedAt, end: r.startedAt + r.latencyMs }));
 }
 
 /** All spans of one case's trace. */
 export function buildCaseSpans(report: EvalReport, info: CaseInfo, evalCase: EvalCase | undefined, datasetId: string): OtlpSpan[] {
   const runs = report.results.filter((r) => r.caseId === info.id).sort((a, b) => a.run - b.run);
-  const windows = runWindows(report, runs);
+  const windows = runWindows(runs);
   const traceId = hexId(`${report.id}:${info.id}`, 32);
   const rootId = hexId(`${traceId}:root`, 16);
   const status = caseStatuses(report).get(info.id);
   const { arch, models, hashes, git } = report.manifest;
+  const { dataset } = report;
 
   const experiment = attributes({
     "langfuse.environment": ENVIRONMENT,
     "langfuse.experiment.id": report.id,
     "langfuse.experiment.name": report.id,
     "langfuse.experiment.description": report.label,
-    "langfuse.experiment.metadata": json({ label: report.label, arch, models, hashes, git }),
+    "langfuse.experiment.metadata": json({ label: report.label, arch, models, hashes, git, dataset }),
     "langfuse.experiment.dataset.id": datasetId,
-    "langfuse.experiment.item.id": info.id,
+    "langfuse.experiment.item.id": info.itemId,
     "langfuse.experiment.item.root_observation_id": rootId,
   });
   const span = (spanId: string, parentSpanId: string | undefined, name: string, start: number, end: number,
@@ -109,19 +90,21 @@ export function buildCaseSpans(report: EvalReport, info: CaseInfo, evalCase: Eva
   const spans: OtlpSpan[] = [
     span(rootId, undefined, `eval:${info.id}`, Math.min(...windows.map((w) => w.start)), Math.max(...windows.map((w) => w.end)), {
       "langfuse.trace.name": `eval:${info.id}`,
-      "langfuse.trace.tags": [info.category, arch, ...(info.known_gap ? ["known_gap"] : [])],
+      "langfuse.trace.tags": [info.category, info.domain, arch, ...(info.unscored ? ["unscored"] : [])],
+      "langfuse.trace.metadata.case_id": info.id,
       "langfuse.trace.metadata.case_name": info.name,
       "langfuse.trace.metadata.category": info.category,
-      "langfuse.observation.input": json({ message: evalCase?.message, history: evalCase?.history }),
-      "langfuse.observation.output": json({ status, passed: `${runs.filter((r) => r.pass).length}/${runs.length}`, replies: runs.map((r) => r.reply) }),
-      "langfuse.experiment.item.expected_output": json(evalCase?.expect),
+      "langfuse.trace.metadata.domain": info.domain,
+      "langfuse.observation.input": json(evalCase?.input),
+      "langfuse.observation.output": json({ status, passed: `${runs.filter((r) => r.pass).length}/${runs.length}`, replies: runs.map((r) => r.reply), drafts: runs.map((r) => r.drafts.map((d) => d.summary)) }),
+      "langfuse.experiment.item.expected_output": json(evalCase?.expected),
       "langfuse.observation.level": status === "❌" ? "WARNING" : "DEFAULT",
     }),
   ];
 
   runs.forEach((r, i) => {
     const runId = hexId(`${traceId}:run:${r.run}`, 16);
-    const failed = r.checks.filter((c) => !c.pass).map((c) => c.check).join("；");
+    const failed = r.checks.filter((c) => c.kind !== "diagnostic" && !c.pass).map((c) => c.check).join("；");
     spans.push(span(runId, rootId, `run ${r.run}`, windows[i].start, windows[i].end, {
       "langfuse.observation.output": json(r.reply),
       "langfuse.observation.metadata.route": r.route?.agents.join("+"),
@@ -129,7 +112,7 @@ export function buildCaseSpans(report: EvalReport, info: CaseInfo, evalCase: Eva
       "langfuse.observation.status_message": failed || undefined,
     }, r.error));
 
-    if (r.attempts) {
+    {
       r.attempts.forEach((a, j) => {
         const attemptId = hexId(`${runId}:attempt:${j}`, 16);
         spans.push(span(attemptId, runId, a.phase, a.startedAt, a.startedAt + a.durationMs, {
@@ -150,17 +133,9 @@ export function buildCaseSpans(report: EvalReport, info: CaseInfo, evalCase: Eva
           }));
         });
       });
-    } else if (r.tokens) {
-      // Before attempts were recorded: one generation with the run's sub-agent tokens.
-      spans.push(span(hexId(`${runId}:legacy`, 16), runId, "agents", windows[i].start, windows[i].end, {
-        "langfuse.observation.type": "generation",
-        "langfuse.observation.model.name": Object.values(models)[0]?.[0],
-        "langfuse.observation.usage_details": json({ total: r.tokens }),
-      }));
     }
 
-    const steps = r.steps ?? [{ agent: "", at: windows[i].start, toolCalls: r.toolCalls }];
-    steps.forEach((step, j) => step.toolCalls.forEach((call, k) => {
+    r.steps.forEach((step, j) => step.toolCalls.forEach((call, k) => {
       spans.push(span(hexId(`${runId}:tool:${j}:${k}`, 16), runId, call.toolName, step.at, step.at + 1, {
         "langfuse.observation.type": "tool",
         "langfuse.observation.input": json(call.args),
@@ -171,7 +146,10 @@ export function buildCaseSpans(report: EvalReport, info: CaseInfo, evalCase: Eva
   return spans;
 }
 
-/** pass_rate (all cases) and passed (scored cases) on each case's trace. */
+/**
+ * On each case's trace: pass_rate, rules and outcome (shares of runs; outcome is absent when the
+ * case's policy is pending) for every case, and passed for scored cases.
+ */
 export function buildScores(report: EvalReport): object[] {
   const statuses = caseStatuses(report);
   return report.cases.flatMap((info) => {
@@ -180,13 +158,25 @@ export function buildScores(report: EvalReport): object[] {
     const traceId = hexId(`${report.id}:${info.id}`, 32);
     const observationId = hexId(`${traceId}:root`, 16);
     const failures = runs.filter((r) => !r.pass)
-      .map((r) => `run ${r.run}：${r.checks.filter((c) => !c.pass).map((c) => c.check).join("；")}`).join("\n");
+      .map((r) => `run ${r.run}：${r.checks.filter((c) => c.kind !== "diagnostic" && !c.pass).map((c) => c.check).join("；")}`).join("\n");
     const common = { traceId, observationId, environment: ENVIRONMENT };
-    const scores: object[] = [{
-      ...common, id: hexId(`${traceId}:pass_rate`, 32), name: "pass_rate", dataType: "NUMERIC",
-      value: runs.filter((r) => r.pass).length / runs.length, ...(failures ? { comment: failures } : {}),
-    }];
-    if (!info.known_gap) {
+    const share = (pass: (r: RunResult) => boolean | null) => {
+      const scoredRuns = runs.filter((r) => pass(r) !== null);
+      return scoredRuns.length ? scoredRuns.filter((r) => pass(r)).length / scoredRuns.length : null;
+    };
+    const numeric = (name: string, value: number | null, comment?: string) =>
+      value === null ? [] : [{ ...common, id: hexId(`${traceId}:${name}`, 32), name, dataType: "NUMERIC", value, ...(comment ? { comment } : {}) }];
+    const scores: object[] = [
+      ...numeric("pass_rate", share((r) => r.pass), failures || undefined),
+      ...numeric("rules", share((r) => kindPassed(r.checks, "rule"))),
+      ...numeric("outcome", share((r) => kindPassed(r.checks, "outcome"))),
+    ];
+    const judged = runs.filter((r) => r.judge);
+    if (judged.length) {
+      scores.push(...numeric("policy_judge", judged.reduce((s, r) => s + r.judge!.score, 0) / judged.length,
+        judged.map((r) => `run ${r.run}：${r.judge!.reason}`).join("\n")));
+    }
+    if (!info.unscored) {
       scores.push({ ...common, id: hexId(`${traceId}:passed`, 32), name: "passed", dataType: "BOOLEAN", value: statuses.get(info.id) === "✅" ? 1 : 0 });
     }
     return scores;
@@ -200,33 +190,16 @@ interface Dataset {
   projectId: string;
 }
 
-async function ensureDataset(): Promise<Dataset> {
+async function getDataset(): Promise<Dataset> {
   const found = await api<Dataset>("GET", `/api/public/v2/datasets/${DATASET_NAME}`);
-  if (found.status !== 404 && found.data) return found.data;
-  const created = await api<Dataset>("POST", "/api/public/v2/datasets", {
-    name: DATASET_NAME,
-    description: "Query Agent eval 案例（mcp-server/evals/cases），由 bun run eval 同步",
-  });
-  return created.data!;
+  if (found.status === 404 || !found.data) throw new Error(`Langfuse 找不到 dataset「${DATASET_NAME}」`);
+  return found.data;
 }
 
 /** Returns the link to the dataset, whose experiments tab lists every uploaded run. */
-export async function uploadReport(report: EvalReport, currentCases: EvalCase[]): Promise<string> {
-  const dataset = await ensureDataset();
-  const byId = new Map(currentCases.map((c) => [c.id, c]));
-
-  // Dataset items mirror the case files; a case deleted since an old report keeps its last version.
-  for (const info of report.cases) {
-    const c = byId.get(info.id);
-    if (!c) continue;
-    await api("POST", "/api/public/dataset-items", {
-      datasetName: DATASET_NAME,
-      id: c.id,
-      input: { message: c.message, history: c.history, role: c.role ?? "owner", fixtures: c.fixtures ?? "basic" },
-      expectedOutput: c.expect,
-      metadata: { name: c.name, category: c.category, note: c.note, known_gap: c.known_gap },
-    });
-  }
+export async function uploadReport(report: EvalReport, cases: EvalCase[]): Promise<string> {
+  const dataset = await getDataset();
+  const byId = new Map(cases.map((c) => [c.id, c]));
 
   for (const info of report.cases) {
     const spans = buildCaseSpans(report, info, byId.get(info.id), dataset.id);
@@ -254,11 +227,13 @@ async function main() {
     : args.map((p) => resolve(p));
   if (!paths.length) throw new Error("Give report files, or --all");
 
-  const cases = loadCases(join(evalsDir, "cases"));
   let url = "";
   for (const path of paths) {
-    const report = loadReport(path, cases);
-    url = await uploadReport(report, cases);
+    const report = loadReport(path);
+    if (!report) { console.log(`- 略過 ${path}：舊格式的報告（version 3 以前）不再上傳`); continue; }
+    // The cases a report ran are in the snapshot it names.
+    const { snapshot } = loadSnapshot(join(evalsDir, "snapshots"), report.dataset.snapshot);
+    url = await uploadReport(report, parseItems(snapshot.items).cases);
     console.log(`✓ ${report.id}`);
   }
   console.log(`Langfuse：${url}`);

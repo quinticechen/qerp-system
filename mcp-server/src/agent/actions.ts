@@ -1,5 +1,5 @@
 /**
- * 待確認操作（草稿＋確認，docs/QUERY_AGENT_PHASE0.md §4.3）
+ * 待確認操作（草稿＋確認，docs/requirements/QUERY_AGENT_PHASE0.md §4.3）
  *
  * 模型要求的寫入先存成 query_pending_actions（pending），對話中顯示確認卡片；使用者確認後才執行。
  * 以 action id 為冪等鍵：只有把狀態從 pending 搶成 executing 的那一次會執行，重複確認回傳同一結果。

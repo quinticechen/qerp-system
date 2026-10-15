@@ -1,5 +1,5 @@
 /**
- * 對話記憶（docs/QUERY_AGENT_PHASE0.md §4.4）
+ * 對話記憶（docs/requirements/QUERY_AGENT_PHASE0.md §4.4）
  *
  * - 對話內容由後端從 query_messages 讀取（使用者 JWT，RLS 只能讀自己的對話），不信任前端送來的 history
  * - 工具查到的特定紀錄（實體）存在 assistant 回覆的 metadata.entities，下一輪寫進 system prompt，
@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ObservedStep, QueryObserver } from "./observer.js";
 import type { ConversationMessage } from "./sub-agents.js";
 
-export type EntityType = "customer" | "factory" | "product" | "order" | "purchase_order" | "shipping";
+export type EntityType = "customer" | "factory" | "product" | "order" | "purchase_order" | "receiving" | "shipping" | "shelf";
 
 export interface Entity {
   type: EntityType;
@@ -37,7 +37,9 @@ const ENTITY_LABELS: Record<EntityType, string> = {
   product: "產品",
   order: "訂單",
   purchase_order: "採購單",
+  receiving: "進貨單",
   shipping: "出貨單",
+  shelf: "貨架",
 };
 
 type Row = Record<string, unknown>;
@@ -63,6 +65,8 @@ const EXTRACTORS: Partial<Record<string, Extractor>> = {
   get_purchase_order: (r) => entity("purchase_order", r.id, r.po_number),
   list_shippings: (r) => entity("shipping", r.id, r.shipping_number),
   get_shipping: (r) => entity("shipping", r.id, r.shipping_number),
+  list_receivings: (r) => entity("receiving", r.id, r.receipt_number),
+  list_shelves: (r) => entity("shelf", r.id, r.name),
 };
 
 /** Entities from one tool result: a single record, or a list of at most MAX_ROWS_PER_LOOKUP. */
@@ -162,5 +166,6 @@ export function combineObservers(...observers: QueryObserver[]): QueryObserver {
     onRoute: (decision, fromFallback) => observers.forEach((o) => o.onRoute?.(decision, fromFallback)),
     onModelAttempt: (attempt) => observers.forEach((o) => o.onModelAttempt?.(attempt)),
     onStep: (agent, step) => observers.forEach((o) => o.onStep?.(agent, step)),
+    onPrompt: (name, source) => observers.forEach((o) => o.onPrompt?.(name, source)),
   };
 }

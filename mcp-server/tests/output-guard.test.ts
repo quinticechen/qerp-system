@@ -1,5 +1,5 @@
 /**
- * Replies never show internal IDs (docs/QUERY_AGENT_PHASE0.md P0-5, F7).
+ * Replies never show internal IDs (docs/requirements/QUERY_AGENT_PHASE0.md P0-5, F7).
  * Run: bun run test
  */
 

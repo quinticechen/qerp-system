@@ -50,7 +50,7 @@ async function callApi(
 }
 
 /** Drops undefined values so the API applies its own defaults. */
-function compact(params: Record<string, unknown>): Record<string, unknown> {
+export function compact(params: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
 }
 
@@ -58,8 +58,28 @@ interface ApiWriteToolDefinition<I extends z.AnyZodObject>
   extends Omit<ToolDefinition<I>, "kind" | "execute" | "summarize"> {
   /** The API function, e.g. "create_order". */
   rpc: string;
-  /** API parameters without p_organization_id / p_dry_run. */
-  toParams(input: z.infer<I>): Record<string, unknown>;
+  /**
+   * API parameters without p_organization_id / p_dry_run. May read the database first (e.g. to
+   * merge item changes into the full list an API expects) and refuse with a message.
+   */
+  toParams(input: z.infer<I>, ctx: ToolContext): Params | Promise<Params | Refusal>;
+}
+
+type Params = Record<string, unknown>;
+/** Returned by toParams instead of parameters when the request cannot become an API call. */
+export interface Refusal {
+  ok: false;
+  error: string;
+}
+export const refuse = (error: string): Refusal => ({ ok: false, error });
+const isRefusal = (p: Params | Refusal): p is Refusal => p.ok === false && typeof p.error === "string";
+
+async function resolveParams<I extends z.AnyZodObject>(
+  def: Pick<ApiWriteToolDefinition<I>, "toParams">, input: z.infer<I>, ctx: ToolContext
+): Promise<{ ok: true; params: Params } | { ok: false; error: string }> {
+  const params = await def.toParams(input, ctx);
+  if (isRefusal(params)) return params;
+  return { ok: true, params: compact(params) };
 }
 
 export function defineApiWriteTool<I extends z.AnyZodObject>(def: ApiWriteToolDefinition<I>): RegisteredTool {
@@ -67,12 +87,17 @@ export function defineApiWriteTool<I extends z.AnyZodObject>(def: ApiWriteToolDe
   return defineTool<I>({
     ...meta,
     kind: "write",
+    api: rpc,
     summarize: async (ctx, input) => {
-      const r = await callApi(ctx, rpc, compact(toParams(input)), true);
+      const params = await resolveParams({ toParams }, input, ctx);
+      if (!params.ok) return params;
+      const r = await callApi(ctx, rpc, params.params, true);
       return r.ok ? { ok: true, summary: r.result.summary } : r;
     },
     execute: async (ctx, input) => {
-      const r = await callApi(ctx, rpc, compact(toParams(input)), false);
+      const params = await resolveParams({ toParams }, input, ctx);
+      if (!params.ok) return fail(params.error);
+      const r = await callApi(ctx, rpc, params.params, false);
       if (!r.ok) return fail(r.error);
       return ok({ message: `${r.result.summary.title}完成`, id: r.result.id, number: r.result.number });
     },

@@ -1,5 +1,5 @@
 /**
- * Confirming / cancelling drafts (docs/QUERY_AGENT_PHASE0.md P0-5), against the fake database.
+ * Confirming / cancelling drafts (docs/requirements/QUERY_AGENT_PHASE0.md P0-5), against the fake database.
  * Run: bun run test
  */
 

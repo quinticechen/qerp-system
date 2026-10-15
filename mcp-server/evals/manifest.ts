@@ -10,10 +10,13 @@ import { join } from "node:path";
 import { zodSchema } from "ai";
 import type { AgentMode } from "../src/agent/answer.js";
 import { modelIdsFor, type ModelPolicy } from "../src/agent/ai-gateway.js";
+import { ROUTABLE_GROUPS } from "../src/agent/permissions.js";
 import { ROUTER_SYSTEM_PROMPT } from "../src/agent/router.js";
+import { PROMPT_NAMES } from "../src/agent/prompts.js";
 import { AGENT_SYSTEM_PROMPTS, SINGLE_AGENT_PROMPT } from "../src/agent/sub-agents.js";
 import { getAllTools } from "../src/tools/index.js";
-import { ARCH_PHASES, type EvalCase, type Manifest } from "./report.js";
+import type { EvalCase } from "./cases.js";
+import { ARCH_PHASES, type Manifest } from "./report.js";
 
 const hash = (value: unknown) =>
   createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex").slice(0, 8);
@@ -29,10 +32,28 @@ function git(cwd: string): Manifest["git"] {
   }
 }
 
-export function buildManifest(arch: AgentMode, policy: ModelPolicy, cases: EvalCase[], evalsDir: string): Manifest {
-  const prompts: Record<string, string> = arch === "router"
-    ? { "prompt.router": hash(ROUTER_SYSTEM_PROMPT), "prompt.commercial": hash(AGENT_SYSTEM_PROMPTS.commercial), "prompt.supply_chain": hash(AGENT_SYSTEM_PROMPTS.supply_chain) }
-    : { "prompt.single": hash(SINGLE_AGENT_PROMPT) };
+/** The prompts a run used: a Langfuse label with each prompt's version and text, or the in-code text. */
+export interface PromptSet {
+  label: string | null;
+  versions: Record<string, number>;
+  texts: Record<string, string>;
+}
+
+/** The in-code prompts by Langfuse name (src/agent/prompts.ts PROMPT_NAMES). */
+export function codePromptTexts(): Record<string, string> {
+  return {
+    [PROMPT_NAMES.router]: ROUTER_SYSTEM_PROMPT,
+    ...Object.fromEntries(ROUTABLE_GROUPS.map((g) => [PROMPT_NAMES.agent(g), AGENT_SYSTEM_PROMPTS[g]])),
+    [PROMPT_NAMES.single]: SINGLE_AGENT_PROMPT,
+  };
+}
+
+export function buildManifest(arch: AgentMode, policy: ModelPolicy, cases: EvalCase[], evalsDir: string, promptSet?: PromptSet): Manifest {
+  const texts = promptSet?.texts ?? codePromptTexts();
+  const names = arch === "router" ? [PROMPT_NAMES.router, ...ROUTABLE_GROUPS.map((g) => PROMPT_NAMES.agent(g))] : [PROMPT_NAMES.single];
+  // "prompt.router" etc.: the same keys as before Langfuse, so older reports still compare.
+  const key = (name: string) => `prompt.${name.replace(/^query-(agent-)?/, "")}`;
+  const prompts = Object.fromEntries(names.map((n) => [key(n), hash(texts[n])]));
   const tools = getAllTools().map((t) => ({
     name: t.name, description: t.description, kind: t.kind, permission: t.permission, input: zodSchema(t.input).jsonSchema,
   }));
@@ -44,5 +65,6 @@ export function buildManifest(arch: AgentMode, policy: ModelPolicy, cases: EvalC
     models: Object.fromEntries(ARCH_PHASES[arch].map((phase) => [phase, modelIdsFor(policy, phase)])),
     hashes: { ...prompts, tools: hash(tools), cases: hash(cases), fixtures: hash(fixtures) },
     git: git(join(evalsDir, "..")),
+    ...(promptSet?.label ? { prompts: { label: promptSet.label, versions: promptSet.versions } } : {}),
   };
 }

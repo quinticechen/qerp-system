@@ -3,7 +3,7 @@
  *
  * 底層統一指向 OpenRouter，可隨時換成任何相容 provider。
  * 模型優先級：主模型失敗自動降級，不影響上層業務邏輯。
- * 降級規則見 docs/QUERY_AGENT_PHASE0.md §4.5。
+ * 降級規則見 docs/requirements/QUERY_AGENT_PHASE0.md §4.5。
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -11,6 +11,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, generateObject, APICallError, NoSuchToolError, type ToolCallRepairFunction, type ToolSet } from "ai";
 import type { LanguageModelV1 } from "@ai-sdk/provider";
 import { normalizeToolName, type ModelCall, type QueryRun } from "./observer.js";
+import { TOOL_GROUPS } from "./permissions.js";
 
 // 模型優先級清單（由上往下降級）
 export const MODEL_PRIORITY = [
@@ -105,6 +106,11 @@ export interface GatewayCall extends QueryRun {
   validate?: (text: string) => string | null;
   /** Text to use when the model finished with no text but the attempt still did its job. */
   emptyReply?: () => string | null;
+  /**
+   * The reply when the model calls a tool it was not given (NoSuchToolError). Defaults to
+   * unavailableToolReply(); a caller that knows the user's permissions can be more specific.
+   */
+  unavailableToolReply?: (toolName: string) => string;
   attemptTimeoutMs?: number;
 }
 
@@ -146,12 +152,31 @@ export function describeError(err: unknown): string {
  */
 function shouldFallBack(err: unknown): boolean {
   if (err instanceof DeadlineExceededError) return false;
-  // A tool the model doesn't have even after repair: a prompt/tool design bug (see F3).
-  if (NoSuchToolError.isInstance(err)) return false;
   // Same API key for every model.
   if (APICallError.isInstance(err) && (err.statusCode === 401 || err.statusCode === 403)) return false;
   return true;
 }
+
+/** Standard replies (QUERY_AGENT_TPM_ALIGNMENT.md §3.4). */
+export const UNSUPPORTED_REPLY = "Query 現在還沒有這個功能。";
+export const UNAVAILABLE_REPLY = "Query 沒辦法在這裡完成這項操作。如果你沒有這項操作的權限，需要請管理員幫你操作；也可以換個方式描述你要做的事。";
+
+/**
+ * A tool the model called but was not given. A tool no agent has is an operation Query does not
+ * support; a tool that exists elsewhere was withheld — the user lacks the permission, or the
+ * router picked another agent — which the gateway cannot tell apart.
+ */
+export function unavailableToolReply(toolName: string): string {
+  const name = normalizeToolName(toolName);
+  const exists = Object.values(TOOL_GROUPS).some((tools) => (tools as readonly string[]).includes(name));
+  return exists ? UNAVAILABLE_REPLY : UNSUPPORTED_REPLY;
+}
+
+/**
+ * Gemini sometimes writes the tool call as text ("tool_code print(default_api.list_orders(...))")
+ * instead of calling it. Such a reply answers nothing, so it falls back to the next model.
+ */
+export const TOOL_CALL_AS_TEXT = /^\s*tool_code\b|\bdefault_api\.\w+\(/;
 
 /** Gemini sometimes calls `default_api.<tool>`; map it back instead of registering aliases (F4). */
 const repairToolCall: ToolCallRepairFunction<ToolSet> = async ({ toolCall, tools }) => {
@@ -195,22 +220,38 @@ async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModel
 type GenerateTextOptions = Omit<Parameters<typeof generateText>[0], "model" | "abortSignal">;
 type GenerateObjectOptions = Omit<Parameters<typeof generateObject>[0], "model" | "abortSignal">;
 
-/** generateText with fallback; an empty final reply counts as a failure. */
-export async function aiGenerateText(options: GenerateTextOptions, call: GatewayCall) {
+type GenerateTextResult = Awaited<ReturnType<typeof generateText>>;
+
+/**
+ * generateText with fallback; an empty final reply counts as a failure. A call to a tool the model
+ * was not given ends the request with a standard reply instead of an error: another model would
+ * see the same tools, and the user should not get a failure for asking (TPM §3.4). Only `text` is
+ * meaningful on such a result.
+ */
+export async function aiGenerateText(options: GenerateTextOptions, call: GatewayCall): Promise<GenerateTextResult> {
   return withFallback(call, async (model, abortSignal) => {
-    const result = await generateText({
-      experimental_repairToolCall: repairToolCall,
-      ...options,
-      model,
-      abortSignal,
-      // Falling back to the next model is the retry; same-model retries only add backoff delay.
-      maxRetries: 0,
-    } as Parameters<typeof generateText>[0]);
+    let result: GenerateTextResult;
+    try {
+      result = await generateText({
+        experimental_repairToolCall: repairToolCall,
+        ...options,
+        model,
+        abortSignal,
+        // Falling back to the next model is the retry; same-model retries only add backoff delay.
+        maxRetries: 0,
+      } as Parameters<typeof generateText>[0]);
+    } catch (err) {
+      if (!NoSuchToolError.isInstance(err)) throw err;
+      console.warn(`[AI Gateway] ${call.phase} 呼叫了沒有的工具: ${err.toolName}`);
+      const text = (call.unavailableToolReply ?? unavailableToolReply)(err.toolName);
+      return { text, steps: [], toolCalls: [], toolResults: [], finishReason: "error" } as unknown as GenerateTextResult;
+    }
     if (!result.text.trim()) {
       const substitute = call.emptyReply?.();
       if (!substitute) throw new EmptyResponseError(result.finishReason);
       return { ...result, text: substitute };
     }
+    if (TOOL_CALL_AS_TEXT.test(result.text)) throw new InvalidReplyError("模型把工具呼叫寫成文字");
     const problem = call.validate?.(result.text);
     if (problem) throw new InvalidReplyError(problem);
     return result;

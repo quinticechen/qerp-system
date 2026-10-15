@@ -204,13 +204,13 @@ export function createFakeSupabase(fixtures: Tables, userId: string, access: Fak
   const writes: RecordedWrite[] = [];
   const rpc = async (fn: string, args: Record<string, unknown>) => {
     if (FAKE_API_NAMES.has(fn)) return simulateApi(fn, args, tables, writes, access.grants);
-    if (args._user_id !== userId) return { data: false, error: null };
-    if (fn === "is_organization_owner") return { data: access.isOwner, error: null };
-    if (fn === "user_has_organization_permission") {
+    if (fn === "is_organization_owner" || fn === "user_has_organization_permission") {
+      if (args._user_id !== userId) return { data: false, error: null };
       // RBAC R1: permissions come from the role's catalog keys only (the owner's grants are the admin's).
-      return { data: access.grants.includes(String(args._permission)), error: null };
+      return { data: fn === "is_organization_owner" ? access.isOwner : access.grants.includes(String(args._permission)), error: null };
     }
-    return { data: null, error: { message: `fake-supabase: unknown rpc ${fn}` } };
+    // As PostgREST: an unknown function is an error, never a silent empty result.
+    return { data: null, error: { code: "PGRST202", message: `fake-supabase: unknown rpc ${fn}`, hint: null } };
   };
   const client = {
     from: (table: string) => new FakeQuery(table, tables, writes),

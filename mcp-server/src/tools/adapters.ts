@@ -1,15 +1,15 @@
 /**
- * Adapters from the single tool source to each protocol (docs/QUERY_AGENT_PHASE0.md §4.1).
+ * Adapters from the single tool source to each protocol (docs/requirements/QUERY_AGENT_PHASE0.md §4.1).
  */
 
-import { tool, type Tool } from "ai";
+import { jsonSchema, tool, zodSchema, type Tool } from "ai";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Draft, RegisteredTool, ToolContext } from "./types.js";
 
 export interface AiToolHooks {
   /**
    * Receives every write the model asks for. Write tools never execute in the agent loop: they
-   * become drafts the user confirms on a card (docs/QUERY_AGENT_PHASE0.md §4.3).
+   * become drafts the user confirms on a card (docs/requirements/QUERY_AGENT_PHASE0.md §4.3).
    */
   onDraft(draft: Draft): void;
 }
@@ -26,7 +26,11 @@ export function toAiSdkTools(defs: readonly RegisteredTool[], ctx: ToolContext, 
     def.name,
     tool({
       description: def.description,
-      parameters: def.input,
+      // The JSON schema without validation: the tool validates (and resolves references) itself
+      // and answers a bad argument with a message the model can act on. Validated here, a record
+      // number in an id parameter threw InvalidToolArgumentsError on every model and the request
+      // failed (eval 20261014T1611).
+      parameters: jsonSchema(zodSchema(def.input).jsonSchema),
       // The model sees the bare data or the error text, not the ToolResult wrapper: the
       // wrapper alone changed gemini-2.5-flash-lite's behaviour (e.g. leaking UUIDs) in evals.
       execute: async (args) => {

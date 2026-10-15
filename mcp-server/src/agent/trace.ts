@@ -1,5 +1,5 @@
 /**
- * Query Trace — one row in query_traces per /query request (docs/QUERY_AGENT_PHASE0.md §4.6).
+ * Query Trace — one row in query_traces per /query request (docs/requirements/QUERY_AGENT_PHASE0.md §4.6).
  *
  * Collects what happened through the QueryObserver callbacks and writes it with the user's own
  * client (RLS: own rows, in an organization the user belongs to). Saving never affects the reply.
@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describeError } from "./ai-gateway.js";
 import type { ObservedAttempt, ObservedStep, QueryObserver, RouteDecision } from "./observer.js";
+import type { PromptSource } from "./prompts.js";
 
 const ARGS_PREVIEW_CHARS = 300;
 const RETENTION_DAYS = 30;
@@ -24,11 +25,16 @@ export class TraceRecorder implements QueryObserver {
   private route: (RouteDecision & { fallback: boolean }) | null = null;
   private readonly attempts: ObservedAttempt[] = [];
   private readonly steps: TraceStep[] = [];
+  private readonly prompts: Record<string, PromptSource> = {};
   private inputTokens = 0;
   private outputTokens = 0;
 
   onRoute(decision: RouteDecision, fromFallback: boolean): void {
     this.route = { ...decision, fallback: fromFallback };
+  }
+
+  onPrompt(name: string, source: PromptSource): void {
+    this.prompts[name] = source;
   }
 
   onModelAttempt(attempt: ObservedAttempt): void {
@@ -55,7 +61,7 @@ export class TraceRecorder implements QueryObserver {
     const finalAttempt = succeeded.filter((a) => a.phase.startsWith("agent:")).at(-1) ?? succeeded.at(-1);
     const firstFailure = this.attempts.find((a) => a.error);
 
-    const { error } = await supabase.from("query_traces").insert({
+    const row = {
       id: this.id,
       user_id: meta.userId,
       organization_id: meta.organizationId,
@@ -75,7 +81,15 @@ export class TraceRecorder implements QueryObserver {
       output_tokens: this.outputTokens,
       latency_ms: Date.now() - this.started,
       error: meta.error ? describeError(meta.error).slice(0, 1000) : null,
-    });
+      prompts: this.prompts,
+    };
+    let { error } = await supabase.from("query_traces").insert(row);
+    // Until migration 20261015003209_query_traces_prompts.sql is applied the column is missing:
+    // keep the trace without it rather than lose it.
+    if (error && /prompts/.test(error.message)) {
+      const { prompts: _prompts, ...withoutPrompts } = row;
+      ({ error } = await supabase.from("query_traces").insert(withoutPrompts));
+    }
     if (error) {
       console.error("[Trace] 寫入失敗:", error.message);
       return;

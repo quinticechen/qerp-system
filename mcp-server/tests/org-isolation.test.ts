@@ -37,6 +37,10 @@ const READ_CALLS: [string, Record<string, unknown>][] = [
   ["list_purchase_orders", {}],
   ["list_shippings", {}],
   ["list_factories", {}],
+  ["list_shelves", { include_inactive: true }],
+  ["list_receivings", {}],
+  ["list_inventory_rolls", {}],
+  ["list_inventory_rolls", { search: "藍0922" }],
 ];
 
 test("every read tool is covered by the isolation check", () => {
@@ -80,6 +84,16 @@ test("writes cannot reference another organization's records", async () => {
   assert.equal(po.ok, false);
   const status = await tool("update_order_status").run(ctx, { order_id: "d0000000-0000-4000-8000-000000000099", status: "cancelled" });
   assert.equal(status.ok, false);
+  // Item changes are merged with the current lines before the API call; a foreign parent is
+  // refused there, before its lines are read.
+  for (const [name, args] of [
+    ["update_order", { order_id: "d0000000-0000-4000-8000-000000000099", remove_product_ids: ["a0000000-0000-4000-8000-000000000001"] }],
+    ["update_purchase_order", { purchase_order_id: "e0000000-0000-4000-8000-000000000099", remove_product_ids: ["a0000000-0000-4000-8000-000000000001"] }],
+    ["update_shipping", { shipping_id: "b0000000-0000-4000-8000-000000000099", remove_roll_ids: ["a0000000-0000-4000-8000-000000000001"] }],
+  ] as const) {
+    const r = await tool(name).draft!(ctx, args);
+    assert.equal(r.ok, false, `${name} drafted a change to a foreign record`);
+  }
   assert.equal(writes.filter((w) => w.op === "insert").length, 0, "no rows inserted");
   assert.ok(!writes.some((w) => w.ids?.includes("d0000000-0000-4000-8000-000000000099")), "foreign order was not updated");
 });

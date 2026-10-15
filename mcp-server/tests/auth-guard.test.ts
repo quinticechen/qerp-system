@@ -1,5 +1,5 @@
 /**
- * Permission resolution and organization scoping (docs/QUERY_AGENT_PHASE0.md P0-3).
+ * Permission resolution and organization scoping (docs/requirements/QUERY_AGENT_PHASE0.md P0-3).
  * Run: bun run test
  */
 

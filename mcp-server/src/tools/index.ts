@@ -1,5 +1,5 @@
 /**
- * Tool registry — the single source every adapter reads from (docs/QUERY_AGENT_PHASE0.md §4.1).
+ * Tool registry — the single source every adapter reads from (docs/requirements/QUERY_AGENT_PHASE0.md §4.1).
  */
 
 import { TOOL_GROUPS, type ToolName } from "../agent/permissions.js";
@@ -11,6 +11,8 @@ import { inventoryTools } from "./inventory.js";
 import { purchaseOrderTools } from "./purchase-orders.js";
 import { shippingTools } from "./shipping.js";
 import { factoryTools } from "./factories.js";
+import { receivingTools } from "./receiving.js";
+import { shelfTools } from "./shelves.js";
 
 const ALL_TOOLS: RegisteredTool[] = [
   ...customerTools,
@@ -20,6 +22,8 @@ const ALL_TOOLS: RegisteredTool[] = [
   ...purchaseOrderTools,
   ...shippingTools,
   ...factoryTools,
+  ...receivingTools,
+  ...shelfTools,
 ];
 
 const TOOLS_BY_NAME = new Map<ToolName, RegisteredTool>();
