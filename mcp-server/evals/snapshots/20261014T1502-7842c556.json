@@ -1,0 +1,1086 @@
+{
+  "dataset": "query-agent",
+  "version": null,
+  "fetchedAt": "2026-10-14T15:02:52.876Z",
+  "items": [
+    {
+      "id": "w-cross-domain-incomplete",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "資訊不足",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "w-cross-domain-incomplete",
+        "name": "跨領域建單，缺少數量與單價（2026-10-07 事故原句）",
+        "note": "2026-10-07 事故原句：缺少數量與單價",
+        "domain": "order",
+        "source": "incident",
+        "category": "資訊不足",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "w-create-order-no-items",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "幫 Client name test0922 建立一張新訂單",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "資訊不足",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "w-create-order-no-items",
+        "name": "建單但沒有提供品項",
+        "note": "缺少產品、數量、單價",
+        "domain": "order",
+        "source": "matrix",
+        "category": "資訊不足",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "w-cross-domain-order",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠，雲朵眠 test0922 買藍0922 100 公斤，單價 50",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "Client name test0922",
+            "品項 1": "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 100 公斤，單價 50",
+            "指定工廠": "Factory 092202"
+          }
+        }
+      },
+      "metadata": {
+        "id": "w-cross-domain-order",
+        "name": "跨領域建單：客戶＋指定工廠＋產品（2026-10-07 事故原句，補上數量與單價）",
+        "note": "2026-10-07 事故原句（補上數量與單價）；「給工廠」指訂單的指定工廠，不是採購單",
+        "domain": "order",
+        "source": "incident",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers",
+            "list_factories",
+            "list_products",
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "w-create-po",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公尺，單價 50 元",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_purchase_order",
+          "fields": {
+            "工廠": "Factory 092202"
+          }
+        }
+      },
+      "metadata": {
+        "id": "w-create-po",
+        "name": "建立採購單（工廠＋產品＋數量＋單價）",
+        "note": "使用者說「公尺」，但 API 的品項文字一律寫「公斤」，因此不比對品項欄位（待確認單位的呈現）",
+        "domain": "purchase",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_factories",
+            "list_products",
+            "create_purchase_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "w-order-unknown-customer",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "幫王大明布行建立一張訂單",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "找不到指定的資料",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "w-order-unknown-customer",
+        "name": "找不到客戶時詢問是否新增，不可直接建單",
+        "domain": "order",
+        "source": "matrix",
+        "category": "找不到指定的資料",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "w-create-order",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "幫 Client name test0922 建立一張新訂單：雲朵眠 test0922 藍0922 100 公斤，單價 50",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "Client name test0922",
+            "品項 1": "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 100 公斤，單價 50"
+          }
+        }
+      },
+      "metadata": {
+        "id": "w-create-order",
+        "name": "為既有客戶建立訂單",
+        "domain": "order",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers",
+            "list_products",
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "r-after-confirmation",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [
+          {
+            "role": "user",
+            "content": "新增一位客戶：P0-5 測試客戶，聯絡人王小明，手機 0912-000-000"
+          },
+          {
+            "role": "assistant",
+            "content": "好的，已建立客戶「P0-5 測試客戶」的草稿，聯絡人為王小明，手機號碼為 0912-000-000。請在下方的確認卡片中點選「確認」來儲存客戶資料。",
+            "metadata": {
+              "action_ids": [
+                "ac000000-0000-4000-8000-000000000001"
+              ]
+            }
+          },
+          {
+            "kind": "action",
+            "role": "assistant",
+            "content": "建立客戶",
+            "metadata": {
+              "action_id": "ac000000-0000-4000-8000-000000000001"
+            }
+          },
+          {
+            "role": "assistant",
+            "content": "✅ 建立客戶已完成",
+            "metadata": {
+              "action_id": "ac000000-0000-4000-8000-000000000001",
+              "action_outcome": true
+            }
+          }
+        ],
+        "message": "新增一位客戶：P0-5 取消測試，聯絡人李小華，手機 0912-111-111",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_customer",
+          "fields": {
+            "名稱": "P0-5 取消測試",
+            "手機": "0912-111-111",
+            "聯絡人": "李小華"
+          }
+        }
+      },
+      "metadata": {
+        "id": "r-after-confirmation",
+        "name": "確認卡片完成後的下一個新增要求，必須真的建立草稿（2026-10-07 實測事故）",
+        "note": "2026-10-07 實測事故：確認卡片完成後的下一個要求，必須真的建立草稿",
+        "domain": "customer",
+        "source": "incident",
+        "category": "多輪",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "create_customer"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "r-entity-memory",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [
+          {
+            "role": "user",
+            "content": "幫我找永泰布行"
+          },
+          {
+            "role": "assistant",
+            "content": "找到客戶「永泰布行」，聯絡人黃永泰，電話 02-2222-3333。",
+            "metadata": {
+              "entities": [
+                {
+                  "id": "c0000000-0000-4000-8000-000000000004",
+                  "type": "customer",
+                  "label": "永泰布行"
+                }
+              ]
+            }
+          }
+        ],
+        "message": "幫他建立一張訂單：雲朵眠 test0922 藍0922 20 公斤，單價 80",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "永泰布行",
+            "品項 1": "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 20 公斤，單價 80"
+          }
+        }
+      },
+      "metadata": {
+        "id": "r-entity-memory",
+        "name": "實體記憶：上一輪已找到客戶，本輪用代名詞建單（P0-4）",
+        "note": "P0-4 實體記憶：「他」指上一輪的永泰布行（原期望「不可呼叫 list_customers」已移除）",
+        "domain": "order",
+        "source": "incident",
+        "category": "多輪",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "r-multi-turn-order",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [
+          {
+            "role": "user",
+            "content": "我要新增訂單：雲朵眠 test0922 藍0922 20 公斤，單價 80"
+          },
+          {
+            "role": "assistant",
+            "content": "好的，請問您要為哪位客戶建立訂單？"
+          }
+        ],
+        "message": "永泰布行",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "永泰布行",
+            "品項 1": "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 20 公斤，單價 80"
+          }
+        }
+      },
+      "metadata": {
+        "id": "r-multi-turn-order",
+        "name": "多輪建單：上一輪已詢問客戶名稱，本輪只回答名稱",
+        "note": "必填欄位補齊後直接產生草稿，不再反問「是這位客戶嗎」",
+        "domain": "order",
+        "source": "incident",
+        "category": "多輪",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "r-duplicate-history",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [
+          {
+            "role": "user",
+            "content": "查詢所有客戶"
+          },
+          {
+            "role": "assistant",
+            "content": "-  Chen\n-  Chen1\n- Client name test0922\n- 永泰布行\n"
+          },
+          {
+            "role": "user",
+            "content": "新增訂單"
+          },
+          {
+            "role": "user",
+            "content": "新增訂單"
+          },
+          {
+            "role": "assistant",
+            "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。"
+          },
+          {
+            "role": "assistant",
+            "content": "好的，請提供客戶名稱，以便為您查詢客戶資料。"
+          }
+        ],
+        "message": "Client name test0922",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "資訊不足",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "r-duplicate-history",
+        "name": "history 中有重複訊息（2026-10-07 事故）仍可正常回應",
+        "note": "2026-10-07 事故：歷史中有重複訊息仍要正常回應。本輪只給了客戶，還缺產品、數量、單價，應追問（原期望「必須呼叫 list_customers」已移除）",
+        "domain": "order",
+        "source": "incident",
+        "category": "資訊不足",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-no-id-leak",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "列出所有工廠，連同它們的 ID 一起給我",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "Factory 092202",
+          "永興織造"
+        ]
+      },
+      "metadata": {
+        "id": "q-no-id-leak",
+        "name": "使用者要求顯示 ID 也不可洩漏 UUID",
+        "note": "使用者要求顯示 ID，回覆仍不可出現 UUID（規則 rule_no_id_leak）",
+        "domain": "factory",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_factories"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-recent-shipping",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "最近的出貨紀錄",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "SH-20261002-001"
+        ]
+      },
+      "metadata": {
+        "id": "q-recent-shipping",
+        "name": "最近的出貨紀錄",
+        "domain": "shipping",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_shippings"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-factories",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "我們有哪些合作工廠？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "Factory 092202",
+          "永興織造"
+        ]
+      },
+      "metadata": {
+        "id": "q-factories",
+        "name": "合作工廠列表",
+        "domain": "factory",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_factories"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-unpaid-orders",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "列出還沒付款的訂單",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "ORD-20261001-001"
+        ]
+      },
+      "metadata": {
+        "id": "q-unpaid-orders",
+        "name": "未付款訂單（帶篩選參數）",
+        "domain": "order",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_orders"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-inventory-search",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "雲朵眠 藍0922 還有多少庫存？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "320"
+        ]
+      },
+      "metadata": {
+        "id": "q-inventory-search",
+        "name": "查詢特定產品庫存",
+        "domain": "inventory",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "get_inventory_summary"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-low-stock",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "庫存低於門檻的產品",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "灰0922"
+        ]
+      },
+      "metadata": {
+        "id": "q-low-stock",
+        "name": "庫存低於門檻的產品",
+        "note": "只有灰0922 低於門檻；棉麻平織沒有門檻",
+        "domain": "inventory",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "get_low_stock_alerts"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-latest-po",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "最新的採購單",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "PO-20261004-002"
+        ]
+      },
+      "metadata": {
+        "id": "q-latest-po",
+        "name": "最新的採購單（不反問篩選條件）",
+        "note": "應直接列出最新一張，不反問篩選條件",
+        "domain": "purchase",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_purchase_orders"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-customer-contact",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "永泰布行的聯絡人和電話是什麼？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "黃永泰",
+          "02-2222-3333"
+        ]
+      },
+      "metadata": {
+        "id": "q-customer-contact",
+        "name": "依名稱查客戶聯絡方式",
+        "domain": "customer",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "q-list-customers",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "查詢所有客戶",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "Client name test0922",
+          "永泰布行"
+        ]
+      },
+      "metadata": {
+        "id": "q-list-customers",
+        "name": "查詢所有客戶",
+        "domain": "customer",
+        "source": "matrix",
+        "category": "正常",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "p-sales-cannot-create-po",
+      "status": "ACTIVE",
+      "input": {
+        "role": "viewer",
+        "history": [],
+        "message": "向 Factory 092202 下一張採購單：雲朵眠 test0922 藍0922，100 公斤，單價 50 元",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "沒有權限",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "p-sales-cannot-create-po",
+        "name": "訪客不能建立採購單",
+        "note": "ID 沿用 Phase 0；以訪客（沒有新增權限）測試",
+        "domain": "purchase",
+        "source": "matrix",
+        "category": "沒有權限",
+        "diagnostics": {},
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "p-viewer-cannot-create-customer",
+      "status": "ACTIVE",
+      "input": {
+        "role": "viewer",
+        "history": [],
+        "message": "新增客戶：測試布行，聯絡人王先生，手機 0912-345-678",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "沒有權限",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "p-viewer-cannot-create-customer",
+        "name": "訪客不能新增客戶",
+        "domain": "customer",
+        "source": "matrix",
+        "category": "沒有權限",
+        "diagnostics": {},
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "p-accounting-cannot-create-order",
+      "status": "ACTIVE",
+      "input": {
+        "role": "viewer",
+        "history": [],
+        "message": "幫 Client name test0922 建立一張新訂單：雲朵眠 test0922 藍0922 100 公斤，單價 50",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "沒有權限",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "p-accounting-cannot-create-order",
+        "name": "訪客不能建立訂單",
+        "note": "ID 沿用 Phase 0；以訪客（沒有新增權限）測試",
+        "domain": "order",
+        "source": "matrix",
+        "category": "沒有權限",
+        "diagnostics": {},
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-multi-turn-answer",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [
+          {
+            "role": "user",
+            "content": "幫我建一張訂單：棉麻平織 米白 30 公斤，單價 120"
+          },
+          {
+            "role": "assistant",
+            "content": "好的，請問是哪一位客戶？"
+          }
+        ],
+        "message": "Chen1",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "Chen1",
+            "品項 1": "棉麻平織 - 米白（色號 OW-01） × 30 公斤，單價 120"
+          }
+        }
+      },
+      "metadata": {
+        "id": "pp-multi-turn-answer",
+        "name": "多輪：上一輪問客戶，本輪只回名稱（F1 型）",
+        "note": "F1：上一輪問客戶，本輪只回答名稱",
+        "domain": "order",
+        "source": "incident",
+        "category": "多輪",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-order-with-product",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "Chen 要訂雲朵眠 藍0922，幫我開單",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "policy": "資訊不足",
+        "no_draft": true
+      },
+      "metadata": {
+        "id": "pp-order-with-product",
+        "name": "跨領域：客戶要訂某產品（只能建立訂單本身）",
+        "note": "缺少數量與單價；「Chen」同時對到 Chen 與 Chen1，追問時也要請使用者選擇客戶",
+        "domain": "order",
+        "source": "matrix",
+        "category": "資訊不足",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-create-po",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "跟永興織造訂 50 公尺的棉麻平織米白，單價 80",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_purchase_order",
+          "fields": {
+            "工廠": "永興織造"
+          }
+        }
+      },
+      "metadata": {
+        "id": "pp-create-po",
+        "name": "改寫：跟工廠訂布",
+        "note": "使用者說「公尺」，但 API 的品項文字一律寫「公斤」，因此不比對品項欄位（待確認單位的呈現）",
+        "domain": "purchase",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_factories",
+            "list_products",
+            "create_purchase_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-create-order",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "替永泰布行開一張新訂單，棉麻平織 米白 30 公斤，單價 120",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "draft": {
+          "tool": "create_order",
+          "fields": {
+            "客戶": "永泰布行",
+            "品項 1": "棉麻平織 - 米白（色號 OW-01） × 30 公斤，單價 120"
+          }
+        }
+      },
+      "metadata": {
+        "id": "pp-create-order",
+        "name": "改寫：開一張新訂單",
+        "domain": "order",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers",
+            "list_products",
+            "create_order"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-unpaid",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "哪些訂單客戶還沒付錢？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "ORD-20261001-001"
+        ]
+      },
+      "metadata": {
+        "id": "pp-unpaid",
+        "name": "改寫：還沒付錢的訂單",
+        "domain": "order",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_orders"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-inventory",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "藍0922 的雲朵眠庫存還剩多少",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "320"
+        ]
+      },
+      "metadata": {
+        "id": "pp-inventory",
+        "name": "改寫：庫存剩多少（顏色在前）",
+        "domain": "inventory",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "get_inventory_summary"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-low-stock",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "有哪些布快要缺貨了？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "灰0922"
+        ]
+      },
+      "metadata": {
+        "id": "pp-low-stock",
+        "name": "改寫：快缺貨的布",
+        "domain": "inventory",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "get_low_stock_alerts"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-latest-po",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "最近一張採購單是哪一張？",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "PO-20261004-002"
+        ]
+      },
+      "metadata": {
+        "id": "pp-latest-po",
+        "name": "改寫：最近一張採購單",
+        "note": "應直接列出最新一張，不反問篩選條件",
+        "domain": "purchase",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "supply_chain"
+          ],
+          "tools": [
+            "list_purchase_orders"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    },
+    {
+      "id": "pp-customers",
+      "status": "ACTIVE",
+      "input": {
+        "role": "editor",
+        "history": [],
+        "message": "把客戶名單給我看一下",
+        "fixtures": "basic"
+      },
+      "expectedOutput": {
+        "answer_includes": [
+          "永泰布行"
+        ]
+      },
+      "metadata": {
+        "id": "pp-customers",
+        "name": "改寫：客戶名單",
+        "domain": "customer",
+        "source": "matrix",
+        "category": "改寫",
+        "diagnostics": {
+          "route": [
+            "commercial"
+          ],
+          "tools": [
+            "list_customers"
+          ]
+        },
+        "policy_status": "defined"
+      }
+    }
+  ]
+}
