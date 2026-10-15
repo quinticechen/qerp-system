@@ -2,7 +2,7 @@
 
 > Status: Confirmed (2026-10-07), In Implementation
 > Scope: `mcp-server/` (AI Query Backend) + `src/hooks/useQueryChat.ts`, `src/components/query/` (Frontend Chat)
-> Related Documents: [ARCHITECTURE.md](https://www.google.com/search?q=./ARCHITECTURE.md)
+> Related Documents: [README.md](../../README.md), [AGENT.md](../AGENT.md)
 
 ## 1. Background and Objectives
 

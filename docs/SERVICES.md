@@ -8,7 +8,7 @@
 | Vercel | 前端部署：正式（production）與預覽（preview）部署 | 環境變數 `VITE_QUERY_API_URL`（AI 伺服器網址）；建置時依 `VERCEL_ENV` 決定 `APP_ENV`：production → 正式、preview → staging（`vite.config.ts`、`src/lib/appEnvironment.ts`） |
 | Google Cloud Run | AI 伺服器 `query-ai-agent`（`asia-south1`，專案 `erp-system-463209`） | 由 `mcp-server/Dockerfile` 持續部署；環境變數 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`OPENROUTER_API_KEY` |
 | OpenRouter | AI 模型閘道 | 預設順序：`google/gemini-2.5-flash-lite` → `google/gemini-2.5-flash` → `anthropic/claude-haiku-4.5`（`mcp-server/src/agent/ai-gateway.ts`） |
-| Langfuse | AI eval 結果的實驗紀錄與比較 | `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL`（[EVALS.md](./EVALS.md)） |
+| Langfuse | AI eval 的案例（Dataset `query-agent`）、實驗紀錄與比較；Query Agent 的 system prompt 版本（Prompt Management，正式環境讀 `production` 標籤，讀不到時用程式內建的版本） | `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL`（[EVALS.md](./EVALS.md)） |
 | Google OAuth | 以 Google 帳號登入 | Supabase Auth 的 redirect 允許清單需包含 `http://localhost:8080/**` |
 
 ## 環境

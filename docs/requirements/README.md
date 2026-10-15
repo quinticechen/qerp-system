@@ -22,5 +22,10 @@
 | [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md) | 多租戶角色與權限（R0–R4） | RBAC Session | 已完成（2026-10-09） |
 | [PHASE1_BUSINESS_API.md](./PHASE1_BUSINESS_API.md) | Phase 1 業務 API 的計畫與決策（A1–A6、B1–B8） | RBAC Session | 已完成（2026-10-09） |
 | [UI_CONSISTENCY.md](./UI_CONSISTENCY.md) | 資料視窗的查看／編輯／新增模式與共用元件 | RBAC Session | 已完成（2026-10-09） |
+| [QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md) | Query Agent Phase 0 基礎設計與事故紀錄（F1–F15） | AI Session | 已完成（2026-10-07） |
+| [QUERY_AGENT_ARCHITECTURE_EVAL.md](./QUERY_AGENT_ARCHITECTURE_EVAL.md) | Router 與單一 Agent 的架構比較（P0-7） | AI Session | 已完成（2026-10-07） |
+| [QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md) | Query Agent Phase 1：API 包成工具、eval 案例分類、子 Agent 分組 | AI Session | 進行中 |
+| [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) | TPM 定義：商業價值、使用者流程、Guardrail、回覆政策、Eval 方法 | TPM／AI Session | 進行中 |
+| [QUERY_AGENT_EVAL_REDESIGN.md](./QUERY_AGENT_EVAL_REDESIGN.md) | Query Agent eval 重新設計：看結果評分、案例與 prompt 移到 Langfuse、LLM 評分 | AI Session | 進行中（步驟 1–4 完成，2026-10-14） |
+| [QUERY_AGENT_EVAL_UTTERANCES.md](./QUERY_AGENT_EVAL_UTTERANCES.md) | 真實語句收集表（TPM 填寫，轉為 eval 案例） | TPM | 已填寫並轉為案例（2026-10-14） |
 
-AI Agent 的規劃文件（`QUERY_AGENT_PHASE0.md`、`QUERY_AGENT_PHASE1.md`、`QUERY_AGENT_TPM_ALIGNMENT.md`、`QUERY_AGENT_ARCHITECTURE_EVAL.md`）目前仍在上一層，將由 AI Session 移到這裡（[SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §6）。
