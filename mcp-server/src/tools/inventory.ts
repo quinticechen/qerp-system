@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool, ok, fail } from "./types.js";
-import { applySearch } from "./search.js";
+import { applySearch, searchNameColor } from "./search.js";
 
 interface StockRow {
   total_stock: number | null;
@@ -20,11 +20,13 @@ export const inventoryTools = [
       limit: z.number().optional(),
     }),
     execute: async ({ supabase, organizationId }, { product_id, search, limit }) => {
-      let q = supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, total_rolls, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock, stock_thresholds").eq("organization_id", organizationId).limit(limit ?? 30);
-      if (product_id) q = q.eq("product_id", product_id);
-      const { data, error } = await applySearch(q, ["product_name", "color"], search);
+      const { data, error } = await searchNameColor((term, max) => {
+        let q = supabase.from("inventory_summary_enhanced").select("product_id, product_name, color, total_stock, total_rolls, a_grade_stock, b_grade_stock, c_grade_stock, d_grade_stock, defective_stock, stock_thresholds").eq("organization_id", organizationId).limit(max);
+        if (product_id) q = q.eq("product_id", product_id);
+        return applySearch(q, ["product_name", "color"], term);
+      }, search, limit ?? 30, "product_name", "color");
       if (error) return fail(`查詢失敗：${error.message}`);
-      return ok(data ?? []);
+      return ok(data);
     },
   }),
 

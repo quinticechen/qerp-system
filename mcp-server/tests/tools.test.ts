@@ -1,5 +1,5 @@
 /**
- * Deterministic checks for the single tool source (docs/QUERY_AGENT_PHASE0.md P0-2).
+ * Deterministic checks for the single tool source (docs/requirements/QUERY_AGENT_PHASE0.md P0-2).
  * Run: bun run test
  */
 
@@ -45,7 +45,7 @@ test("AI SDK and MCP adapters expose the same tools", async () => {
   const aiNames = Object.keys(toAiSdkTools(getAllTools(), ctx, { onDraft: () => {} })).filter((n) => !n.startsWith("default_api.")).sort();
   const { tools } = await (await connectMcp(ctx)).listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), aiNames);
-  assert.equal(aiNames.length, 17);
+  assert.equal(aiNames.length, 44);
 });
 
 test("MCP marks read tools read-only and write tools not", async () => {

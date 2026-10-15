@@ -1,5 +1,5 @@
 /**
- * Single-agent architecture (docs/QUERY_AGENT_PHASE0.md P0-7), with mock models.
+ * Single-agent architecture (docs/requirements/QUERY_AGENT_PHASE0.md P0-7), with mock models.
  * Run: bun run test
  */
 

@@ -1,5 +1,5 @@
 /**
- * Tool 單一來源的型別定義（docs/QUERY_AGENT_PHASE0.md §4.1）
+ * Tool 單一來源的型別定義（docs/requirements/QUERY_AGENT_PHASE0.md §4.1）
  *
  * 每個 tool 只用 defineTool() 定義一次，再由 adapters.ts 轉成 AI SDK 與 MCP 格式。
  */
@@ -7,6 +7,7 @@
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolName } from "../agent/permissions.js";
+import { resolveRefs, type RefPaths } from "./refs.js";
 
 /** Per-request context handed to every tool. */
 export interface ToolContext {
@@ -47,7 +48,7 @@ export type ToolResult =
 
 export const ok = (data: unknown): ToolResult => ({ ok: true, data });
 
-/** What a confirmation card shows — names, never IDs (docs/QUERY_AGENT_PHASE0.md §4.3). */
+/** What a confirmation card shows — names, never IDs (docs/requirements/QUERY_AGENT_PHASE0.md §4.3). */
 export interface ActionSummary {
   title: string;
   fields: { label: string; value: string }[];
@@ -69,6 +70,10 @@ interface ToolMeta {
   /** `write` tools move to the draft + confirm flow in P0-5. */
   kind: "read" | "write";
   permission: PermissionKey;
+  /** Write tools backed by a business API: its name (docs/API.md §3). */
+  api?: string;
+  /** Inputs that take a record by UUID, number or name (src/tools/refs.ts), resolved before running. */
+  refs?: RefPaths;
 }
 
 export interface ToolDefinition<I extends z.AnyZodObject> extends ToolMeta {
@@ -96,17 +101,23 @@ function parseInput<I extends z.AnyZodObject>(input: I, raw: unknown): { ok: tru
     : { ok: false, error: `參數錯誤：${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("；")}` };
 }
 
+/** Parsed input with its references resolved to ids. */
+async function prepareInput<I extends z.AnyZodObject>(def: ToolDefinition<I>, ctx: ToolContext, raw: unknown) {
+  const parsed = parseInput(def.input, raw);
+  return parsed.ok ? resolveRefs(ctx, parsed.data, def.refs) : parsed;
+}
+
 export function defineTool<I extends z.AnyZodObject>(def: ToolDefinition<I>): RegisteredTool {
   const { execute, summarize, ...meta } = def;
   if (def.kind === "write" && !summarize) throw new Error(`Write tool ${def.name} needs summarize() for the confirmation card`);
   return {
     ...meta,
     run: async (ctx, rawInput) => {
-      const parsed = parseInput(def.input, rawInput);
+      const parsed = await prepareInput(def, ctx, rawInput);
       return parsed.ok ? execute(ctx, parsed.data) : fail(parsed.error);
     },
     draft: summarize && (async (ctx, rawInput) => {
-      const parsed = parseInput(def.input, rawInput);
+      const parsed = await prepareInput(def, ctx, rawInput);
       if (!parsed.ok) return parsed;
       const described = await summarize(ctx, parsed.data);
       return described.ok ? { ok: true, draft: { tool: def.name, payload: parsed.data, summary: described.summary } } : described;

@@ -32,3 +32,44 @@ export function applySearch<Q extends OrFilterable<Q>>(query: Q, columns: string
   }
   return q;
 }
+
+/**
+ * F15: users type a product name and its color without a space ("雲朵眠藍", "40S雙面布藏青"), so
+ * no column contains the token. A token also matches when it splits into a part of the name
+ * followed by a part of the color.
+ */
+export function matchesNameColor(token: string, name: unknown, color: unknown): boolean {
+  const t = token.toLowerCase();
+  const n = String(name ?? "").toLowerCase();
+  const c = String(color ?? "").toLowerCase();
+  if (n.includes(t) || c.includes(t)) return true;
+  for (let i = 1; i < t.length; i++) {
+    if (n.includes(t.slice(0, i)) && c.includes(t.slice(i))) return true;
+  }
+  return false;
+}
+
+/** Rows fetched when the column search found nothing: the organization's catalog is small. */
+const FALLBACK_ROWS = 500;
+
+type Rows<R> = PromiseLike<{ data: R[] | null; error: { message: string } | null }>;
+
+/**
+ * Column search first (applySearch); when it finds nothing, the rows without the search, filtered
+ * with matchesNameColor. `fetch(search, limit)` builds the query with every other filter.
+ */
+export async function searchNameColor<R extends Record<string, unknown>>(
+  fetch: (search: string | undefined, limit: number) => Rows<R>,
+  search: string | undefined,
+  limit: number,
+  nameColumn: keyof R & string,
+  colorColumn: keyof R & string
+): Promise<{ data: R[]; error: { message: string } | null }> {
+  const first = await fetch(search, limit);
+  if (first.error || !search || (first.data ?? []).length) return { data: first.data ?? [], error: first.error };
+  const tokens = searchTokens(search);
+  const all = await fetch(undefined, FALLBACK_ROWS);
+  if (all.error) return { data: [], error: all.error };
+  const matched = (all.data ?? []).filter((row) => tokens.every((t) => matchesNameColor(t, row[nameColumn], row[colorColumn])));
+  return { data: matched.slice(0, limit), error: null };
+}
