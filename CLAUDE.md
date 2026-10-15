@@ -154,7 +154,7 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 |------|-------|
 | Frontend port | 8080 |
 | MCP server port | 3100 |
-| Query backend (production) | Google Cloud Run — service `query-ai-agent`, `asia-east1`, project `erp-system-463209`, `https://query-ai-agent-189729990634.asia-east1.run.app`. Built by continuous deployment from `mcp-server/Dockerfile` (build context `mcp-server/`); env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY` set on the service |
+| Query backend (production) | Google Cloud Run — service `query-ai-agent`, `asia-south1`, project `erp-system-463209`, `https://query-ai-agent-189729990634.asia-south1.run.app`. Built by continuous deployment from `mcp-server/Dockerfile` (build context `mcp-server/`); env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY` set on the service |
 | Frontend → Query backend | `VITE_QUERY_API_URL` (set in Vercel to the Cloud Run URL; unset locally → `http://localhost:3100`; override locally in `.env.local`) |
 | Supabase project ref | gyiyedvutcbwzpbcsmjc |
 | Test account | quinticechen@gmail.com |
