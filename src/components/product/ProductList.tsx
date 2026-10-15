@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Pencil, Plus, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import { PRODUCT_CATEGORIES } from '@/lib/api/products';
 import { cn } from '@/lib/utils';
 import { ProductGroupDialog } from './ProductGroupDialog';
 import { ProductColorDialog } from './ProductColorDialog';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
@@ -39,7 +40,7 @@ const ProductList = () => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditProducts');
   const canCreate = hasPermission('canCreateProducts');
-  const { data: products = [], isLoading, error } = useProductCatalog();
+  const { data: products = [], isLoading, isFetching, error } = useProductCatalog();
 
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
@@ -48,6 +49,22 @@ const ProductList = () => {
 
   const [productDialog, setProductDialog] = useState<string | null>(null);
   const [colorDialog, setColorDialog] = useState<{ productId: string; colorId: string | null } | null>(null);
+
+  // ?open=<id> names a product or one of its colors (e.g. after a Query confirmation); it opens
+  // once the catalog has it — a record just created arrives with the next fetch.
+  const [pendingOpen, setPendingOpen] = useState<string | null>(null);
+  useOpenRecordFromUrl(setPendingOpen);
+  useEffect(() => {
+    if (!pendingOpen) return;
+    const product = products.find((p) => p.id === pendingOpen);
+    const owner = product ? null : products.find((p) => p.colors.some((c) => c.id === pendingOpen));
+    if (product) setProductDialog(product.id);
+    else if (owner) {
+      setColorDialog({ productId: owner.id, colorId: pendingOpen });
+      setExpanded((current) => new Set(current).add(owner.id));
+    } else if (isFetching || isLoading) return;
+    setPendingOpen(null);
+  }, [pendingOpen, products, isFetching, isLoading]);
 
   const keyword = search.trim().toLowerCase();
 

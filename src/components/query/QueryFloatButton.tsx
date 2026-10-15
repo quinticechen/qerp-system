@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MantaRayIcon } from './MantaRayIcon';
-import { QueryChat } from './QueryChat';
+import { QueryChat, type QueryLayout } from './QueryChat';
 import { useSwipeBack } from './useSwipeBack';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -11,10 +12,77 @@ function isFullScreenEntry(): boolean {
   return Boolean((window.history.state as Record<string, unknown> | null)?.[HISTORY_FLAG]);
 }
 
+// Desktop layout and sidebar width are remembered per browser (docs/requirements/QUERY_UI_LAYOUT_AND_RECORD_NAV.md §2).
+const LAYOUT_KEY = 'query-layout';
+const WIDTH_KEY = 'query-sidebar-width';
+/** Same width as the floating panel. */
+const DEFAULT_WIDTH = 380;
+const MIN_WIDTH = 320;
+/** CSS variable Layout.tsx reserves on the right while the sidebar is open, so the ERP shrinks. */
+const SIDEBAR_WIDTH_VAR = '--query-sidebar-width';
+
+const maxWidth = () => Math.max(MIN_WIDTH, Math.floor(window.innerWidth / 2));
+const clampWidth = (width: number) => Math.min(maxWidth(), Math.max(MIN_WIDTH, Math.round(width)));
+
+function readStored<T>(key: string, parse: (value: string) => T | null, fallback: T): T {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : parse(value) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function store(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Private mode or blocked storage: the choice just isn't remembered.
+  }
+}
+
+const parseLayout = (value: string): QueryLayout | null =>
+  value === 'floating' || value === 'sidebar' || value === 'fullscreen' ? value : null;
+const parseWidth = (value: string): number | null => (Number.isFinite(Number(value)) ? clampWidth(Number(value)) : null);
+
 export function QueryFloatButton() {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [layout, setLayout] = useState<QueryLayout>(() => readStored(LAYOUT_KEY, parseLayout, 'floating'));
+  const [width, setWidth] = useState<number>(() => readStored(WIDTH_KEY, parseWidth, DEFAULT_WIDTH));
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const changeLayout = useCallback((next: QueryLayout) => {
+    setLayout(next);
+    store(LAYOUT_KEY, next);
+  }, []);
+
+  // The sidebar takes its width from the ERP instead of covering it.
+  const sidebarOpen = !isMobile && isOpen && layout === 'sidebar';
+  useEffect(() => {
+    const root = document.documentElement;
+    if (sidebarOpen) root.style.setProperty(SIDEBAR_WIDTH_VAR, `${width}px`);
+    else root.style.removeProperty(SIDEBAR_WIDTH_VAR);
+    return () => {
+      root.style.removeProperty(SIDEBAR_WIDTH_VAR);
+    };
+  }, [sidebarOpen, width]);
+
+  // Dragging the sidebar's left edge resizes it.
+  const startResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const onMove = (e: PointerEvent) => setWidth(clampWidth(window.innerWidth - e.clientX));
+    const onUp = (e: PointerEvent) => {
+      store(WIDTH_KEY, String(clampWidth(window.innerWidth - e.clientX)));
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.userSelect = '';
+    };
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, []);
 
   // On mobile the chat is a page of its own: opening pushes a history entry, so the browser's
   // back button or edge-swipe returns to the ERP page instead of leaving it.
@@ -58,6 +126,14 @@ export function QueryFloatButton() {
 
   const swipeHandlers = useSwipeBack(panelRef, close);
 
+  // After a confirmed write the ERP opens the record (QUERY_UI_LAYOUT_AND_RECORD_NAV.md §1.4): on
+  // mobile the chat page closes; a full-screen chat becomes the sidebar so the record is visible.
+  const openRecord = useCallback((path: string) => {
+    if (isMobile) setIsOpen(false);
+    else if (layout === 'fullscreen') changeLayout('sidebar');
+    navigate(path);
+  }, [isMobile, layout, changeLayout, navigate]);
+
   if (isMobile) {
     return (
       <>
@@ -78,9 +154,40 @@ export function QueryFloatButton() {
             isOpen ? 'translate-x-0 visible' : 'translate-x-full invisible',
           ].join(' ')}
         >
-          <QueryChat onClose={close} fullScreen />
+          <QueryChat onClose={close} fullScreen onOpenRecord={openRecord} />
         </div>
       </>
+    );
+  }
+
+  const chat = <QueryChat onClose={close} layout={layout} onLayoutChange={changeLayout} onOpenRecord={openRecord} />;
+
+  if (isOpen && layout === 'sidebar') {
+    return (
+      <aside
+        role="dialog"
+        aria-label="Query 助理"
+        className="fixed top-0 right-0 z-40 h-screen bg-white border-l border-gray-200 shadow-xl"
+        style={{ width }}
+      >
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="調整 Query 寬度"
+          title="拖曳調整寬度"
+          onPointerDown={startResize}
+          className="absolute left-0 top-0 h-full w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-indigo-300/60 active:bg-indigo-400/60"
+        />
+        {chat}
+      </aside>
+    );
+  }
+
+  if (isOpen && layout === 'fullscreen') {
+    return (
+      <div role="dialog" aria-label="Query 助理" className="fixed inset-0 z-50 bg-white">
+        {chat}
+      </div>
     );
   }
 
@@ -97,7 +204,7 @@ export function QueryFloatButton() {
         ].join(' ')}
         style={{ background: 'white' }}
       >
-        <QueryChat onClose={close} />
+        {chat}
       </div>
 
       <TriggerButton isOpen={isOpen} onClick={isOpen ? close : open} />

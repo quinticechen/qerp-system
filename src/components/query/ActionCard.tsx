@@ -5,6 +5,8 @@ import { useQueryAction, type QueryActionStatus } from '@/hooks/useQueryAction';
 
 interface ActionCardProps {
   actionId: string;
+  /** Called with the record's page after a confirmed write. */
+  onOpenRecord?: (path: string) => void;
 }
 
 const STATUS_LABELS: Record<QueryActionStatus, string> = {
@@ -26,8 +28,8 @@ const STATUS_CLASSES: Record<QueryActionStatus, string> = {
 };
 
 /** Confirmation card for a write the Query assistant drafted — nothing is saved until 確認. */
-export function ActionCard({ actionId }: ActionCardProps) {
-  const { action, isLoading, confirm, cancel, isDeciding } = useQueryAction(actionId);
+export function ActionCard({ actionId, onOpenRecord }: ActionCardProps) {
+  const { action, isLoading, confirm, cancel, isDeciding } = useQueryAction(actionId, onOpenRecord);
 
   if (isLoading || !action) {
     return (

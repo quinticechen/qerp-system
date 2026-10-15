@@ -9,10 +9,12 @@ import { useShelves, type Shelf } from '@/hooks/useShelves';
 import { CreateShelfDialog } from './CreateShelfDialog';
 import { ShelfDialog } from './ShelfDialog';
 import { PermissionGate } from '@/components/PermissionGate';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 export const ShelfManagement: React.FC = () => {
   const { data: shelves, isLoading, error } = useShelves();
   const [openShelfId, setOpenShelfId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setOpenShelfId);
   const { hasPermission } = usePermissions();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const canEdit = hasPermission('canEditShelves');

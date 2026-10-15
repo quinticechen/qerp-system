@@ -9,11 +9,13 @@ import { EnhancedTable, TableColumn } from '@/components/ui/enhanced-table';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Badge } from '@/components/ui/badge';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 export const FactoryList = () => {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('canEditFactories');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setSelectedId);
   const { organizationId, hasOrganization } = useCurrentOrganization();
 
   const { data: factories, isLoading } = useQuery({

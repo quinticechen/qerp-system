@@ -8,10 +8,12 @@ import { PurchaseList } from './purchase/PurchaseList';
 import { CreatePurchaseDialog } from './purchase/CreatePurchaseDialog';
 import { PendingInventorySection } from './inventory/PendingInventorySection';
 import { PermissionGate } from '@/components/PermissionGate';
+import { useOpenRecordFromUrl } from '@/hooks/useOpenRecordFromUrl';
 
 const PurchaseManagement = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  useOpenRecordFromUrl(setSelectedPurchaseId);
 
   // A newly created purchase order opens in the list's dialog
   const handleCreateSuccess = (purchase: { id: string }) => setSelectedPurchaseId(purchase.id);

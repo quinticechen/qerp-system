@@ -262,7 +262,9 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         page.wait_for_timeout(1_500)
 
         # Scope to the rounded chips — the header button can also contain a session title.
-        suggestion_btn = page.locator("button.rounded-full", has_text="查詢所有客戶")
+        # A suggestion chip shown by QueryChat.tsx (update together with its list)
+        SUGGESTION = "查詢工廠或客戶資料"
+        suggestion_btn = page.locator("button.rounded-full", has_text=SUGGESTION)
         check("Quick-reply suggestions visible", suggestion_btn.count() > 0, page, "04_suggestions")
 
         chat_input = page.locator("textarea[placeholder^='輸入訊息']")
@@ -278,7 +280,7 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         page.wait_for_timeout(1_500)  # let React state update & optimistic bubble render
 
         # User message: any element containing the suggestion text that isn't a button
-        user_msg_visible = page.get_by_text("查詢所有客戶", exact=True).last.is_visible()
+        user_msg_visible = page.get_by_text(SUGGESTION, exact=True).last.is_visible()
         check("User message bubble rendered", user_msg_visible, page, "05_user_msg")
 
         # The backend rejects /query without the organization selected in the UI (P0-3)

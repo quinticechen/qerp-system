@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, KeyboardEvent, type ReactNode } from 'react';
-import { X, Send, Trash2, Loader2, ChevronDown, ChevronLeft, Pin, Plus, Trash } from 'lucide-react';
+import { X, Send, Trash2, Loader2, ChevronDown, ChevronLeft, Pin, Plus, Trash, PanelRight, PictureInPicture2, Maximize2 } from 'lucide-react';
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ActionCard } from './ActionCard';
@@ -7,10 +7,24 @@ import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+/** Desktop layouts (docs/requirements/QUERY_UI_LAYOUT_AND_RECORD_NAV.md §2). */
+export type QueryLayout = 'floating' | 'sidebar' | 'fullscreen';
+
+const LAYOUTS: { value: QueryLayout; label: string; Icon: typeof PanelRight }[] = [
+  { value: 'floating', label: '浮動視窗', Icon: PictureInPicture2 },
+  { value: 'sidebar', label: '側邊欄', Icon: PanelRight },
+  { value: 'fullscreen', label: '全螢幕', Icon: Maximize2 },
+];
+
 interface QueryChatProps {
   onClose: () => void;
   /** Mobile full-screen page: a back arrow replaces the close button. */
   fullScreen?: boolean;
+  /** Desktop: the current layout and how to switch it; absent on mobile. */
+  layout?: QueryLayout;
+  onLayoutChange?: (layout: QueryLayout) => void;
+  /** Called with the record's page after a confirmation card's write succeeded. */
+  onOpenRecord?: (path: string) => void;
 }
 
 const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 🐟
@@ -23,7 +37,9 @@ const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 �
 
 有什麼需要幫忙的嗎？`;
 
-export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
+export function QueryChat({ onClose, fullScreen = false, layout = 'floating', onLayoutChange, onOpenRecord }: QueryChatProps) {
+  // Only the floating panel has rounded corners.
+  const rounded = !fullScreen && layout === 'floating';
   const {
     sessions,
     activeSessionId,
@@ -78,7 +94,7 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0 ${fullScreen ? 'pl-2' : 'rounded-t-2xl'}`}>
+      <div className={`flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 shrink-0 ${fullScreen ? 'pl-2' : ''} ${rounded ? 'rounded-t-2xl' : ''}`}>
         {fullScreen && (
           <button
             onClick={onClose}
@@ -124,8 +140,24 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
           </PopoverContent>
         </Popover>
         <div className="flex items-center gap-1 shrink-0">
+          {onLayoutChange &&
+            LAYOUTS.map(({ value, label, Icon }) => (
+              <button
+                key={value}
+                onClick={() => onLayoutChange(value)}
+                aria-label={label}
+                aria-pressed={layout === value}
+                title={label}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  layout === value ? 'text-white bg-white/20' : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon size={15} />
+              </button>
+            ))}
           <button
             onClick={clearMessages}
+            aria-label="清除對話"
             className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             title="清除對話"
           >
@@ -134,6 +166,8 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
           {!fullScreen && (
             <button
               onClick={onClose}
+              aria-label="關閉 Query"
+              title="關閉 Query"
               className="p-1.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             >
               <X size={15} />
@@ -154,7 +188,7 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
             <UserBubble key={msg.id} content={msg.content} />
           ) : msg.kind === 'action' && msg.actionId ? (
             <AssistantBubble key={msg.id}>
-              <ActionCard actionId={msg.actionId} />
+              <ActionCard actionId={msg.actionId} onOpenRecord={onOpenRecord} />
             </AssistantBubble>
           ) : (
             <AssistantBubble key={msg.id}>
@@ -184,7 +218,7 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
       )}
 
       {/* Input */}
-      <div className={`px-3 py-3 bg-white border-t border-gray-100 shrink-0 ${fullScreen ? '' : 'rounded-b-2xl'}`}>
+      <div className={`px-3 py-3 bg-white border-t border-gray-100 shrink-0 ${rounded ? 'rounded-b-2xl' : ''}`}>
         <div className="flex items-end gap-2 bg-gray-100 rounded-xl px-3 py-2">
           <textarea
             key={inputKey}
