@@ -5,6 +5,7 @@
  * 所有 callback 皆為選用；未傳入 observer 時不影響任何行為。
  */
 
+import type { PromptSource } from "./prompts.js";
 import type { AgentGroup } from "./permissions.js";
 import type { GatewayModel, ModelPolicy } from "./ai-gateway.js";
 import type { Entity } from "./memory.js";
@@ -66,6 +67,8 @@ export interface QueryObserver {
   onModelAttempt?(attempt: ObservedAttempt): void;
   /** `agent` is the sub-agent group, or "all" for the single agent. */
   onStep?(agent: string, step: ObservedStep): void;
+  /** A system prompt was read (prompts.ts): its Langfuse label and version, or "code". */
+  onPrompt?(name: string, source: PromptSource): void;
 }
 
 /** Per-request options threaded from the entry point through router, sub-agents and gateway. */

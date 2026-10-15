@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { authGuard } from "./auth-guard.js";
 import { answerQuery } from "./answer.js";
+import { isRateLimited, RATE_LIMIT_REPLY } from "./input-guard.js";
 import { TraceRecorder } from "./trace.js";
 import { EntityCollector, combineObservers, entitiesFromHistory, loadHistory, toModelHistory, type StoredMessage } from "./memory.js";
 import type { GatewayModel } from "./ai-gateway.js";
@@ -10,6 +11,12 @@ import type { ConversationMessage } from "./sub-agents.js";
 
 /** Whole-request budget; each model attempt is also capped (ai-gateway.ts). */
 const REQUEST_TIMEOUT_MS = 90_000;
+
+/**
+ * Shown when the agent fails (every model failed, a tool threw): no technical detail reaches the
+ * user (QUERY_AGENT_TPM_ALIGNMENT.md §3.4); the error itself is kept in query_traces.
+ */
+export const AGENT_FAILURE_REPLY = "Query 這次沒辦法完成，請稍後再試，或換個方式描述你要做的事。";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -84,7 +91,15 @@ export async function handleQuery(
   const drafts: Draft[] = [];
   const meta = { userId: access.userId, organizationId: access.organizationId, sessionId };
 
+  // Rate limit (TPM §3.3): answered without the agent; the trace row still counts the request.
+  if (await isRateLimited(supabase, access.userId)) {
+    await trace.save(supabase, meta);
+    const messageId = sessionId ? await saveReply(supabase, sessionId, RATE_LIMIT_REPLY, { trace_id: trace.id }) : null;
+    return { reply: RATE_LIMIT_REPLY, allowedToolCount: access.allowedTools.length, traceId: trace.id, messageId, actions: [] };
+  }
+
   try {
+    let agentError: unknown = null;
     const reply = await answerQuery(
       request.message,
       { supabase, userId: access.userId, organizationId: access.organizationId },
@@ -97,8 +112,14 @@ export async function handleQuery(
         drafts,
         models: options.models,
       }
-    );
-    await trace.save(supabase, meta);
+    ).catch((err: unknown) => {
+      // The agent's own failure: answer politely and keep no half-made drafts. Failures before
+      // this point (sign-in, membership) still fail the request.
+      agentError = err;
+      drafts.length = 0;
+      return AGENT_FAILURE_REPLY;
+    });
+    await trace.save(supabase, agentError ? { ...meta, error: agentError } : meta);
     const actions = await createActions(supabase, drafts, meta);
     // action_ids marks a reply that introduced drafts — its text is left out of later model
     // history (memory.ts toModelHistory) because the model imitates it instead of calling tools.
