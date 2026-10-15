@@ -16,10 +16,10 @@ interface QueryChatProps {
 const WELCOME_MESSAGE = `你好！我是 **Query**，你的 ERP 智慧助理 🐟
 
 我可以幫你：
-- 查詢客戶、訂單和產品資訊
-- 檢查庫存狀況和低庫存警示
-- 查看採購單和出貨記錄
-- 了解合作工廠資訊
+- 建立客戶、訂單和產品資訊
+- 查詢低庫存警示
+- 建立採購單和出貨記錄
+- 查詢客戶或合作工廠資訊
 
 有什麼需要幫忙的嗎？`;
 
@@ -171,7 +171,7 @@ export function QueryChat({ onClose, fullScreen = false }: QueryChatProps) {
       {/* Suggestions (shown when no messages) */}
       {messages.length === 0 && (
         <div className="px-4 pb-3 bg-gray-50/80 flex flex-wrap gap-2 shrink-0">
-          {['查詢所有客戶', '庫存低於門檻的產品', '最新的採購單'].map((s) => (
+          {['幫我新增一張訂單', '查詢低庫存的產品', '查詢工廠或客戶資料'].map((s) => (
             <button
               key={s}
               onClick={() => { sendMessage(s); }}
