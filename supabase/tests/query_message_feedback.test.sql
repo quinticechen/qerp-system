@@ -15,7 +15,7 @@ begin
   values (v_session, 'assistant', '回覆', '{"trace_id": "t1"}') returning id into v_reply;
 
   v_result := pg_temp.call_as(v_user, format('select public.set_query_message_feedback(%L, %L)', v_reply, 'down'));
-  perform pg_temp.check(v_result->'feedback'->>'value' = 'down', 'thumbs down is stored, got ' || v_result);
+  perform pg_temp.check(v_result->'feedback'->>'value' = 'down', 'thumbs down is stored, got ' || v_result::text);
   perform pg_temp.check(v_result->>'trace_id' = 't1', 'the rest of metadata is kept');
 
   v_result := pg_temp.call_as(v_user, format('select public.set_query_message_feedback(%L, %L)', v_reply, 'up'));
