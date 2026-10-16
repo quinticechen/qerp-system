@@ -3,6 +3,7 @@ import { authGuard } from "./auth-guard.js";
 import { answerQuery } from "./answer.js";
 import { isRateLimited, RATE_LIMIT_REPLY } from "./input-guard.js";
 import { TraceRecorder } from "./trace.js";
+import { traceQuery, type QueryTraceHandle } from "./langfuse.js";
 import { EntityCollector, combineObservers, entitiesFromHistory, loadHistory, toModelHistory, type StoredMessage } from "./memory.js";
 import type { GatewayModel } from "./ai-gateway.js";
 import { createActions, addActionCards, type PersistedAction } from "./actions.js";
@@ -87,6 +88,23 @@ export async function handleQuery(
     : request.history ?? [];
 
   const trace = new TraceRecorder();
+  const meta = { userId: access.userId, organizationId: access.organizationId, sessionId };
+  // One Langfuse trace per request, its id derived from query_traces.id (langfuse.ts).
+  return traceQuery({ id: trace.id, ...meta, input: request.message }, (lf) =>
+    answerAndSave(supabase, request, access, sessionId, stored, trace, lf, options)
+  );
+}
+
+async function answerAndSave(
+  supabase: SupabaseClient,
+  request: QueryRequest,
+  access: Awaited<ReturnType<typeof authGuard>>,
+  sessionId: string | null,
+  stored: StoredMessage[],
+  trace: TraceRecorder,
+  lf: QueryTraceHandle,
+  options: { models?: GatewayModel[] }
+): Promise<QueryResponse> {
   const entities = new EntityCollector();
   const drafts: Draft[] = [];
   const meta = { userId: access.userId, organizationId: access.organizationId, sessionId };
@@ -94,6 +112,7 @@ export async function handleQuery(
   // Rate limit (TPM §3.3): answered without the agent; the trace row still counts the request.
   if (await isRateLimited(supabase, access.userId)) {
     await trace.save(supabase, meta);
+    lf.end({ output: RATE_LIMIT_REPLY, degraded: false, metadata: { rate_limited: true } });
     const messageId = sessionId ? await saveReply(supabase, sessionId, RATE_LIMIT_REPLY, { trace_id: trace.id }) : null;
     return { reply: RATE_LIMIT_REPLY, allowedToolCount: access.allowedTools.length, traceId: trace.id, messageId, actions: [] };
   }
@@ -121,6 +140,12 @@ export async function handleQuery(
     });
     await trace.save(supabase, agentError ? { ...meta, error: agentError } : meta);
     const actions = await createActions(supabase, drafts, meta);
+    lf.end({
+      output: reply,
+      degraded: trace.degraded,
+      error: agentError ?? undefined,
+      metadata: { ...trace.summary(), drafts: drafts.map((d) => d.tool) },
+    });
     // action_ids marks a reply that introduced drafts — its text is left out of later model
     // history (memory.ts toModelHistory) because the model imitates it instead of calling tools.
     const messageId = sessionId

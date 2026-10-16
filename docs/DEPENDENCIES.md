@@ -1,6 +1,6 @@
 # 相依性
 
-> 現況文件（2026-10-09）。版本以 `package.json` 為準；新增或移除套件時更新本文件。
+> 現況文件（2026-10-16）。版本以 `package.json` 為準；新增或移除套件時更新本文件。
 
 ## 1. 前端（`package.json`）
 
@@ -21,6 +21,7 @@
 |------|------|
 | HTTP | `express`（5） |
 | 模型 | `ai`（Vercel AI SDK 4）、`@openrouter/ai-sdk-provider` |
+| Langfuse | `@langfuse/client`、`@langfuse/tracing`、`@langfuse/otel`（6.0.0，版本固定）；OpenTelemetry：`@opentelemetry/api`、`@opentelemetry/sdk-node`、`@opentelemetry/sdk-trace-base`、`@opentelemetry/core`、`@opentelemetry/exporter-trace-otlp-http`、`@opentelemetry/otlp-exporter-base`（版本固定）。需要 Node 22 以上 |
 | MCP | `@modelcontextprotocol/sdk` |
 | 資料 | `@supabase/supabase-js`、`zod` |
 
@@ -28,5 +29,5 @@
 
 ## 3. 外部依賴
 
-- 前端依賴 Supabase 與 AI 伺服器；AI 伺服器依賴 Supabase 與 OpenRouter（[SERVICES.md](./SERVICES.md)）。
+- 前端依賴 Supabase 與 AI 伺服器；AI 伺服器依賴 Supabase 與 OpenRouter，Langfuse 為選用（讀不到 prompt 或送不出 trace 都不影響回覆）（[SERVICES.md](./SERVICES.md)）。
 - 業務 API 的參數與錯誤代碼是前端與 AI tools 共同依賴的契約（[API.md](./API.md)、[SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4）。

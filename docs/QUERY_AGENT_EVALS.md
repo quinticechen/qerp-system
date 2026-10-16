@@ -1,8 +1,8 @@
 # Query Agent Eval：執行、指標與實驗紀錄
 
-> 2026-10-14 起適用（評分改為看結果，案例改由 Langfuse Dataset 提供）。設計與決策見 [requirements/QUERY_AGENT_EVAL_REDESIGN.md](./requirements/QUERY_AGENT_EVAL_REDESIGN.md)；情境類別見 [QUERY_AGENT_PHASE1.md](./requirements/QUERY_AGENT_PHASE1.md) §4.2；回覆政策見 [QUERY_AGENT_TPM_ALIGNMENT.md](./requirements/QUERY_AGENT_TPM_ALIGNMENT.md) §3.4；P0-7 的架構比較見 [QUERY_AGENT_ARCHITECTURE_EVAL.md](./requirements/QUERY_AGENT_ARCHITECTURE_EVAL.md)。
+> 2026-10-14 起適用（評分改為看結果，案例改由 Langfuse Dataset 提供）；2026-10-16 起以 Langfuse 官方 SDK 執行（[QUERY_AGENT_LANGFUSE.md](./requirements/QUERY_AGENT_LANGFUSE.md)）。設計與決策見 [requirements/QUERY_AGENT_EVAL_REDESIGN.md](./requirements/QUERY_AGENT_EVAL_REDESIGN.md)；情境類別見 [QUERY_AGENT_PHASE1.md](./requirements/QUERY_AGENT_PHASE1.md) §4.2；回覆政策見 [QUERY_AGENT_TPM_ALIGNMENT.md](./requirements/QUERY_AGENT_TPM_ALIGNMENT.md) §3.4；P0-7 的架構比較見 [QUERY_AGENT_ARCHITECTURE_EVAL.md](./requirements/QUERY_AGENT_ARCHITECTURE_EVAL.md)。
 
-每次修改 Agent（system prompt、模型、架構、tools、權限）都跑一次 eval。結果會存在本機報告，同時上傳到 Langfuse 供比較；全部案例的執行會在 §5 加一列，由 TPM 填寫決定。
+每次修改 Agent（system prompt、模型、架構、tools、權限）都跑一次 eval。每次執行是 Langfuse 的一次 experiment（SDK 的 experiment runner，trace 與分數在執行時送出），同時存一份本機報告；全部案例的執行會在 §5 加一列，由 TPM 填寫決定。
 
 ## 1. 執行
 
@@ -18,7 +18,7 @@ bun run eval -- --filter order- --runs 1                              # 只跑�
 
 1. **讀取案例**：從 Langfuse Dataset `query-agent` 讀取（只讀，eval 不會修改 Dataset）。每個案例都必須符合需求文件 §3 的格式，否則列出所有問題並停止。用到的案例存成快照 `evals/snapshots/<時間>-<hash>.json`，內容沒變時沿用同一份。
 2. **資料庫一致性檢查**（`evals/db-check.ts`）：用測試帳號確認假資料、工具查詢的欄位、`fake-api.ts` 模擬的 API 參數、狀態值、`roles.json` 都與目前的資料庫一致，錯誤代碼都寫在 [API.md](./API.md) §3。只送 `limit=0` 的查詢與參數探測，不讀取資料、不執行任何函式。有不一致就列出並停止。
-3. **執行與評分**：呼叫真的模型，資料層為記憶體中的假資料（`evals/fake-supabase.ts`、`evals/fake-api.ts`）。
+3. **執行與評分**：呼叫真的模型，資料層為記憶體中的假資料（`evals/fake-supabase.ts`、`evals/fake-api.ts`）。設定了 Langfuse 時以 `evals/experiment.ts` 執行：先建立缺少的 score config（§3），每個案例的各次執行依序在同一個 trace 中，案例之間並行（`--concurrency`，預設 4）。
 
 | 參數 | 說明 |
 |------|------|
@@ -29,7 +29,7 @@ bun run eval -- --filter order- --runs 1                              # 只跑�
 | `--snapshot <檔案>` | 使用指定的快照 |
 | `--skip-db-check` | 略過資料庫一致性檢查；這次執行不會寫入 §5，也不會被當成基準 |
 | `--compare <報告 ID>` | 指定比較基準。預設為「同架構、各節點主模型相同」的最近一次完整、通過一致性檢查的執行；找不到時用最近一次這樣的執行。2026-10-14 以前的報告格式不同，不會被當成基準 |
-| `--no-langfuse` | 不上傳結果 |
+| `--no-langfuse` | 只在本機執行，不建立 Langfuse experiment（之後可用 `bun run eval:upload` 上傳報告） |
 | `--no-judge` | 不執行 LLM 評分（§2.1） |
 | `--prompt-label <標籤>` | 使用 Langfuse 上該標籤的 prompt（例如 `candidate`）；預設用程式裡的 prompt。讀不到時直接失敗，報告記錄每個 prompt 的版本。上線流程見需求文件 §5.2 |
 | `--runs`、`--min-pass` | 每案執行次數（預設 3）、案例通過門檻（預設 66%，即 3 次中 2 次） |
@@ -38,8 +38,8 @@ bun run eval -- --filter order- --runs 1                              # 只跑�
 
 **輸出**
 
-- 終端機：各項指標、門檻是否通過、與基準相比退步（✅ → ❌）和修好的案例、Langfuse 連結
-- `mcp-server/evals/reports/<報告 ID>.md`／`.json`：本機報告（JSON 不含模型的輸入輸出，避免檔案過大；完整內容在 Langfuse）
+- 終端機：各項指標、門檻是否通過、與基準相比退步（✅ → ❌）和修好的案例、Langfuse experiment 的連結
+- `mcp-server/evals/reports/<報告 ID>.md`／`.json`：本機報告（JSON 不含模型的輸入輸出，避免檔案過大；完整內容在 Langfuse）。JSON 的 `langfuse.runs` 記錄每次執行在 Langfuse 的 trace 與 observation，供標註佇列使用（§3.2）
 - Langfuse：見 §3
 - 本文件 §5：新增一列（只有完整、通過一致性檢查的執行）
 
@@ -97,17 +97,42 @@ Router 分派正確率（原門檻 ≥ 95%）改為診斷指標，不再是門�
 | Langfuse 中的位置 | 內容 |
 |-------------------|------|
 | Dataset `query-agent` | **案例的來源**：在這裡新增、修改、封存案例（格式見需求文件 §3）。每次修改都會產生新的版本 |
-| Experiment | 一次 eval 執行，名稱為報告 ID；metadata 有架構、各節點模型、hash、git commit、Dataset 版本與快照 |
-| Experiment 中的每一列 | 一個案例的 trace（連到對應的 Dataset item）：底下有每次執行 → 每個節點的模型嘗試 → 每次模型呼叫（generation，含模型、token、花費、上游 provider、輸入輸出）與 tool 呼叫 |
-| 分數 | `pass_rate`（通過的執行比例，評語列出沒通過的規則與結果檢查）、`rules`、`outcome`（政策未定義的案例沒有）、`policy_judge`（LLM 評分的平均，評語為各次的理由）、`passed`（是否達案例通過門檻；🚧 案例沒有） |
+| Experiment `query-agent` 的一次 run | 一次 eval 執行，run 名稱為報告 ID、說明為 `--label`；metadata 有架構、各節點模型、hash、git commit、prompt 版本、Dataset 版本與快照 |
+| run 中的每一列 | 一個案例的 trace（連到對應的 Dataset item）：底下的 `run 1`、`run 2`… 是每次執行（輸入為情境、政策與對話，輸出為回覆與草稿），其下是 AI SDK 記錄的每個節點（`router`、`agent:<群組>`、`judge`）、每次模型呼叫（generation：模型、token、輸入輸出）與 tool 呼叫。以 `--prompt-label` 執行時，generation 連到產生它的 prompt 版本（Prompts 頁可看每個版本的使用量與分數） |
+| 分數（每個案例） | `pass_rate`（通過的執行比例，評語列出沒通過的規則與結果檢查）、`rules`、`outcome`（政策未定義的案例沒有）、`latency_ms`（平均延遲）、`policy_judge`（程式內 LLM 評分的平均，評語為各次的理由）、`passed`（是否達案例通過門檻；🚧 案例沒有） |
+| 分數（整次 run） | `task_completion`（任務完成率）、`gates_passed`（§2.3 的門檻是否全部通過，評語列出未通過的門檻） |
+| Score config | 每個分數都帶 config（`evals/experiment.ts` 的 `SCORE_CONFIGS`，eval 執行時自動建立缺少的）：上述各項，以及人工標註與 LLM 評審用的 `policy-compliance`（符合／部分符合／不符合）、使用者回饋 `user-feedback` |
 
 **比較兩次執行**：在 Experiments 頁勾選兩個以上的執行，即可逐案並排比較分數、花費與延遲。
 
-eval 的 trace 環境為 `sdk-experiment`，與之後正式環境的 trace 分開篩選。
+eval 的 trace 環境為 `sdk-experiment`，正式環境的 trace 為 `production`（本機開發為 `development`），分開篩選。
+
+**花費**：本機報告的花費取自 OpenRouter 回傳的實際金額；Langfuse 的花費依它的模型價格表計算，表中沒有的模型（例如 OpenRouter 的 `anthropic/claude-haiku-4.5`）沒有花費，需要時在 Langfuse → Settings → Models 新增。
 
 **要記錄的看法**：對單一案例的看法寫在該案例 trace 的留言（Langfuse 的留言只能加在 trace 或 observation 上，不能加在整個 experiment 上）；對整次執行的決定寫在本文件 §5。
 
-**重新上傳報告**：`bun run eval:upload -- <報告檔>`（或 `--all`）。只上傳 2026-10-14 以後的報告；案例內容取自報告記錄的快照。
+**上傳本機的報告**：以 `--no-langfuse` 執行的報告可用 `bun run eval:upload -- <報告檔>`（或 `--all`）上傳（`evals/langfuse.ts`，以 OTLP 直接上傳，結構與 SDK 的 experiment 相同，但沒有 prompt 連結與 score config）。只上傳 2026-10-14 以後的報告；案例內容取自報告記錄的快照。
+
+### 3.1 在 GitHub 手動執行
+
+GitHub → Actions → **Query Agent Eval** → Run workflow（`.github/workflows/query-agent-eval.yml`）。只手動觸發，不擋合併。輸入：名稱（`--label`）、prompt 標籤（填 `code` 用程式內建的 prompt）、每案執行次數、篩選。先跑 `npm run test`，再跑 eval；報告、快照與終端機輸出存為這次執行的 artifact，§5 的紀錄不會寫回 repo（需要時手動補上）。
+
+需要的 repository secrets：`OPENROUTER_API_KEY`、`LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL`、`SUPABASE_URL`、`SUPABASE_ANON_KEY`、`VERIFY_EMAIL`、`VERIFY_PASSWORD`。
+
+### 3.2 LLM 評審的校準
+
+目標：讓 Langfuse 管理的 LLM 評審（LLM-as-a-Judge）判斷回覆是否符合回覆政策，與人工標註約 85% 一致（整體與各情境類別）後才啟用。校準完成前，eval 的 `policy_judge`（`evals/judge.ts`）只記錄、不計入門檻。在 `mcp-server/` 執行（`evals/judge-calibration.ts`）：
+
+| 步驟 | 指令或位置 | 內容 |
+|------|-----------|------|
+| 1 | `bun run judge -- prompt` | 評審 prompt 存到 Prompt Management：`judge-calibration/policy-compliance`（標籤 `candidate`）。變數 `{{input}}`（情境、政策與對話）與 `{{output}}`（回覆與草稿）對應每次執行的 observation |
+| 2 | `bun run judge -- queue [--report <報告 ID>]` | 從最近一次完整的 experiment 挑約 50 次執行（分散到各情境類別，通過與未通過交錯），放入標註佇列 `policy-calibration` |
+| 3 | Langfuse → Annotation Queues → `policy-calibration` | 人工標註 `policy-compliance`：符合／部分符合／不符合，可加評語 |
+| 4 | `bun run judge -- dataset` | 把標註轉成資料集 `judge-calibration/policy-compliance`（期望輸出為人工的評分；重新標註會更新同一筆） |
+| 5 | `bun run judge -- run [--label candidate]` | 以評審 prompt 跑一次 experiment（`policy-compliance-judge`），每筆的 `policy-compliance-judge-output-correct` 為評審與人工是否一致；終端機列出整體與各類別的一致率 |
+| 6 | Langfuse → Evaluators | 一致後由使用者在 Langfuse 建立 LLM-as-a-Judge 評分器：使用這個 prompt、分數 `policy-compliance`，套用到 eval（`sdk-experiment`）與正式環境（`production`）的 observation。需要先在 Settings → LLM Connections 建立連線 |
+
+不一致時修改 `evals/judge-calibration.ts` 的 `JUDGE_PROMPT`，重複步驟 1、5。
 
 ## 4. 比較不同設定
 
@@ -144,3 +169,4 @@ eval 的 trace 環境為 `sdk-experiment`，與之後正式環境的 trace 分�
 | `20261015T0047-phase1-agent-fixes-2` | router；router、commercial、supply_chain、warehouse、catalog、facilities: gemini-2.5-flash-lite | 87% | US$0.00084 | 16.2s | ❌ 不可違反的規則、寫入類案例（應產生草稿） | `pp-inventory`、`q-inventory-search`、`q-no-id-leak`、`real-inventory-08`、`real-order-04`、`real-product-03`、`real-purchase-07` |  |
 | `20261015T0106-search-and-prompt-fixes` | router；router、commercial、supply_chain、warehouse、catalog、facilities: gemini-2.5-flash-lite | 84% | US$0.00086 | 16.1s | ❌ 整體任務完成率、寫入類案例（應產生草稿） | `pp-multi-turn-answer`、`r-entity-memory`、`r-multi-turn-order`、`real-cross-02`、`real-order-01`、`real-purchase-05`、`real-receiving-01`、`real-receiving-04`、`real-receiving-05` |  |
 | `20261015T0119-v1-prompts-current-tools` | router；router、commercial、supply_chain、warehouse、catalog、facilities: gemini-2.5-flash-lite | 83% | US$0.00078 | 15.4s | ❌ 整體任務完成率、不可違反的規則、寫入類案例（應產生草稿） | `pp-unpaid`、`real-customer-03`、`real-customer-04`、`real-inventory-06`、`real-product-01`、`real-purchase-09`、`real-receiving-07`、`real-shelf-01` |  |
+| `20261016T0455-sdk-baseline` | router；router、commercial、supply_chain、warehouse、catalog、facilities: gemini-2.5-flash-lite | 85% | US$0.00058 | 14.8s | ❌ 整體任務完成率、不可違反的規則、寫入類案例（應產生草稿） | `real-other-01`、`real-product-03`、`real-purchase-07`、`real-receiving-01` |  |

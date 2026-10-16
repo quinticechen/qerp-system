@@ -1,7 +1,7 @@
 import { ToolName, AgentGroup, TOOL_GROUPS, GROUP_LABELS, ROUTABLE_GROUPS, filterByGroup } from "./permissions.js";
 import type { Draft, ToolContext } from "../tools/types.js";
 import { createAgentTools } from "./tool-registry.js";
-import { PROMPT_NAMES, systemPrompt } from "./prompts.js";
+import { PROMPT_NAMES, systemPrompt, type PromptLink } from "./prompts.js";
 import { aiGenerateText, unavailableToolReply } from "./ai-gateway.js";
 import { getAllTools } from "../tools/index.js";
 import { entityNote } from "./memory.js";
@@ -214,6 +214,8 @@ interface AgentSpec {
   /** Observer / trace label: the group, or "all" for the single agent. */
   label: string;
   system: string;
+  /** The Langfuse prompt version behind `system`, linked to the agent's generations. */
+  prompt?: PromptLink;
   tools: ToolName[];
   /** Every tool the user may use, including other groups'. */
   permitted: readonly ToolName[];
@@ -257,6 +259,7 @@ async function runAgent(spec: AgentSpec, task: string, ctx: ToolContext, history
   } as any, {
     ...run,
     phase: `agent:${spec.label}`,
+    prompt: spec.prompt,
     unavailableToolReply: (toolName: string) => replyForUnavailableTool(spec.permitted, toolName),
     onAttemptFailed: () => { drafts = []; },
     // A reply that points to a confirmation card when none was drafted would mislead the user.
@@ -287,7 +290,7 @@ export async function runSubAgent(
   // The base prompt is read once per request (prompts.ts); fallback attempts reuse it.
   const base = await systemPrompt(PROMPT_NAMES.agent(group), AGENT_SYSTEM_PROMPTS[group], run);
   return runAgent(
-    { label: group, system: base + permissionNote(TOOL_GROUPS[group], groupTools) + note, tools: groupTools, permitted: allowedTools },
+    { label: group, system: base.text + permissionNote(TOOL_GROUPS[group], groupTools) + note, prompt: base.link, tools: groupTools, permitted: allowedTools },
     task, ctx, history, run
   );
 }
@@ -304,7 +307,7 @@ export async function runSingleAgent(
   const scope = [...new Set(ROUTABLE_GROUPS.flatMap((g) => TOOL_GROUPS[g]))];
   const base = await systemPrompt(PROMPT_NAMES.single, SINGLE_AGENT_PROMPT, run);
   return runAgent(
-    { label: "all", system: base + permissionNote(scope, allowedTools), tools: allowedTools, permitted: allowedTools },
+    { label: "all", system: base.text + permissionNote(scope, allowedTools), prompt: base.link, tools: allowedTools, permitted: allowedTools },
     message, ctx, history, run
   );
 }

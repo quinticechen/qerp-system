@@ -1,6 +1,6 @@
 /**
- * System prompts from Langfuse with the in-code fallback (src/agent/prompts.ts). fetch is stubbed —
- * no network.
+ * System prompts from Langfuse (through the SDK) with the in-code fallback (src/agent/prompts.ts).
+ * fetch is stubbed — no network.
  * Run: bun run test
  */
 
@@ -21,7 +21,11 @@ function serve(handler: (url: string) => Response | Promise<Response>) {
     return handler(url);
   }) as typeof fetch;
 }
-const prompt = (text: string, version: number) => new Response(JSON.stringify({ type: "text", prompt: text, version }), { status: 200 });
+const prompt = (text: string, version: number) =>
+  new Response(JSON.stringify({ name: "p", type: "text", prompt: text, version, labels: ["production"], tags: [], config: {} }), {
+    status: 200, headers: { "Content-Type": "application/json" },
+  });
+const text = async (...args: Parameters<typeof systemPrompt>) => (await systemPrompt(...args)).text;
 
 function recorder() {
   const seen: Record<string, PromptSource> = {};
@@ -47,7 +51,7 @@ test("without Langfuse configured, the in-code prompt is used", async () => {
   delete process.env.LANGFUSE_PUBLIC_KEY;
   serve(() => prompt("遠端", 1));
   const { seen, run } = recorder();
-  assert.equal(await systemPrompt("query-router", "程式內建", run), "程式內建");
+  assert.equal(await text("query-router", "程式內建", run), "程式內建");
   assert.deepEqual(seen, { "query-router": "code" });
   assert.equal(requests.length, 0);
 });
@@ -55,18 +59,20 @@ test("without Langfuse configured, the in-code prompt is used", async () => {
 test("production reads the `production` label once a minute and reports the version", async () => {
   serve(() => prompt("遠端第 3 版", 3));
   const { seen, run } = recorder();
-  assert.equal(await systemPrompt("query-agent-commercial", "程式內建", run), "遠端第 3 版");
-  assert.equal(await systemPrompt("query-agent-commercial", "程式內建", run), "遠端第 3 版");
+  assert.equal(await text("query-agent-commercial", "程式內建", run), "遠端第 3 版");
+  assert.equal(await text("query-agent-commercial", "程式內建", run), "遠端第 3 版");
   assert.equal(requests.length, 1, "cached");
   assert.match(requests[0], /\/api\/public\/v2\/prompts\/query-agent-commercial\?label=production$/);
+  assert.deepEqual((await systemPrompt("query-agent-commercial", "程式內建")).link, { name: "query-agent-commercial", version: 3 }, "linked to generations");
   assert.deepEqual(seen, { "query-agent-commercial": { label: "production", version: 3 } });
 });
 
 test("when Langfuse is down, production falls back to the in-code prompt", async () => {
   serve(() => new Response("oops", { status: 503 }));
   const { seen, run } = recorder();
-  assert.equal(await systemPrompt("query-router", "程式內建", run), "程式內建");
+  assert.equal(await text("query-router", "程式內建", run), "程式內建");
   assert.deepEqual(seen, { "query-router": "code" });
+  assert.equal((await systemPrompt("query-router", "程式內建")).link, undefined, "the in-code text is never linked");
 });
 
 test("an eval that asks for a label fails instead of silently using the in-code prompt", async () => {
@@ -74,12 +80,12 @@ test("an eval that asks for a label fails instead of silently using the in-code 
   setPromptLabel("candidate");
   await assert.rejects(systemPrompt("query-router", "程式內建"), /query-router@candidate/);
   setPromptLabel(null);
-  assert.equal(await systemPrompt("query-router", "程式內建"), "程式內建", "evals default to the in-code prompt");
+  assert.equal(await text("query-router", "程式內建"), "程式內建", "evals default to the in-code prompt");
 });
 
 test("QUERY_PROMPT_LABEL=code keeps a developer's server on the in-code prompts", async () => {
   process.env.QUERY_PROMPT_LABEL = "code";
   serve(() => prompt("遠端", 1));
-  assert.equal(await systemPrompt("query-router", "程式內建"), "程式內建");
+  assert.equal(await text("query-router", "程式內建"), "程式內建");
   assert.equal(requests.length, 0);
 });

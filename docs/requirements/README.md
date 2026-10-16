@@ -26,6 +26,7 @@
 | [QUERY_AGENT_ARCHITECTURE_EVAL.md](./QUERY_AGENT_ARCHITECTURE_EVAL.md) | Router 與單一 Agent 的架構比較（P0-7） | AI Session | 已完成（2026-10-07） |
 | [QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md) | Query Agent Phase 1：API 包成工具、eval 案例分類、子 Agent 分組 | AI Session | 進行中 |
 | [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) | TPM 定義：商業價值、使用者流程、Guardrail、回覆政策、Eval 方法 | TPM／AI Session | 進行中 |
+| [QUERY_AGENT_LANGFUSE.md](./QUERY_AGENT_LANGFUSE.md) | Query Agent：官方 SDK、正式環境 tracing、讚／倒讚、Langfuse 管理的 LLM 評審、手動觸發的 CI | AI Session | 進行中（2026-10-16） |
 | [QUERY_UI_LAYOUT_AND_RECORD_NAV.md](./QUERY_UI_LAYOUT_AND_RECORD_NAV.md) | Query：確認後打開寫入的紀錄；電腦版的浮動、側邊欄、全螢幕 | AI Session | 已完成（2026-10-15） |
 | [QUERY_AGENT_EVAL_REDESIGN.md](./QUERY_AGENT_EVAL_REDESIGN.md) | Query Agent eval 重新設計：看結果評分、案例與 prompt 移到 Langfuse、LLM 評分 | AI Session | 進行中（步驟 1–4 完成，2026-10-14） |
 | [QUERY_AGENT_EVAL_UTTERANCES.md](./QUERY_AGENT_EVAL_UTTERANCES.md) | 真實語句收集表（TPM 填寫，轉為 eval 案例） | TPM | 已填寫並轉為案例（2026-10-14） |

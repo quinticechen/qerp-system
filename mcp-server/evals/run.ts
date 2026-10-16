@@ -13,9 +13,12 @@
  *   bun run eval -- --snapshot <file>                  # a given snapshot
  *   bun run eval -- --compare <report id>              # baseline (default: latest comparable full run)
  *   bun run eval -- --skip-db-check                    # don't check the fake data against the database
- *   bun run eval -- --no-langfuse                      # don't upload the results
+ *   bun run eval -- --no-langfuse                      # run locally only, no Langfuse experiment
  *   bun run eval -- --no-judge                         # skip the LLM judge (evals/judge.ts)
  *   bun run eval -- --prompt-label candidate           # Langfuse prompts with that label (default: in-code prompts)
+ *
+ * With Langfuse configured the run is a Langfuse experiment on the dataset (evals/experiment.ts):
+ * traces, generations and scores go to Langfuse as it runs, and the report stays local as well.
  *
  * Before any model is called: every case must parse (evals/cases.ts) and the fake data must match
  * the database (evals/db-check.ts). Exit code is 1 when either fails, when a scored case's pass
@@ -42,12 +45,13 @@ import { checkDatabase } from "./db-check.js";
 import { fakeApiParams } from "./fake-api.js";
 import { createFakeSupabase, type FakeAccess, type Tables } from "./fake-supabase.js";
 import { buildManifest, codePromptTexts, type PromptSet } from "./manifest.js";
-import { fetchPrompt, setPromptLabel } from "../src/agent/prompts.js";
+import { setPromptLabel, systemPrompt } from "../src/agent/prompts.js";
+import { flushTracing, langfuseClient, shutdownTracing, startTracing } from "../src/agent/langfuse.js";
 import {
   buildMarkdown, caseStatuses, compareReports, computeMetrics, evaluateGates, findBaseline, gateRequirement, gateValue,
-  loadReport, logRow, type CaseInfo, type EvalReport, type RunAttempt, type RunResult, type RunStep,
+  loadReport, logRow, type CaseInfo, type EvalReport, type LangfuseRunRef, type RunAttempt, type RunResult, type RunStep,
 } from "./report.js";
-import { uploadReport } from "./langfuse.js";
+import { ensureScoreConfigs, runExperiment, type RunInSpan } from "./experiment.js";
 
 const EVALS_DIR = dirname(fileURLToPath(import.meta.url));
 const REPORTS_DIR = join(EVALS_DIR, "reports");
@@ -184,18 +188,29 @@ async function runOnce(c: EvalCase, run: number, arch: AgentMode, modelPolicy: M
   return { caseId: c.id, run, ...output, routeFromFallback, modelErrors, startedAt, attempts, steps, checks, pass, ...(verdict !== undefined ? { judge: verdict } : {}) };
 }
 
-async function runPool<T>(tasks: (() => Promise<T>)[], concurrency: number, onDone: (r: T) => void): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
+/** A case's runs, one after another; in an experiment each run is a span of the case's trace. */
+async function runCase(c: EvalCase, opts: ReturnType<typeof parseArgs>, runInSpan: RunInSpan): Promise<RunResult[]> {
+  const results: RunResult[] = [];
+  for (let run = 1; run <= opts.runs; run++) {
+    const r = await runInSpan(run, () => runOnce(c, run, opts.arch, opts.policy, opts.judge));
+    process.stdout.write(r.pass ? "." : "F");
+    results.push(r);
+  }
+  return results;
+}
+
+/** Without Langfuse: the same cases and runs, locally. */
+async function runLocally(cases: EvalCase[], opts: ReturnType<typeof parseArgs>): Promise<RunResult[]> {
+  const byCase: RunResult[][] = new Array(cases.length);
   let next = 0;
-  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
-    while (next < tasks.length) {
+  const workers = Array.from({ length: Math.min(opts.concurrency, cases.length) }, async () => {
+    while (next < cases.length) {
       const i = next++;
-      results[i] = await tasks[i]();
-      onDone(results[i]);
+      byCase[i] = await runCase(cases[i], opts, (_run, fn) => fn());
     }
   });
   await Promise.all(workers);
-  return results;
+  return byCase.flat();
 }
 
 /** The report as saved to disk: model inputs and outputs stay in Langfuse only, to keep reports small. */
@@ -222,6 +237,7 @@ async function main() {
   const opts = parseArgs();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is required (run via `bun run eval`, which loads .env)");
 
+  const useLangfuse = opts.langfuse && langfuseConfigured();
   const { cases: allCases, dataset } = await loadCases(opts);
   const cases = opts.filter ? allCases.filter((c) => c.id.includes(opts.filter!)) : allCases;
   if (!cases.length) throw new Error(opts.filter ? `No eval cases match filter "${opts.filter}"` : `Dataset「${dataset.name}」沒有案例`);
@@ -256,7 +272,7 @@ async function main() {
   let promptSet: PromptSet | undefined;
   if (opts.promptLabel) {
     const names = Object.keys(codePromptTexts());
-    const fetched = await Promise.all(names.map((n) => fetchPrompt(n, opts.promptLabel!)));
+    const fetched = (await Promise.all(names.map((n) => systemPrompt(n, "")))).map((p) => ({ text: p.text, version: p.link!.version }));
     promptSet = {
       label: opts.promptLabel,
       versions: Object.fromEntries(names.map((n, i) => [n, fetched[i].version])),
@@ -266,21 +282,47 @@ async function main() {
   }
   const manifest = buildManifest(opts.arch, opts.policy, cases, EVALS_DIR, promptSet);
   const createdAt = new Date().toISOString();
+  const id = `${createdAt.replace(/[-:]/g, "").slice(0, 13)}-${opts.label}`;
+  const caseInfos = cases.map(caseInfo);
   console.log(`Running ${cases.length} cases × ${opts.runs} runs (arch ${opts.arch}, concurrency ${opts.concurrency})…`);
   for (const [phase, ids] of Object.entries(manifest.models)) console.log(`  ${phase}: ${ids.join(" → ")}`);
   console.log(opts.judge ? `  LLM 評分：${JUDGE_MODEL}（只記錄，不計入門檻）` : "  LLM 評分：略過");
-  const tasks = cases.flatMap((c) => Array.from({ length: opts.runs }, (_, i) => () => runOnce(c, i + 1, opts.arch, opts.policy, opts.judge)));
-  const results = await runPool(tasks, opts.concurrency, (r) => process.stdout.write(r.pass ? "." : "F"));
+
+  let results: RunResult[];
+  let experimentUrl: string | undefined;
+  let langfuseRuns: Record<string, LangfuseRunRef> | undefined;
+  if (useLangfuse) {
+    // Experiment traces are fake data: every one is sent, unmasked.
+    startTracing({ environment: "sdk-experiment", sampleRate: 1, mask: false });
+    const langfuse = langfuseClient();
+    const [configIds, langfuseDataset] = await Promise.all([ensureScoreConfigs(langfuse), langfuse.api.datasets.get(DATASET_NAME)]);
+    const { arch, models, hashes, git, prompts } = manifest;
+    ({ results, url: experimentUrl, runs: langfuseRuns } = await runExperiment({
+      langfuse, runName: id, description: opts.label,
+      metadata: { label: opts.label, arch, models, hashes, git, prompts, dataset, ...(opts.filter ? { filter: opts.filter } : {}) },
+      datasetId: langfuseDataset.id, ...(dataset.version ? { datasetVersion: dataset.version } : {}),
+      cases, infos: new Map(caseInfos.map((c) => [c.id, c])), configIds, concurrency: opts.concurrency,
+      runCase: (c, runInSpan) => runCase(c, opts, runInSpan),
+      status: (caseId, runs) => caseStatuses({ cases: caseInfos, results: runs, minPass: opts.minPass }).get(caseId),
+      gates: (all) => {
+        const m = computeMetrics(caseInfos, all);
+        return { taskCompletion: m.taskCompletion, gates: evaluateGates(m) };
+      },
+    }));
+    await flushTracing();
+    await shutdownTracing();
+  } else {
+    results = await runLocally(cases, opts);
+  }
   process.stdout.write("\n");
   Object.assign(console, restore);
 
-  const id = `${createdAt.replace(/[-:]/g, "").slice(0, 13)}-${opts.label}`;
-  const caseInfos = cases.map(caseInfo);
   const metrics = computeMetrics(caseInfos, results);
   const report: EvalReport = {
     version: 3, id, label: opts.label, createdAt, ...(opts.filter ? { filter: opts.filter } : {}),
     runs: opts.runs, minPass: opts.minPass, manifest, dataset, dbCheck: opts.dbCheck ? "passed" : "skipped",
     cases: caseInfos, metrics, gates: evaluateGates(metrics), results,
+    ...(langfuseRuns ? { langfuse: { ...(experimentUrl ? { experimentUrl } : {}), runs: langfuseRuns } } : {}),
   };
 
   const baseline = opts.compare
@@ -305,14 +347,7 @@ async function main() {
   }
   console.log(`報告：${base}.md`);
 
-  if (opts.langfuse && langfuseConfigured()) {
-    try {
-      const url = await uploadReport(report, cases);
-      console.log(`Langfuse：${url}`);
-    } catch (err) {
-      console.log(`Langfuse 上傳失敗（報告已存在本機）：${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
+  if (experimentUrl) console.log(`Langfuse：${experimentUrl}`);
 
   const failing = [...caseStatuses(report)].filter(([, status]) => status === "❌").map(([caseId]) => caseId);
   const failedGates = report.gates.filter((g) => !g.pass);
@@ -321,6 +356,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(err instanceof Error ? err.message : err);
+  // stderr directly: console.error is muted while cases run.
+  process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
   process.exit(1);
 });

@@ -154,6 +154,14 @@ export interface EvalReport {
   metrics: Metrics;
   gates: GateResult[];
   results: RunResult[];
+  /** Set when the run was a Langfuse experiment: its link and each run's span ("<case id>#<run>"). */
+  langfuse?: { experimentUrl?: string; runs: Record<string, LangfuseRunRef> };
+}
+
+/** Where one run lives in Langfuse; annotation queues and the judge calibration point at it. */
+export interface LangfuseRunRef {
+  traceId: string;
+  observationId: string;
 }
 
 interface Gate {

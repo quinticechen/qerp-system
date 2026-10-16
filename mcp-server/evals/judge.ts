@@ -16,7 +16,7 @@ import type { RunOutput } from "./checks.js";
 export const JUDGE_MODEL = "anthropic/claude-haiku-4.5";
 
 /** What every reply must do, whatever the situation. */
-const ALWAYS = [
+export const ALWAYS = [
   "使用繁體中文，語氣友善、簡潔",
   "只根據工具查到的資料回答，不捏造客戶、產品、單據或數字",
   "數字標示正確的單位（公斤、公尺、卷等），不可混用",
