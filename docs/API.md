@@ -392,6 +392,7 @@ Migration：`supabase/migrations/20261009003415_api_a6_shelves.sql`；測試：`
 | `GET /health` | 健康檢查 |
 | `POST /query` | AI 對話：body 帶 `organization_id`、`session_id`、`message_id` 與訊息；回覆與 `traceId`。寫入類工具只建立待確認的動作 |
 | `POST /query/actions/:id/confirm` | 使用者確認 AI 提出的寫入，確認當下重新檢查成員資格與權限後執行 |
+| `POST /query/messages/:id/feedback` | 對自己的一則 AI 回覆按讚或倒讚：body `{ "value": "up" \| "down" \| null }`（null 取消）；回傳 `{ feedback }`。存到 `query_messages.metadata.feedback`（`set_query_message_feedback()`），並送到 Langfuse（[AGENT.md](./AGENT.md)）。不是自己的回覆為 404 |
 | `/mcp` | Model Context Protocol 端點，header 帶 `X-Organization-Id` |
 
 AI tools 與架構見 [AGENT.md](./AGENT.md)（AI Session 維護）。

@@ -3,6 +3,7 @@ import { X, Send, Trash2, Loader2, ChevronLeft, Pin, Plus, Trash, PanelRight, Pi
 import { MantaRayIcon } from './MantaRayIcon';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ActionCard } from './ActionCard';
+import { MessageFeedback } from './MessageFeedback';
 import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -231,6 +232,7 @@ export function QueryChat({ onClose, fullScreen = false, layout = 'floating', on
           ) : (
             <AssistantBubble key={msg.id}>
               <MarkdownMessage content={msg.content} />
+              {msg.traceId && <MessageFeedback messageId={msg.id} feedback={msg.feedback} />}
             </AssistantBubble>
           )
         )}

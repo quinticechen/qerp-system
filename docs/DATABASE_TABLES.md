@@ -83,7 +83,7 @@
 | 資料表 | 筆數 | 用途 |
 |--------|------|------|
 | `query_sessions` | 35 | 使用者與 AI 的對話 |
-| `query_messages` | 74 | 對話中的每則訊息 |
+| `query_messages` | 74 | 對話中的每則訊息；`metadata` 有 `trace_id`、`entities`、確認卡片的 `action_id`，以及使用者的讚／倒讚 `feedback`。沒有 UPDATE policy，`feedback` 只能經 `set_query_message_feedback()`（`private` 實作，只限自己的 AI 回覆；migration `20261016060000_query_message_feedback.sql`）修改 |
 | `query_pending_actions` | 3 | AI 提出、等待使用者確認的寫入動作 |
 | `query_traces` | 16 | 每次 AI 回覆的模型、工具呼叫、耗時（除錯用，只有本人可看） |
 

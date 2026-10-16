@@ -19,8 +19,19 @@ export interface ChatMessage {
   kind: 'text' | 'action';
   /** query_pending_actions.id, for 'action' messages. */
   actionId: string | null;
+  /** query_traces.id of a reply the server saved; only such replies can be rated. */
+  traceId: string | null;
+  /** The user's thumbs up/down on this reply. */
+  feedback: 'up' | 'down' | null;
   content: string;
   timestamp: Date;
+}
+
+/** query_messages.metadata as the server writes it. */
+interface MessageMetadata {
+  action_id?: string;
+  trace_id?: string;
+  feedback?: { value: 'up' | 'down' };
 }
 
 interface QuerySessionRow {
@@ -133,14 +144,19 @@ export function useQueryChat() {
 
   const messages: ChatMessage[] = useMemo(
     () =>
-      rawMessages.map((m) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        kind: m.kind === 'action' ? 'action' : 'text',
-        actionId: (m.metadata as { action_id?: string } | null)?.action_id ?? null,
-        content: m.content,
-        timestamp: new Date(m.created_at),
-      })),
+      rawMessages.map((m) => {
+        const metadata = m.metadata as MessageMetadata | null;
+        return {
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          kind: m.kind === 'action' ? 'action' : 'text',
+          actionId: metadata?.action_id ?? null,
+          traceId: metadata?.trace_id ?? null,
+          feedback: metadata?.feedback?.value ?? null,
+          content: m.content,
+          timestamp: new Date(m.created_at),
+        };
+      }),
     [rawMessages]
   );
 
