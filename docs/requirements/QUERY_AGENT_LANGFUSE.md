@@ -68,7 +68,7 @@
 | 2 | `langfuse.ts`：OpenTelemetry、去個資、尾端抽樣；Agent 開啟 telemetry；prompt 改用 SDK 並連結到 generation | 1 | ✅ 2026-10-16 |
 | 3 | eval 改用 SDK experiment；score config | 2 | ✅ 2026-10-16（score config 已在 Langfuse 建立） |
 | 4 | 讚／倒讚：前端、端點、分數、倒讚補送 | 2 | ✅ 2026-10-16（migration 待使用者套用） |
-| 5 | LLM 評審：score config、標註佇列、校準資料集、評審 prompt、校準 experiment | 3；使用者標註；LLM 連線 | 程式與評審 prompt v1（`candidate`）✅ 2026-10-16；標註佇列待新基準建立後填入；標註與 Langfuse 評分器待使用者 |
+| 5 | LLM 評審：score config、標註佇列、校準資料集、評審 prompt、校準 experiment | 3；使用者標註；LLM 連線 | 程式與評審 prompt v1（`candidate`）✅ 2026-10-16；佇列已填入 50 筆（2026-10-16）；**標註暫停**，等 [QUERY_AGENT_EVAL_REDESIGN.md](./QUERY_AGENT_EVAL_REDESIGN.md) §8 的架構調整後重新填入（2026-10-20） |
 | 6 | GitHub Actions（手動觸發） | 3；GitHub secrets | ✅ 2026-10-16（secrets 待使用者設定） |
 | 7 | 新基準；查清 91% → 83% 的退步（[AGENT.md](../AGENT.md)） | 3 | 新基準 `20261016T0455-sdk-baseline`：85% ✅ 2026-10-16。原因已查清（prompt、案例相同，退步來自工具定義：追問選填欄位、貨架名稱解析、多子 Agent 分派），修正另案處理 |
 | 8 | 更新現況文件 | 2–7 | ✅ 2026-10-16 |

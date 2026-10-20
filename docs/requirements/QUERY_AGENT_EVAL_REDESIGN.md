@@ -1,6 +1,6 @@
 # Query Agent Eval 重新設計
 
-> 狀態：進行中（2026-10-15）：§6 步驟 1–5 完成，步驟 6 的評分器完成（校準待人工標註）。負責：AI Session。
+> 狀態：進行中（2026-10-20）：§6 步驟 1–5 完成，步驟 6 的評分器完成；**人工標註暫停**，先完成 §8 的架構調整（標註時發現，2026-10-20）。負責：AI Session。
 > 現況的 eval 見 [QUERY_AGENT_EVALS.md](../QUERY_AGENT_EVALS.md)；情境類別與期望行為見 [QUERY_AGENT_PHASE1.md](./QUERY_AGENT_PHASE1.md) §4.2；回覆政策見 [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) §3.4。
 > 完成後更新：`QUERY_AGENT_EVALS.md`、[EVALS.md](../EVALS.md)、CLAUDE.md 的「Agent Evals」段落。
 
@@ -183,11 +183,73 @@ PostgREST 的 OpenAPI 說明只開放給 service_role 金鑰，因此改用上�
 | 3 | ✅ 舊案例改寫為 §3 格式，刪除檢查過程的條件，修正錯誤的期望值（2026-10-14）：31 個案例寫入 Langfuse（同 ID 更新），已不存在的 `p-warehouse-no-customers` 封存；`fake-api.ts` 的確認卡片文字改為與資料庫的 summary 函式一致。新格式的第一次執行：`20261014T1502-v3-step3-rewritten-cases` | 2 |
 | 4 | ✅ 把真實語句轉為案例；假資料補上語句提到的客戶、產品、單據（2026-10-14）：71 個案例（`real-*`）、假資料 `fixtures/real.json`；合計 102 個案例。依 §4.2 矩陣補齊缺少的類別留待新工具建立時進行 | 1、2 |
 | 5 | ✅ Prompt 搬到 Langfuse：正式環境依標籤讀取並快取、程式內的備用 prompt、`--prompt-label`（2026-10-15）：7 個 prompt 的 v1（= eval `20261014T1630-phase1-agent-fixes` 的版本）已標為 `production`；Cloud Run 尚未設定 `LANGFUSE_*`，設定前正式環境仍用程式內建的版本 | — |
-| 6 | 🔧 依 §3.4 撰寫評分標準，建立 LLM 評分器與標註佇列：評分器已完成（2026-10-15，`evals/judge.ts`，由 eval 程式執行並上傳為 `policy_judge` 分數，不用 Langfuse 網頁上的評分器，因為整段 Agent 流程只能由 eval 程式執行）；標註佇列與校準待人工標註 | 3 |
+| 6 | 🔧 依 §3.4 撰寫評分標準，建立 LLM 評分器與標註佇列：評分器已完成（2026-10-15，`evals/judge.ts`，由 eval 程式執行並上傳為 `policy_judge` 分數，不用 Langfuse 網頁上的評分器，因為整段 Agent 流程只能由 eval 程式執行）；標註佇列 `policy-calibration` 已放入 50 筆（2026-10-16，[QUERY_AGENT_LANGFUSE.md](./QUERY_AGENT_LANGFUSE.md) §2.5）。**暫停（2026-10-20）**：佇列中的回覆是拼接的子 Agent 回覆，等 §8 完成後以新基準重新填入，並先寫標註指南（§8.5） | 3、§8 |
 | 7 | 以目前的版本跑一次新的基準線，讓 TPM 看到現況與政策的差距 | 3、4、6 |
 | 8 | 更新現況文件（`QUERY_AGENT_EVALS.md`、`EVALS.md`、CLAUDE.md） | 7 |
 | 9 | 正式環境 trace 回流（§5.4）：讚／倒讚、去個資、送出到 Langfuse | TPM 確認使用條款 |
 
 ## 7. 待決
 
-無。
+§8.3 的 A1–A3（架構調整的取捨）。
+
+## 8. 架構調整：子 Agent 的結果統一彙整後再回覆（2026-10-20）
+
+### 8.1 發現的問題
+
+標註 `policy-calibration` 時（使用者，2026-10-20）發現：現在的流程是 Router → 一個或多個子 Agent → 回覆。每個子 Agent 各自寫一段給使用者的回覆，分派到多個子 Agent 時，`router.ts` 把各段以「**📋 客戶與訂單** … --- **🧵 產品** …」直接接在一起。沒有任何一步看過全部的結果再回答，因此：
+
+- 不能跨流程推理：例如「這張訂單的布夠不夠出貨」需要訂單與庫存兩邊的結果一起判斷，現在只會各說各的
+- 回覆互相矛盾或多餘：一個子 Agent 建好草稿，另一個說「無法處理這個要求」（eval `20261016T0455-sdk-baseline` 的 `real-purchase-07`、`real-receiving-01`，[AGENT.md](../AGENT.md) 已知問題 3）
+- 標註與 LLM 評審判斷的是拼接的結果：多數會因拼接被判為部分符合或不符合，架構改完後這類錯誤消失，校準學到的會是已不存在的錯誤
+
+### 8.2 目標流程
+
+```
+使用者訊息
+   ▼
+Router：判斷要哪些子 Agent，給每個子 Agent 的任務
+   ▼
+子 Agent（並行）：呼叫工具查詢、建立草稿；回傳查到的事實與建立的草稿，不直接對使用者說話
+   ▼
+彙整（Summary）：看到使用者的原始訊息、對話紀錄、所有子 Agent 的結果與草稿，依回覆政策（TPM §3.4）寫一則回覆
+   ▼
+使用者
+```
+
+不變的規則：
+
+- 寫入仍只建立草稿，使用者按確認卡片才寫入；彙整步驟沒有工具，不能建立或修改草稿
+- 彙整的回覆不能提到不存在的草稿（現有的 `validate` 規則）、不顯示 ID（`redactIds`）
+- 子 Agent 失敗時，彙整依其他子 Agent 的結果回答，並說明哪一部分沒有完成；全部失敗時回覆 `AGENT_FAILURE_REPLY`
+- 彙整步驟有自己的 prompt（Langfuse `query-summary`）、模型降級清單（`ModelPolicy` 的 `summary` 節點）與 trace 中的節點
+
+### 8.3 待決的取捨
+
+| # | 問題 | 選項 | 建議 |
+|---|------|------|------|
+| A1 | 彙整什麼時候執行 | (a) 每次都執行；(b) 只在分派到 2 個以上子 Agent 時執行，只有 1 個時由該子 Agent 直接回覆 | **(a)**：使用者要的是能推理的統一回覆，單一子 Agent 時也由同一個步驟套用回覆政策，行為一致；代價是每次多一次模型呼叫（目前平均延遲 5.4 秒，門檻 10 秒），以 eval 實測 |
+| A2 | 是否同時比較單一 Agent | (a) 只改 Router 架構；(b) 也以 eval 比較單一 Agent（一個 Agent 拿全部被授權的工具，本身就能跨流程推理；P0-7 選了 Router，但當時沒有彙整的需求） | **(b)**：兩種架構都跑 eval，以完成率、延遲、花費決定，結果記在 [QUERY_AGENT_EVALS.md](../QUERY_AGENT_EVALS.md) §5 |
+| A3 | 子 Agent 回傳的格式 | (a) 自由文字的「查到的事實」；(b) 結構化（查到的紀錄、建立的草稿、缺少的必填欄位、遇到的錯誤） | **(b)**：彙整依結構判斷要追問什麼、要說明什麼錯誤，也讓 eval 的診斷看得到每個子 Agent 做了什麼 |
+
+### 8.4 驗證
+
+- `bun run test`：彙整的確定性測試（多個子 Agent 的結果合成一則回覆、子 Agent 失敗、不能宣稱不存在的草稿）
+- eval：與基準 `20261016T0455-sdk-baseline` 比較；預期多子 Agent 的案例改善，不可有退步；門檻同 §4
+- `verify-query-ui.py`（`/query` 的回應格式不變）
+
+### 8.5 完成後接續步驟 6
+
+1. 以新架構跑新基準
+2. 撰寫標註指南：依情境類別說明「符合／部分符合／不符合」的判斷方式，每類附實例（取自新基準的回覆）；寫在 [QUERY_AGENT_EVALS.md](../QUERY_AGENT_EVALS.md) §3.2
+3. 清空 `policy-calibration` 中舊架構的 50 筆，從新基準重新填入
+4. 使用者依指南標註，再進行校準（[QUERY_AGENT_LANGFUSE.md](./QUERY_AGENT_LANGFUSE.md) §2.5）
+
+### 8.6 步驟
+
+| # | 工作 | 依賴 |
+|---|------|------|
+| 1 | 使用者決定 A1–A3 | — |
+| 2 | 子 Agent 改為回傳結果；新增彙整步驟、`query-summary` prompt、`summary` 模型節點與 trace | 1 |
+| 3 | 確定性測試；eval 比較（A2 選 (b) 時兩種架構都跑） | 2 |
+| 4 | 更新現況文件（[AGENT.md](../AGENT.md)、[QUERY_AGENT_EVALS.md](../QUERY_AGENT_EVALS.md)） | 3 |
+| 5 | §8.5 | 4 |
