@@ -9,7 +9,7 @@
   "customers": [
     {
       "id": "c0000000-0000-4000-8000-000000000001",
-      "name": "Chen",
+      "name": "永豐學生服-台北店",
       "contact_person": "陳大文",
       "phone": "0912-111-222",
       "email": "chen@example.com",
@@ -19,7 +19,7 @@
     },
     {
       "id": "c0000000-0000-4000-8000-000000000002",
-      "name": "Chen1",
+      "name": "永豐學生服-台中店",
       "contact_person": "陳小美",
       "phone": "0912-333-444",
       "email": null,
@@ -29,7 +29,7 @@
     },
     {
       "id": "c0000000-0000-4000-8000-000000000003",
-      "name": "Client name test0922",
+      "name": "毅進團體服",
       "contact_person": "林志明",
       "phone": "0922-555-666",
       "email": null,

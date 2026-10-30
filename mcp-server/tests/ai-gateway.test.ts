@@ -184,7 +184,7 @@ test("the agent loop never writes: create_order becomes a draft (P0-5)", async (
   assert.deepEqual(businessInserts(writes), [], "no business rows written");
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].tool, "create_order");
-  assert.deepEqual(drafts[0].summary.fields.find((f) => f.label === "客戶")?.value, "Client name test0922", "card shows the name, not the id");
+  assert.deepEqual(drafts[0].summary.fields.find((f) => f.label === "客戶")?.value, "毅進團體服", "card shows the name, not the id");
 });
 
 test("a failed attempt's drafts are discarded; only the answering attempt's draft survives", async () => {

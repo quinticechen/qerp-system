@@ -30,7 +30,7 @@ test("every write tool is backed by an API dry run (draft) and the same API for 
   assert.ok(drafted.ok);
   assert.equal(drafted.draft.summary.title, "建立訂單", "card title comes from the API");
   assert.deepEqual(drafted.draft.summary.fields, [
-    { label: "客戶", value: "Client name test0922" },
+    { label: "客戶", value: "毅進團體服" },
     { label: "品項 1", value: "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 100 公斤，單價 50" },
     { label: "指定工廠", value: "Factory 092202" },
     { label: "訂單總額", value: "5000" },

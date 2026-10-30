@@ -29,5 +29,6 @@ This folder holds documents about *what to build, why, and how it was decided*: 
 | [QUERY_AGENT_LANGFUSE.md](./QUERY_AGENT_LANGFUSE.md) | Query Agent: official SDK, production tracing, thumbs up/down, Langfuse-managed LLM judge, manually triggered CI | AI Session | In progress (2026-10-16) |
 | [QUERY_UI_LAYOUT_AND_RECORD_NAV.md](./QUERY_UI_LAYOUT_AND_RECORD_NAV.md) | Query: open the written record after confirming; floating, sidebar and full-screen layouts on desktop | AI Session | Done (2026-10-15) |
 | [QUERY_AGENT_EVAL_REDESIGN.md](./QUERY_AGENT_EVAL_REDESIGN.md) | Query Agent eval redesign: outcome-based scoring, cases and prompts moved to Langfuse, LLM scoring; §8 merge sub-agent results into one reply | AI Session | In progress (§8 pending decision, 2026-10-20) |
+| [QUERY_AGENT_EVAL_COVERAGE.md](./QUERY_AGENT_EVAL_COVERAGE.md) | Query Agent eval: case coverage per tool, role and situation; reply rubric (符合／部分符合／不符合) for the judge and human labels | AI Session / TPM | Draft for TPM review (2026-10-30) |
 | [QUERY_AGENT_EVAL_UTTERANCES.md](./QUERY_AGENT_EVAL_UTTERANCES.md) | Real-utterance collection sheet (filled in by the TPM, turned into eval cases) | TPM | Filled in and turned into cases (2026-10-14) |
 
