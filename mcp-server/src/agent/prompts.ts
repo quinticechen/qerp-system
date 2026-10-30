@@ -33,6 +33,7 @@ export interface SystemPrompt {
 export const PROMPT_NAMES = {
   router: "query-router",
   single: "query-agent-single",
+  summary: "query-summary",
   agent: (group: string) => `query-agent-${group}`,
 } as const;
 

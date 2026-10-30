@@ -61,7 +61,7 @@ export interface RunResult {
 
 /** The phases each architecture calls a model in. */
 export const ARCH_PHASES: Record<AgentMode, string[]> = {
-  router: ["router", ...ROUTABLE_GROUPS.map((group) => `agent:${group}`)],
+  router: ["router", ...ROUTABLE_GROUPS.map((group) => `agent:${group}`), "summary"],
   single: ["agent:all"],
 };
 

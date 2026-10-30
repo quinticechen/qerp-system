@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { ToolName, TOOL_GROUPS, GROUP_LABELS, ROUTABLE_GROUPS, type RoutableGroup } from "./permissions.js";
-import { runSubAgent, ConversationMessage } from "./sub-agents.js";
+import { ToolName, TOOL_GROUPS, ROUTABLE_GROUPS, type RoutableGroup } from "./permissions.js";
+import { runSubAgent, runSubAgentForSummary, ConversationMessage } from "./sub-agents.js";
+import { summarize, type FailedSubAgent } from "./summary.js";
 import { aiGenerateObject } from "./ai-gateway.js";
 import type { QueryRun } from "./observer.js";
 import { redactIds } from "./output-guard.js";
@@ -54,6 +55,12 @@ export function subAgentMessage(message: string, task: string | undefined, agent
 }
 
 /**
+ * One router attempt's limit. Classifying takes 1–2 s; a model that hangs should hand over to the
+ * next one long before the 30 s reply limit (evals 20261030: flash-lite hung for the full 30 s).
+ */
+export const ROUTER_ATTEMPT_TIMEOUT_MS = 8_000;
+
+/**
  * Router Agent — 用 generateObject 做結構化意圖分類，比解析 JSON 字串可靠
  */
 export async function routeQuery(
@@ -90,7 +97,7 @@ export async function routeQuery(
         ...recentHistory,
         { role: "user" as const, content: message },
       ],
-    } as any, { ...run, phase: "router", prompt: routerPrompt.link });
+    } as any, { ...run, phase: "router", prompt: routerPrompt.link, attemptTimeoutMs: ROUTER_ATTEMPT_TIMEOUT_MS });
     observer?.onRoute?.(decision, false);
   } catch {
     // 分類失敗時 fallback：用第一個可用群組
@@ -110,37 +117,26 @@ export async function routeQuery(
     return "你沒有執行此操作所需的權限。";
   }
 
-  // 並行呼叫子 Agent — allSettled so one failing agent doesn't discard the other's answer
+  // One sub-agent answers the user itself (decision A1).
+  if (authorizedAgents.length === 1) {
+    const [agent] = authorizedAgents;
+    return redactIds(await runSubAgent(agent, subAgentMessage(message, decision.tasks?.[agent], 1), allowedTools, ctx, history, run, names));
+  }
+
+  // Several: each reports its results, then one summary step writes the reply (§8). allSettled so
+  // one failing sub-agent doesn't discard the others' results.
   const settled = await Promise.allSettled(
     authorizedAgents.map((agent) =>
-      runSubAgent(
-        agent,
-        subAgentMessage(message, decision.tasks?.[agent], authorizedAgents.length),
-        allowedTools,
-        ctx,
-        history,
-        run,
-        names
-      )
+      runSubAgentForSummary(agent, subAgentMessage(message, decision.tasks?.[agent], authorizedAgents.length), allowedTools, ctx, history, run, names)
     )
   );
-
   if (settled.every((s) => s.status === "rejected")) {
     throw (settled[0] as PromiseRejectedResult).reason;
   }
-
-  const results = settled.map((s, i) => {
+  const results = settled.map((s, i): Awaited<ReturnType<typeof runSubAgentForSummary>> | FailedSubAgent => {
     if (s.status === "fulfilled") return s.value;
     console.error(`[Router] ${authorizedAgents[i]} 子 Agent 失敗:`, s.reason);
-    return "⚠️ 這部分處理時發生錯誤，請稍後再試或換個方式描述。";
+    return { group: authorizedAgents[i], task: decision.tasks?.[authorizedAgents[i]] ?? message, failed: true };
   });
-
-  if (results.length === 1) return redactIds(results[0]);
-
-  // 多 Agent 合併結果
-  return redactIds(results
-    .map((result, i) => {
-      return `**${GROUP_LABELS[authorizedAgents[i]]}**\n${result}`;
-    })
-    .join("\n\n---\n\n"));
+  return redactIds(await summarize(message, history, results, run));
 }
