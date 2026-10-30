@@ -8,24 +8,24 @@
  *   bun run prompts -- promote                # the `candidate` versions → `production` (after the eval passes)
  *
  * Flow: push → bun run eval -- --prompt-label candidate → promote. Production reads `production`
- * within a minute (src/agent/prompts.ts cache).
+ * within a minute (src/agent/prompts.ts cache). Uses the Langfuse SDK's prompt client.
  */
 
-import { fetchPrompt } from "../src/agent/prompts.js";
-import { langfuseApi, langfuseConfigured } from "./cases.js";
+import { langfuseClient, langfuseConfigured } from "../src/agent/langfuse.js";
 import { codePromptTexts } from "./manifest.js";
 
 async function version(name: string, label: string): Promise<{ text: string; version: number } | null> {
   try {
-    return await fetchPrompt(name, label);
+    // cacheTtlSeconds 0: always the current version, never a cached one.
+    const p = await langfuseClient().prompt.get(name, { label, type: "text", cacheTtlSeconds: 0 });
+    return { text: p.prompt, version: p.version };
   } catch {
     return null;
   }
 }
 
 async function setLabels(name: string, v: number, labels: string[]): Promise<void> {
-  const res = await langfuseApi("PATCH", `/api/public/v2/prompts/${encodeURIComponent(name)}/versions/${v}`, { newLabels: labels });
-  if (res.status === 404) throw new Error(`找不到 ${name} v${v}，無法設定標籤`);
+  await langfuseClient().prompt.update({ name, version: v, newLabels: labels });
 }
 
 async function main() {
@@ -52,10 +52,10 @@ async function main() {
         console.log(`= ${name} v${latest.version}（沒有變更）→ ${labels.join("、")}`);
         continue;
       }
-      const res = await langfuseApi<{ version: number }>("POST", "/api/public/v2/prompts", {
+      const created = await langfuseClient().prompt.create({
         name, type: "text", prompt: text, labels, commitMessage: "bun run prompts -- push",
       });
-      console.log(`+ ${name} v${res.data?.version} → ${labels.join("、")}`);
+      console.log(`+ ${name} v${created.version} → ${labels.join("、")}`);
     }
     return;
   }

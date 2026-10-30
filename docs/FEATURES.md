@@ -1,50 +1,66 @@
-# 功能
+# Features
 
-> 現況文件（2026-10-09）。各功能依角色開放，見 [PERMISSIONS.md](./PERMISSIONS.md)；資料寫入都經過 [API.md](./API.md) 的業務 API。
+> Current-state document (2026-10-09). Each feature is available by role, see [PERMISSIONS.md](./PERMISSIONS.md); all data writes go through the business APIs in [API.md](./API.md).
 
-## 1. 帳號與組織
+## 1. Accounts and organizations
 
-| 功能 | 頁面 | 說明 |
-|------|------|------|
-| 登入、註冊、忘記密碼 | `/login`、`/reset-password` | Email 密碼或 Google 登入 |
-| 個人設定 | 右上角選單 | 姓名、電話 |
-| 建立組織、切換組織 | `/create-organization`、右上角選單 | 建立者成為擁有者；一個帳號可屬於多個組織 |
-| 接受邀請 | `/accept-invitation`、儀表板的邀請卡片 | |
-| 用戶管理 | `/user` | 邀請成員、改角色、停用（在成員的編輯模式）、重新發送邀請、查看操作紀錄 |
-| 權限說明 | `/permission`、`/organization-roles` | 四種固定角色與各角色可用的功能 |
-| 組織設定 | `/system` | 轉移擁有權、刪除組織（擁有者）。其餘設定卡片尚未實作，正式環境不顯示（CLAUDE.md「Unfinished Features」） |
+| Feature | Page | Description |
+|---------|------|-------------|
+| Sign in, sign up, forgot password | `/login`, `/reset-password` | Email/password or Google sign-in |
+| Personal settings | Top-right menu | Name, phone |
+| Create organization, switch organization | `/create-organization`, top-right menu | The creator becomes the owner; one account can belong to several organizations |
+| Accept invitation | `/accept-invitation`, invitation card on the dashboard | |
+| User management | `/user` | Invite members, change roles, deactivate (in the member's edit mode), resend invitations, view the activity log |
+| Permission guide | `/permission`, `/organization-roles` | The four fixed roles and what each can use |
+| Organization settings | `/system` | Transfer ownership, delete organization (owner). The other settings cards are not implemented yet and are hidden in production (CLAUDE.md "Unfinished Features") |
 
-## 2. 主檔
+## 2. Master data
 
-| 功能 | 頁面 | 說明 |
-|------|------|------|
-| 產品 | `/product` | 兩層：產品（名稱、類別、單位）與顏色（顏色、色號、色值、安全庫存）。展開列表看每個顏色的庫存與低庫存提示；產品與顏色各自編輯、停用，各有編輯紀錄 |
-| 客戶 | `/customer` | 聯絡資料；停用後不出現在新訂單 |
-| 工廠 | `/factory` | 同客戶；停用後不能指定給新訂單或新採購單 |
-| 貨架 | `/shelf` | 名稱、位置、目前存放的布卷；停用後不能放新布卷 |
+| Feature | Page | Description |
+|---------|------|-------------|
+| Products | `/product` | Two levels: product (name, category, unit) and color (color, color code, color value, safety stock). Expand a row to see each color's stock and low-stock warning; products and colors are edited and deactivated separately, each with its own edit history |
+| Customers | `/customer` | Contact details; once deactivated, they don't appear in new orders |
+| Factories | `/factory` | Same as customers; once deactivated, they can't be assigned to new orders or purchase orders |
+| Shelves | `/shelf` | Name, location, the rolls currently stored; once deactivated, no new rolls can be placed |
 
-## 3. 訂單到出貨
+## 3. From order to shipping
 
-| 功能 | 頁面 | 說明 |
-|------|------|------|
-| 訂單 | `/order` | 客戶、品項（產品顏色、公斤數、單價、卷數、規格）、指定工廠、備註；狀態、付款狀態；出貨進度自動計算。已出貨或已採購的品項鎖定；可取消（沒有出貨與進行中的採購單時） |
-| 採購 | `/purchase` | 向工廠下採購單並關聯訂單（訂單自動變成「已向工廠下單」）；待入庫清單。入庫進度自動計算，列表顯示最近入庫日，詳情顯示每個產品的已入庫量與入庫日期；未入庫前可取消 |
-| 入庫 | `/inventory` | 依採購單入庫，每卷布記錄重量、品級、貨架與位置；進貨單編號、布卷編號自動產生。超收會提示 |
-| 庫存 | `/inventory` | 依產品統計的庫存、品級分布、待入庫、待出貨；每個產品的布卷明細；修改布卷的重量、品級、位置 |
-| 出貨 | `/shipping` | 依訂單選布卷出貨，扣庫存並更新訂單出貨進度；可修改、取消（庫存歸還） |
+| Feature | Page | Description |
+|---------|------|-------------|
+| Orders | `/order` | Customer, line items (product color, kilograms, unit price, rolls, specification), assigned factories, note; status, payment status; shipping progress is computed automatically. Shipped or purchased lines are locked; an order can be cancelled (when it has no shippings and no active purchase orders) |
+| Purchasing | `/purchase` | Place purchase orders with factories and link them to orders (the orders automatically become 「已向工廠下單」, ordered from factory); a list awaiting receipt. Receiving progress is computed automatically; the list shows the latest receiving date, and the details show each product's received quantity and receiving dates; cancellable until goods are received |
+| Receiving | `/inventory` | Receive against a purchase order, recording each roll's weight, grade, shelf and position; receipt numbers and roll numbers are generated automatically. Over-receiving shows a warning |
+| Inventory | `/inventory` | Stock per product, grade breakdown, awaiting receipt, awaiting shipment; roll details for each product; edit a roll's weight, grade and position |
+| Shipping | `/shipping` | Ship rolls against an order, deducting stock and updating the order's shipping progress; can be edited or cancelled (stock is returned) |
 
-共通：
+Common to all:
 
-- 列表點一筆資料，打開的是查看模式；按「編輯」才能修改，編輯模式左下是作廢或停用／啟用（[requirements/UI_CONSISTENCY.md](./requirements/UI_CONSISTENCY.md)）。訂單、採購單、入庫、出貨列表都有備註欄。
-- 數字欄位只接受數字，預設空白。
-- 單據編號為「字母＋日期＋流水號」：訂單 B、採購單 P、進貨單 I、出貨單 O（[API.md](./API.md) §2.5）。
-- 每張單據與主檔都有「編輯紀錄」，顯示誰在什麼時候改了什麼。
-- 被規則擋下的操作會顯示中文原因（例如「已有入庫紀錄，不能取消」）。
+- Clicking a record in a list opens it in view mode; editing requires pressing "Edit", and the bottom left of edit mode holds Void or Deactivate / Activate ([requirements/UI_CONSISTENCY.md](./requirements/UI_CONSISTENCY.md)). Order, purchase order, receiving and shipping lists all have a note column.
+- Number fields accept digits only and are empty by default.
+- Document numbers are "letter + date + sequence number": orders B, purchase orders P, receipts I, shippings O ([API.md](./API.md) §2.5).
+- Every document and master record has an "Edit history" showing who changed what and when.
+- Actions blocked by a rule show the reason in Chinese (for example 「已有入庫紀錄，不能取消」, "already received, can't cancel").
 
-## 4. 儀表板（`/dashboard`）
+## 4. Dashboard (`/dashboard`)
 
-統計卡片（訂單、庫存產品、客戶、待出貨）、最近訂單、依權限顯示的快速操作。統計卡片上「較上月」的變化尚未實作，正式環境不顯示。
+Stat cards (orders, products in stock, customers, awaiting shipment), recent orders, and quick actions shown by permission. The "vs last month" change on the stat cards is not implemented yet and is hidden in production.
 
-## 5. AI 查詢助理
+## 5. AI query assistant
 
-畫面右下角的 Query 按鈕：以中文詢問訂單、庫存、採購、出貨等資料，也可以請 AI 建立客戶、訂單、採購單，AI 會先顯示確認卡片，使用者確認後才寫入。架構與規劃見 [AGENT.md](./AGENT.md)。
+The Query button at the bottom right: ask about and operate on customers, factories, products, shelves, orders, purchasing, receiving, inventory and shipping in Chinese. For any create, edit, deactivate or cancel, the AI first shows a confirmation card, and nothing is written until the user presses "Confirm"; after the write, the ERP switches to that record's page and opens it (for example, after creating an order it opens that order on `/order`). For the architecture and planning, see [AGENT.md](./AGENT.md).
+
+Each AI reply has thumbs-up and thumbs-down icon buttons beneath it; pressing again undoes it. The feedback is used to improve Query ([AGENT.md](./AGENT.md)).
+
+The buttons on the right of the Query title bar, left to right: History (conversation list; pin, delete), Display mode (desktop), New conversation, Delete conversation, Close. Deleting a conversation asks the user to confirm and cannot be undone.
+
+On desktop, clicking "Display mode" (its icon shows the current mode) offers these three, and the last choice is remembered:
+
+| Mode | Layout |
+|------|--------|
+| Floating window (default) | A 380×580 panel at the bottom right |
+| Sidebar | Full height on the right, with the ERP shrinking to the left; drag the left edge to resize (320px to half the screen) |
+| Full screen | Fills the whole screen; after confirming a write, switches to the sidebar so the opened record is visible |
+
+On mobile it is a full-screen chat page; use the back button or swipe from the left edge to return to the ERP.
+
+Each page can open a record from the URL: `?open=<record id>` (receiving records also add `tab=records`); the parameters are removed from the URL once it opens.

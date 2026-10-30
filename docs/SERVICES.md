@@ -1,22 +1,23 @@
-# 選用服務
+# Services in Use
 
-> 現況文件（2026-10-09）。
+> Current-state document (2026-10-16).
 
-| 服務 | 用途 | 設定 |
-|------|------|------|
-| Supabase | PostgreSQL 資料庫、Auth（Email 密碼、Google OAuth）、PostgREST API | 專案 `gyiyedvutcbwzpbcsmjc`；只有一個環境（正式），migration 直接套用到正式資料庫 |
-| Vercel | 前端部署：正式（production）與預覽（preview）部署 | 環境變數 `VITE_QUERY_API_URL`（AI 伺服器網址）；建置時依 `VERCEL_ENV` 決定 `APP_ENV`：production → 正式、preview → staging（`vite.config.ts`、`src/lib/appEnvironment.ts`） |
-| Google Cloud Run | AI 伺服器 `query-ai-agent`（`asia-south1`，專案 `erp-system-463209`） | 由 `mcp-server/Dockerfile` 持續部署；環境變數 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`OPENROUTER_API_KEY` |
-| OpenRouter | AI 模型閘道 | 預設順序：`google/gemini-2.5-flash-lite` → `google/gemini-2.5-flash` → `anthropic/claude-haiku-4.5`（`mcp-server/src/agent/ai-gateway.ts`） |
-| Langfuse | AI eval 的案例（Dataset `query-agent`）、實驗紀錄與比較；Query Agent 的 system prompt 版本（Prompt Management，正式環境讀 `production` 標籤，讀不到時用程式內建的版本） | `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL`（[EVALS.md](./EVALS.md)） |
-| Google OAuth | 以 Google 帳號登入 | Supabase Auth 的 redirect 允許清單需包含 `http://localhost:8080/**` |
+| Service | Purpose | Configuration |
+|---------|---------|---------------|
+| Supabase | PostgreSQL database, Auth (email/password, Google OAuth), PostgREST API | Project `gyiyedvutcbwzpbcsmjc`; there is only one environment (production), and migrations are applied directly to the production database |
+| Vercel | Frontend deployment: production and preview deployments | Environment variable `VITE_QUERY_API_URL` (AI server URL); at build time `APP_ENV` is set from `VERCEL_ENV`: production → production, preview → staging (`vite.config.ts`, `src/lib/appEnvironment.ts`) |
+| Google Cloud Run | AI server `query-ai-agent` (`asia-south1`, project `erp-system-463209`) | Continuously deployed from `mcp-server/Dockerfile`; environment variables `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` (optional `LANGFUSE_SAMPLE_RATE`, default 0.05). Traces are sent after the reply; when CPU is only allocated during requests, sending may be delayed until the next request, and everything is flushed before shutdown (SIGTERM) |
+| OpenRouter | AI model gateway | Default order: `google/gemini-2.5-flash-lite` → `google/gemini-2.5-flash` → `anthropic/claude-haiku-4.5` (`mcp-server/src/agent/ai-gateway.ts`) |
+| Langfuse | Langfuse Cloud (EU), used through official SDK v6: AI eval cases (Dataset `query-agent`) and experiments; Query Agent system prompt versions (Prompt Management; production reads the `production` label and falls back to the in-code version if it can't); production traces (PII removed, 5% sampled, [AGENT.md](./AGENT.md)) and users' thumbs up/down; score configs, annotation queues and LLM judge calibration | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` ([EVALS.md](./EVALS.md)). Running the LLM judge in Langfuse requires a connection under Settings → LLM Connections |
+| GitHub Actions | `Query Agent Eval` (manually triggered eval), `Keep Supabase Active` | Repository secrets the eval needs: see [QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md) §3.1 |
+| Google OAuth | Sign-in with a Google account | The Supabase Auth redirect allow list must include `http://localhost:8080/**` |
 
-## 環境
+## Environments
 
-| 環境 | 前端 | 資料庫 | 尚未實作的功能 |
-|------|------|--------|----------------|
-| 正式 | Vercel production | Supabase（唯一） | 不顯示 |
-| Staging | Vercel preview | 同一個 Supabase | 灰底顯示 |
-| 本地 | `bun run dev`（port 8080） | 同一個 Supabase | 灰底顯示 |
+| Environment | Frontend | Database | Features not yet implemented |
+|-------------|----------|----------|------------------------------|
+| Production | Vercel production | Supabase (the only one) | Hidden |
+| Staging | Vercel preview | The same Supabase | Shown greyed out |
+| Local | `bun run dev` (port 8080) | The same Supabase | Shown greyed out |
 
-目前沒有獨立的測試資料庫；資料庫變更以回滾測試（`supabase/tests/run.sql`）先驗證再套用。
+There is no separate test database; database changes are verified with a rolled-back test (`supabase/tests/run.sql`) before being applied.

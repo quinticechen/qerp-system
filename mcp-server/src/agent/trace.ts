@@ -29,6 +29,20 @@ export class TraceRecorder implements QueryObserver {
   private inputTokens = 0;
   private outputTokens = 0;
 
+  /** A model attempt failed or routing fell back: the reply may be worse than usual. */
+  get degraded(): boolean {
+    return this.attempts.some((a) => a.error) || !!this.route?.fallback;
+  }
+
+  /** What the Langfuse trace keeps beside the input and reply. */
+  summary(): Record<string, unknown> {
+    return {
+      route: this.route?.agents ?? null,
+      models: this.attempts.map((a) => `${a.phase} ${a.modelId}${a.error ? " ✗" : ""}`),
+      tools: this.steps.flatMap((s) => s.tools.map((t) => t.name)),
+    };
+  }
+
   onRoute(decision: RouteDecision, fromFallback: boolean): void {
     this.route = { ...decision, fallback: fromFallback };
   }

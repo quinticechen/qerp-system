@@ -1,117 +1,117 @@
-# Phase 1 業務 API：計畫與決策
+# Phase 1 Business APIs: Plan and Decisions
 
-> 需求文件（RBAC Session）。原 `docs/BUSINESS_API.md` 的計畫、進度與決策；各 API 的現況規格已移到 [../API.md](../API.md)（§2 共用規則、§3 業務 API）。Phase 1 業務 API 已全部完成（2026-10-09）。
+> Requirement document (RBAC Session). The plan, progress and decisions from the former `docs/BUSINESS_API.md`; the current specification of each API moved to [../API.md](../API.md) (§2 shared rules, §3 business APIs). All Phase 1 business APIs are done (2026-10-09).
 
-## 1. 目標
+## 1. Goals
 
-把 12 個功能的寫入打包成資料庫 API（RPC），讓前端與 AI tools 呼叫同一份邏輯：
+Package the writes of 12 features as database APIs (RPCs), so the frontend and AI tools call the same logic:
 
-1. 權限、組織範圍、資料驗證都在 API 內完成，前端與 AI 不再各寫一份
-2. 每個寫入 API 都有試算模式，AI 的確認卡片與真正寫入走同一段驗證
-3. 前端改用 API 後，業務表的 RLS 才依權限鍵收緊（MULTI_TENANT_RBAC.md R4）
+1. Permissions, organization scope and data validation all happen inside the API, so the frontend and AI no longer each write their own
+2. Every write API has a dry-run mode, so the AI's confirmation card and the real write go through the same validation
+3. Once the frontend uses the APIs, the business tables' RLS is tightened by permission key (MULTI_TENANT_RBAC.md R4)
 
-讀取：單表讀取維持直接查表＋RLS（Phase 0 D1）；跨表的讀取（例如訂單含品項與出貨進度）視 AI 的需求提供 RPC 或 `security_invoker` view。
+Reads: single-table reads keep querying the table directly + RLS (Phase 0 D1); cross-table reads (such as an order with its lines and shipping progress) get an RPC or a `security_invoker` view as the AI needs them.
 
-## 3. API 目錄
+## 3. API catalog
 
-狀態：⏳ 規劃、🔧 實作中、✅ 完成（API 與前端改用都完成，並在 SESSION_COORDINATION.md §5 標記）。
+Status: ⏳ planned, 🔧 in progress, ✅ done (API and frontend switch both done, and marked in SESSION_COORDINATION.md §5).
 
-### 流程 1：訂單主流程
+### Flow 1: main order flow
 
-| 組 | API | 權限鍵 | 說明 | 狀態 |
-|----|-----|--------|------|------|
-| A1 客戶 | `create_customer` | `canCreateCustomers` | 名稱、聯絡人必填；手機或市話至少一個；同組織不可重名 | ✅ |
+| Group | API | Permission key | Description | Status |
+|-------|-----|----------------|-------------|--------|
+| A1 Customers | `create_customer` | `canCreateCustomers` | Name and contact person required; at least one of mobile or landline; no duplicate names in the same organization | ✅ |
 | | `update_customer` | `canEditCustomers` | `p_changes` | ✅ |
-| | `set_customer_active` | `canEditCustomers` | 停用後不出現在建單的客戶選單，既有單據不受影響 | ✅ |
-| A2 訂單 | `create_order` | `canCreateOrders` | 客戶、品項（產品、數量、單價、卷數、規格）、指定工廠、備註；回傳訂單編號 | ✅ |
-| | `update_order` | `canEditOrders` | 品項（沿用 `save_order_items` 的鎖定規則）、工廠、備註、付款狀態 | ✅ |
-| | `cancel_order` | `canEditOrders` | 已有出貨或有效採購單時不可取消 | ✅ |
-| A3 採購 | `create_purchase_order` | `canCreatePurchases` | 工廠、關聯訂單、品項、下單日、預計到貨日；關聯訂單改為「已向工廠下單」 | ✅ |
-| | `update_purchase_order` | `canEditPurchases` | 沿用 `save_purchase_order_items` 的鎖定規則 | ✅ |
-| | `cancel_purchase_order` | `canEditPurchases` | 已入庫時不可取消；關聯訂單沒有其他進行中的採購單時改回「已確認」 | ✅ |
-| A4 入庫 | `receive_inventory` | `canCreateInventory` | 採購單、到貨日、布卷（產品、貨架、品質、重量、捲號）；更新採購單收貨進度 | ✅ |
-| | `update_inventory` | `canEditInventory` | 到貨日、備註、布卷（沿用 `save_inventory_rolls` 的鎖定規則） | ✅ |
-| | `update_inventory_roll` | `canEditInventory` | 單一布卷的重量、品質、倉庫、貨架 | ✅ |
-| A5 出貨 | `create_shipping` | `canCreateShipping` | 訂單、出貨日、布卷與重量；扣庫存、更新訂單出貨進度 | ✅ |
-| | `update_shipping` | `canEditShipping` | 沿用 `save_shipping_items` | ✅ |
-| | `cancel_shipping` | `canEditShipping` | 歸還布卷庫存、重算訂單出貨進度（決策 B3） | ✅ |
+| | `set_customer_active` | `canEditCustomers` | Once deactivated, not shown in the customer menu when creating documents; existing documents are unaffected | ✅ |
+| A2 Orders | `create_order` | `canCreateOrders` | Customer, lines (product, quantity, unit price, rolls, specification), assigned factories, note; returns the order number | ✅ |
+| | `update_order` | `canEditOrders` | Lines (keeping the locking rules of `save_order_items`), factories, note, payment status | ✅ |
+| | `cancel_order` | `canEditOrders` | Can't be cancelled once it has shippings or active purchase orders | ✅ |
+| A3 Purchasing | `create_purchase_order` | `canCreatePurchases` | Factory, linked orders, lines, order date, expected arrival date; linked orders become 「已向工廠下單」 (ordered from factory) | ✅ |
+| | `update_purchase_order` | `canEditPurchases` | Keeps the locking rules of `save_purchase_order_items` | ✅ |
+| | `cancel_purchase_order` | `canEditPurchases` | Can't be cancelled once received; linked orders with no other active purchase order go back to 「已確認」 (confirmed) | ✅ |
+| A4 Receiving | `receive_inventory` | `canCreateInventory` | Purchase order, arrival date, rolls (product, shelf, quality, weight, roll number); updates the purchase order's receiving progress | ✅ |
+| | `update_inventory` | `canEditInventory` | Arrival date, note, rolls (keeping the locking rules of `save_inventory_rolls`) | ✅ |
+| | `update_inventory_roll` | `canEditInventory` | A single roll's weight, quality, warehouse, shelf | ✅ |
+| A5 Shipping | `create_shipping` | `canCreateShipping` | Order, shipping date, rolls and weights; deducts stock, updates the order's shipping progress | ✅ |
+| | `update_shipping` | `canEditShipping` | Reuses `save_shipping_items` | ✅ |
+| | `cancel_shipping` | `canEditShipping` | Returns roll stock, recomputes the order's shipping progress (decision B3) | ✅ |
 
-### 流程 2：主檔維護
+### Flow 2: master data maintenance
 
-| 組 | API | 權限鍵 | 狀態 |
-|----|-----|--------|------|
-| A1 工廠（與客戶同一組） | `create_factory`、`update_factory`、`set_factory_active` | `canCreateFactories`／`canEditFactories` | ✅ |
-| A6 產品 | `create_product`、`update_product`、`set_product_active`、`add_product_color`、`update_product_color`、`set_product_color_active`（兩層，見 §7） | `canCreateProducts`／`canEditProducts` | ✅ |
-| A6 貨架 | `create_shelf`、`update_shelf`（名稱、位置）、`set_shelf_active` | `canCreateShelves`／`canEditShelves` | ✅ |
+| Group | API | Permission key | Status |
+|-------|-----|----------------|--------|
+| A1 Factories (same group as customers) | `create_factory`, `update_factory`, `set_factory_active` | `canCreateFactories` / `canEditFactories` | ✅ |
+| A6 Products | `create_product`, `update_product`, `set_product_active`, `add_product_color`, `update_product_color`, `set_product_color_active` (two levels, see §7) | `canCreateProducts` / `canEditProducts` | ✅ |
+| A6 Shelves | `create_shelf`, `update_shelf` (name, location), `set_shelf_active` | `canCreateShelves` / `canEditShelves` | ✅ |
 
-客戶與工廠的欄位與規則相同，所以與 A1 一起完成。
+Customers and factories have the same fields and rules, so they were done together in A1.
 
-### 流程 3：管理功能（AI 唯讀，Phase 0 D3）
+### Flow 3: admin features (read-only for the AI, Phase 0 D3)
 
-| API | 權限鍵 | 狀態 |
-|-----|--------|------|
-| `set_member_role`、`set_member_active`、邀請相關 | `canEditUsers`／`canCreateUsers` | ✅（RBAC R1） |
-| `update_organization_settings` | `canEditSystemSettings` | ⏳（組織設定頁目前大多未接上功能，先確認要保留哪些設定） |
+| API | Permission key | Status |
+|-----|----------------|--------|
+| `set_member_role`, `set_member_active`, invitations | `canEditUsers` / `canCreateUsers` | ✅ (RBAC R1) |
+| `update_organization_settings` | `canEditSystemSettings` | ⏳ (most of the organization settings page isn't wired to features yet; first confirm which settings to keep) |
 
-## 4. 每組 API 的交付清單
+## 4. Delivery checklist for each API group
 
-1. Migration：API、需要的欄位（例如 `is_active`）、權限與組織檢查
-2. SQL 回滾測試 `supabase/tests/api_<組>.test.sql`：
-   - 權限矩陣：訪客被拒、編輯者可以、他組織的人被拒
-   - 引用他組織的資料一律「找不到」
-   - 試算模式不寫入任何資料，且回傳的 `summary` 與正式寫入相同
-   - 每個錯誤代碼至少一個案例
-3. 前端改用 API（`src/lib/api/*.ts`），移除直接寫資料表的程式；`types.ts` 局部更新
-4. [API.md](../API.md) §3 補上 API 說明（參數、回傳、錯誤代碼）
-5. SESSION_COORDINATION.md §5 標為「API 完成」，通知 AI Session
-6. 之後由 RBAC Session 收緊該組資料表的 RLS（R4）
+1. Migration: the API, any needed columns (such as `is_active`), permission and organization checks
+2. SQL rollback test `supabase/tests/api_<group>.test.sql`:
+   - Permission matrix: viewer rejected, editor allowed, someone from another organization rejected
+   - Referencing another organization's data is always "not found"
+   - Dry-run mode writes no data, and returns the same `summary` as the real write
+   - At least one case per error code
+3. Frontend switched to the API (`src/lib/api/*.ts`), removing code that writes tables directly; `types.ts` updated locally
+4. Add the API description to [API.md](../API.md) §3 (parameters, return value, error codes)
+5. Mark "API done" in SESSION_COORDINATION.md §5 and notify the AI Session
+6. The RBAC Session then tightens the RLS of that group's tables (R4)
 
-## 6. 決策
+## 6. Decisions
 
-| # | 問題 | 建議 |
-|---|------|------|
-| B1 | 錯誤格式：SQLSTATE 表示類別、`HINT` 放固定代碼、訊息為中文（[API.md](../API.md) §2.3） | 採用 |
-| B2 | 單據的試算以子交易真的寫入再回滾（[API.md](../API.md) §2.4），並改由 API 依組織產生編號（[API.md](../API.md) §2.5） | ✅ 已確認（2026-10-08） |
-| B3 | 出貨單目前沒有狀態欄位。「取消出貨」要不要提供？提供的話：新增狀態欄位，取消時歸還布卷庫存並重算訂單出貨進度 | ✅ 已確認提供（2026-10-08） |
-| B4 | 客戶、工廠、貨架新增 `is_active`；停用的資料不出現在新單據的選單，但既有單據照常顯示 | 採用 |
-| B5 | 產品的 `UNIQUE (name, color, color_code)` 是全域的，兩個組織不能有同名同色的產品 | ✅ 已確認改為組織內唯一（A6；產品結構另見 B7） |
-| B6 | 同一組織內客戶、工廠不可重名 | 採用（只在建立與改名時檢查，不影響既有資料） |
-| B7 | 產品改為兩層：產品（母）＋顏色（子），見 §7 | ✅ 已確認（2026-10-08） |
-| B8 | 交易單據統一編號「字母＋YYYYMMDD＋四位流水號」（B 訂單、P 採購單、I 進貨單、O 出貨單），見 [API.md](../API.md) §2.5；既有單據保留原編號 | ✅ 已確認（2026-10-08） |
+| # | Question | Recommendation |
+|---|----------|----------------|
+| B1 | Error format: SQLSTATE for the category, a fixed code in `HINT`, the message in Chinese ([API.md](../API.md) §2.3) | Adopted |
+| B2 | Document dry runs really write in a subtransaction and then roll back ([API.md](../API.md) §2.4), and the API generates numbers per organization instead ([API.md](../API.md) §2.5) | ✅ Confirmed (2026-10-08) |
+| B3 | Shippings currently have no status column. Should "cancel shipping" be offered? If so: add a status column, and on cancel return roll stock and recompute the order's shipping progress | ✅ Confirmed, offered (2026-10-08) |
+| B4 | Add `is_active` to customers, factories and shelves; deactivated records don't appear in new-document menus, but existing documents show them as usual | Adopted |
+| B5 | The products' `UNIQUE (name, color, color_code)` is global, so two organizations can't have a product with the same name and color | ✅ Confirmed: changed to unique within the organization (A6; product structure also see B7) |
+| B6 | No duplicate customer or factory names within one organization | Adopted (checked only on create and rename; existing data unaffected) |
+| B7 | Products become two levels: product (parent) + color (child), see §7 | ✅ Confirmed (2026-10-08) |
+| B8 | Unified transaction document numbers "letter + YYYYMMDD + four-digit sequence" (B orders, P purchase orders, I receipts, O shippings), see [API.md](../API.md) §2.5; existing documents keep their numbers | ✅ Confirmed (2026-10-08) |
 
-## 7. 產品結構（B7）
+## 7. Product structure (B7)
 
-### 7.1 資料
+### 7.1 Data
 
-新增母表 `product_groups`；現有的 `products_new` 每一列成為一個顏色，加上 `group_id`。訂單品項、採購品項、入庫布卷、出貨紀錄原本就指向顏色那一列，因此**單據與庫存的關聯都不變**。
+Add a parent table `product_groups`; each existing row of `products_new` becomes a color, with a `group_id` added. Order lines, purchase lines, received rolls and shipping records already point to the color row, so **the links from documents and stock are unchanged**.
 
-| 層 | 資料表 | 欄位 | 唯一性 |
-|----|--------|------|--------|
-| 產品（母） | `product_groups` | 名稱、類別、單位、`is_active` | 組織內名稱唯一（不分大小寫） |
-| 顏色（子） | `products_new` | `group_id`、顏色名稱、色號、色值（可選，例如 `#C0392B`，用於色塊）、安全庫存、狀態 | 同一產品下「顏色＋色號」唯一（取代全域的 `UNIQUE (name, color, color_code)`，B5） |
+| Level | Table | Columns | Uniqueness |
+|-------|-------|---------|------------|
+| Product (parent) | `product_groups` | Name, category, unit, `is_active` | Name unique within the organization (case-insensitive) |
+| Color (child) | `products_new` | `group_id`, color name, color code, color value (optional, e.g. `#C0392B`, for the swatch), safety stock, status | "Color + color code" unique within a product (replacing the global `UNIQUE (name, color, color_code)`, B5) |
 
-- 過渡期間顏色列保留 `name`、`category`、`unit_of_measure`，由 API 與母表同步，既有的讀取（列表、view、AI tools）不必一次全改；之後逐步改讀母表再移除
-- 停用分兩層：停用產品＝其下所有顏色都不出現在新單據的選單；也可只停用單一顏色
-- 遷移：依「組織＋名稱」建立母表（2026-10-08 檢查：同名產品的類別與單位皆一致）
-- 唯讀 view `product_catalog`（`security_invoker`）：產品、顏色、每個顏色的庫存重量與卷數、是否低於安全庫存；前端與 AI 共用
+- During the transition, color rows keep `name`, `category`, `unit_of_measure`, synced with the parent table by the API, so existing reads (lists, views, AI tools) don't all have to change at once; they move to the parent table gradually, and then the columns are removed
+- Deactivation has two levels: deactivating a product = none of its colors appear in new-document menus; a single color can also be deactivated
+- Migration: build the parent table by "organization + name" (checked 2026-10-08: products with the same name all had the same category and unit)
+- Read-only view `product_catalog` (`security_invoker`): product, color, each color's stock weight and rolls, whether it's below safety stock; shared by the frontend and the AI
 
-### 7.2 畫面
+### 7.2 Screens
 
-- 產品頁為可展開的兩層表格：產品列顯示顏色數、總庫存、低庫存顏色數；展開後列出各顏色的色號、庫存（重量／卷數）、安全庫存、狀態
-- 搜尋同時比對產品名稱、顏色與色號，符合的產品自動展開
-- 新增產品時可一次輸入多個顏色；展開後可「新增顏色」
-- **編輯分層**：點產品列展開或收合；產品列的編輯按鈕編輯產品（名稱、類別、單位、狀態），編輯紀錄記在產品；點顏色列編輯顏色（顏色、色號、色值、安全庫存、狀態），編輯紀錄記在該顏色。改產品名稱時同步到顏色列的名稱只記在產品的紀錄，不會重複出現在每個顏色
-- 訂單、採購、出貨的產品選單依產品分組（「1601鳥眼布 › 17大紅」），可用「鳥眼 大紅」搜尋（尚未實作，隨 A3 採購一起做；A6 先讓建單選單排除已停用的產品）
+- The product page is an expandable two-level table: product rows show the number of colors, total stock and number of low-stock colors; expanding lists each color's color code, stock (weight / rolls), safety stock and status
+- Search matches product name, color and color code together, and matching products expand automatically
+- Several colors can be entered at once when adding a product; after expanding, "Add color" is available
+- **Editing by level**: clicking a product row expands or collapses it; the product row's edit button edits the product (name, category, unit, status), with edit history recorded on the product; clicking a color row edits the color (color, color code, color value, safety stock, status), with edit history recorded on that color. When a product name change syncs to the color rows' names, it's recorded only on the product, not repeated on every color
+- Product menus in orders, purchasing and shipping are grouped by product (「1601鳥眼布 › 17大紅」) and searchable with 「鳥眼 大紅」 (not implemented yet; to be done with A3 purchasing; A6 first makes the order-creation menu exclude deactivated products)
 
-### 7.3 API
+### 7.3 APIs
 
-| API | 權限鍵 | 說明 |
-|-----|--------|------|
-| `create_product` | `canCreateProducts` | 產品資料＋一個以上的顏色 |
-| `update_product`、`set_product_active` | `canEditProducts` | 只改母層；名稱、類別、單位同步到顏色列 |
-| `add_product_color` | `canCreateProducts` | 在既有產品下新增顏色 |
-| `update_product_color`、`set_product_color_active` | `canEditProducts` | 只改單一顏色 |
+| API | Permission key | Description |
+|-----|----------------|-------------|
+| `create_product` | `canCreateProducts` | Product data + one or more colors |
+| `update_product`, `set_product_active` | `canEditProducts` | Changes the parent level only; name, category and unit sync to the color rows |
+| `add_product_color` | `canCreateProducts` | Adds a color under an existing product |
+| `update_product_color`, `set_product_color_active` | `canEditProducts` | Changes a single color only |
 
-### 7.4 時程
+### 7.4 Timing
 
-排在 A2 訂單之後立即進行（A6 提前），讓 A2 重寫的建單對話框直接使用分組的產品選單，A3 採購、A5 出貨沿用。
+Scheduled right after A2 orders (A6 moved up), so the order-creation dialog rewritten in A2 uses the grouped product menu directly, and A3 purchasing and A5 shipping reuse it.

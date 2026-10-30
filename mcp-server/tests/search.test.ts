@@ -27,7 +27,7 @@ test("a separator on its own is not a search word; one inside a word is kept", (
 });
 
 test("name and color match with a separator, without a space, or with a trailing 色", () => {
-  for (const term of ["雲朵眠-藍", "雲朵眠藍色", "藍色", "雲朵眠藍"]) assert.ok(matchesNameColor(term, "雲朵眠", "藍"), term);
+  for (const term of ["雲朵眠-藍", "雲朵眠藍色", "藍色", "雲朵眠藍", "藍的", "雲朵眠藍色的"]) assert.ok(matchesNameColor(term, "雲朵眠", "藍"), term);
   assert.ok(matchesNameColor("米白色", "棉麻平織", "米白色"), "a color named …色 still matches whole");
   assert.ok(!matchesNameColor("紅色", "雲朵眠", "藍"));
 });
@@ -38,7 +38,7 @@ test("the phrasings from the regressed eval cases find the product and its stock
   assert.ok(inventory.ok && (inventory.data as { total_stock: number }[]).some((r) => r.total_stock === 320), "pp-inventory / q-inventory-search");
 
   const real = ctxFor("real");
-  for (const search of ["雲朵眠 - 藍色", "雲朵眠 藍色", "雲朵眠藍色"]) {
+  for (const search of ["雲朵眠 - 藍色", "雲朵眠 藍色", "雲朵眠藍色", "雲朵眠 藍的"]) {
     const products = await tool("list_products").run(real, { search });
     assert.ok(products.ok && (products.data as { color: string }[]).some((p) => p.color === "藍"), search);
   }

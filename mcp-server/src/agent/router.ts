@@ -85,12 +85,12 @@ export async function routeQuery(
     );
     decision = await aiGenerateObject<RouterDecision>({
       schema: routerSchema,
-      system: routerPrompt + names,
+      system: routerPrompt.text + names,
       messages: [
         ...recentHistory,
         { role: "user" as const, content: message },
       ],
-    } as any, { ...run, phase: "router" });
+    } as any, { ...run, phase: "router", prompt: routerPrompt.link });
     observer?.onRoute?.(decision, false);
   } catch {
     // 分類失敗時 fallback：用第一個可用群組

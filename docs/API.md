@@ -1,35 +1,37 @@
-# API 文件
+# API Documentation
 
-> 現況文件（2026-10-09）。前端、AI tools 都透過 Supabase（PostgREST）呼叫資料庫函式；AI 對話另有獨立的 HTTP 伺服器（§6）。開發計畫與決策紀錄在 [requirements/PHASE1_BUSINESS_API.md](./requirements/PHASE1_BUSINESS_API.md)。
+> Current-state document (2026-10-09). The frontend and the AI tools both call database functions through Supabase (PostgREST); AI conversations also have their own HTTP server (§6). The development plan and decision record are in [requirements/PHASE1_BUSINESS_API.md](./requirements/PHASE1_BUSINESS_API.md).
+>
+> The app's UI is in Chinese, so user-facing strings returned by the APIs (`summary` titles and labels, error messages) are Chinese. Where this document quotes them, the Chinese text is the literal value and the English is a gloss.
 
-## 1. 概覽
+## 1. Overview
 
-| 類別 | 呼叫方式 | 說明 |
-|------|----------|------|
-| 業務 API（§3） | `supabase.rpc('<名稱>', { ... })`，前端包在 `src/lib/api/*.ts` | 所有業務資料的寫入：客戶、工廠、產品、貨架、訂單、採購、入庫、出貨。以函式擁有者身分執行，開頭檢查權限鍵 |
-| 組織與成員（§4） | `supabase.rpc(...)` | 建立組織之外的成員與擁有權操作、邀請 |
-| 唯讀資料（§5） | `supabase.from('<資料表或 view>').select(...)` | 讀取依 RLS 與權限鍵（[PERMISSIONS.md](./PERMISSIONS.md)） |
-| AI 伺服器（§6） | HTTP，帶 Supabase JWT | AI 對話、確認 AI 提出的寫入、MCP |
+| Category | How it's called | Description |
+|----------|-----------------|-------------|
+| Business APIs (§3) | `supabase.rpc('<name>', { ... })`, wrapped on the frontend in `src/lib/api/*.ts` | Every write of business data: customers, factories, products, shelves, orders, purchasing, receiving, shipping. Runs as the function owner and checks the permission key first |
+| Organizations and members (§4) | `supabase.rpc(...)` | Member and ownership operations other than creating an organization, invitations |
+| Read-only data (§5) | `supabase.from('<table or view>').select(...)` | Reads follow RLS and permission keys ([PERMISSIONS.md](./PERMISSIONS.md)) |
+| AI server (§6) | HTTP, with a Supabase JWT | AI conversations, confirming writes the AI proposed, MCP |
 
-資料表的用途見 [DATABASE_TABLES.md](./DATABASE_TABLES.md)。
+What each table is for: [DATABASE_TABLES.md](./DATABASE_TABLES.md).
 
-## 2. 共用規則（A0）
+## 2. Shared rules (A0)
 
-### 2.1 函式
+### 2.1 Functions
 
-| 項目 | 規則 |
+| Item | Rule |
 |------|------|
-| 名稱 | `<動作>_<對象>`：`create_customer`、`update_customer`、`set_customer_active`、`create_order`、`cancel_order` |
-| 參數 | 一律 `p_` 開頭；第一個參數是 `p_organization_id`；最後一個是 `p_dry_run boolean DEFAULT false` |
-| 安全性 | 實作在不公開的 `private` schema：`SECURITY DEFINER`、`SET search_path TO 'public'`；`public` 只放同名、同參數的 `SECURITY INVOKER` 包裝函式，供 PostgREST 呼叫（`supabase.rpc('<名稱>')`）。只開放給 `authenticated`。開頭先檢查權限鍵，再確認每一筆引用的資料（客戶、產品、訂單…）都屬於 `p_organization_id`。§4 的組織與成員 RPC、權限函式也是同樣的結構 |
-| 修改與新增 | 修改實作用 `CREATE OR REPLACE FUNCTION private.<名稱>`，包裝函式不用動；**不要** `CREATE OR REPLACE` public 裡的同名函式（會蓋掉包裝函式）。新增 API 時兩個都要建立，參照 `supabase/migrations/20261009140512_private_definer_functions.sql` |
-| 權限 | 以 `api_require_permission(p_organization_id, '<鍵>')` 檢查，內部使用 `user_has_organization_permission()`（[SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4 的契約） |
-| 更新 | 以 `p_changes jsonb` 傳入要改的欄位：沒出現的欄位不變，出現且為空字串或 `null` 的欄位清空。方便 AI 只改一個欄位，也讓試算結果能列出「舊值 → 新值」 |
-| 刪除 | 不提供。主檔以 `set_<對象>_active` 停用；單據以 `cancel_<對象>` 取消（R5） |
+| Name | `<action>_<object>`: `create_customer`, `update_customer`, `set_customer_active`, `create_order`, `cancel_order` |
+| Parameters | Always prefixed `p_`; the first parameter is `p_organization_id`; the last is `p_dry_run boolean DEFAULT false` |
+| Security | Implemented in the non-public `private` schema: `SECURITY DEFINER`, `SET search_path TO 'public'`; `public` holds only a same-named, same-parameter `SECURITY INVOKER` wrapper for PostgREST to call (`supabase.rpc('<name>')`). Granted only to `authenticated`. It first checks the permission key, then confirms that every referenced record (customer, product, order…) belongs to `p_organization_id`. The §4 organization and member RPCs and the permission functions have the same structure |
+| Changing and adding | Change an implementation with `CREATE OR REPLACE FUNCTION private.<name>`, leaving the wrapper alone; **never** `CREATE OR REPLACE` the same-named function in public (it would overwrite the wrapper). A new API needs both, following `supabase/migrations/20261009140512_private_definer_functions.sql` |
+| Permissions | Checked with `api_require_permission(p_organization_id, '<key>')`, which uses `user_has_organization_permission()` internally (the contract in [SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4) |
+| Updates | Fields to change are passed in `p_changes jsonb`: fields not present are unchanged, and fields present as an empty string or `null` are cleared. This lets the AI change a single field, and lets the dry-run result list "old value → new value" |
+| Deletes | Not offered. Master data is deactivated with `set_<object>_active`; documents are cancelled with `cancel_<object>` (R5) |
 
-### 2.2 回傳
+### 2.2 Return value
 
-所有寫入 API 回傳同一種 `jsonb`：
+Every write API returns the same `jsonb`:
 
 ```json
 {
@@ -43,355 +45,358 @@
 }
 ```
 
-- `id`：寫入後的 ID；試算建立時為 `null`
-- `number`：可顯示的編號（訂單編號、採購單號、出貨單號）；沒有編號的對象為 `null`
-- `summary`：以名稱表示的內容，格式與 AI 確認卡片相同；只列出有值的欄位；更新時 `value` 為「舊值 → 新值」，且只列出有變更的欄位
+(`建立客戶` = Create customer; `公司名稱` = Company name; `聯絡人` = Contact person.)
 
-### 2.3 錯誤
+- `id`: the ID after the write; `null` for a dry-run create
+- `number`: a displayable number (order number, purchase order number, shipping number); `null` for objects without numbers
+- `summary`: the content expressed with names, in the same format as the AI confirmation card; only fields with values are listed; for updates, `value` is "old value → new value" and only changed fields are listed
 
-錯誤以 `PERFORM public.api_fail('<類別>', '<代碼>', '<給使用者看的中文>')` 拋出（2026-10-09 起；原本為 `RAISE ... USING ERRCODE, HINT`）。透過 PostgREST（前端 `supabase.rpc`、AI tools）收到的錯誤內容為 `{ code: 類別, message: 中文訊息, hint: 代碼 }`；前端與 AI 直接顯示 `message`，依 `hint` 判斷情況，不顯示資料庫原始錯誤。
+### 2.3 Errors
 
-| 類別（`code`） | HTTP 狀態 | 意義 | 代碼範例 |
-|----------------|-----------|------|----------|
-| `42501` | 403 | 沒有登入或沒有權限 | `forbidden` |
-| `P0002` | 404 | 找不到（含屬於其他組織） | `customer_not_found`、`product_not_found` |
-| `22023` | 400 | 輸入不正確 | `name_required`、`phone_required`、`invalid_email` |
-| `23505` | 409 | 重複 | `customer_name_taken` |
-| `55000` | 409 | 目前狀態不允許（例如已出貨不可取消） | `order_has_shipments` |
+Errors are raised with `PERFORM public.api_fail('<class>', '<code>', '<Chinese message for the user>')` (since 2026-10-09; previously `RAISE ... USING ERRCODE, HINT`). Through PostgREST (the frontend's `supabase.rpc`, AI tools) the error arrives as `{ code: class, message: Chinese message, hint: code }`; the frontend and AI show `message` as is and use `hint` to tell cases apart, never showing the raw database error.
 
-`api_fail()` 以 PostgREST 的自訂錯誤（SQLSTATE `PGRST`）實作，才能指定 HTTP 狀態；直接用一般的 SQLSTATE 時，`P0002`、`55000` 會變成 500。在資料庫內（SQL 測試、其他函式）攔截時看到的 SQLSTATE 是 `PGRST`，`code`、`message`、`hint` 在錯誤訊息的 JSON 中（`supabase/tests/_helpers.sql` 的 `check_api_error_as` 會自動拆開）。新增 API 時一律使用 `api_fail()`。
+| Class (`code`) | HTTP status | Meaning | Example codes |
+|----------------|-------------|---------|---------------|
+| `42501` | 403 | Not signed in or no permission | `forbidden` |
+| `P0002` | 404 | Not found (including belonging to another organization) | `customer_not_found`, `product_not_found` |
+| `22023` | 400 | Invalid input | `name_required`, `phone_required`, `invalid_email` |
+| `23505` | 409 | Duplicate | `customer_name_taken` |
+| `55000` | 409 | Not allowed in the current state (e.g. can't cancel once shipped) | `order_has_shipments` |
 
-屬於其他組織的資料一律回報「找不到」，不透露它存在。
+`api_fail()` is implemented with PostgREST's custom error (SQLSTATE `PGRST`) so it can set the HTTP status; with a plain SQLSTATE, `P0002` and `55000` would become 500. Caught inside the database (SQL tests, other functions), the SQLSTATE is `PGRST`, with `code`, `message` and `hint` in the error message's JSON (`check_api_error_as` in `supabase/tests/_helpers.sql` unpacks it automatically). Always use `api_fail()` in new APIs.
 
-### 2.4 試算模式
+Data belonging to another organization is always reported as "not found", without revealing that it exists.
 
-- 簡單的寫入（主檔）：驗證完、組好 `summary` 後，`p_dry_run` 為 `true` 就直接回傳，不寫入
-- 牽涉多張表的單據（訂單、採購、入庫、出貨）：在子交易中**真的寫入一次**，取得完整的驗證結果與 `summary` 後，以例外回滾子交易。試算與正式寫入因此走完全相同的程式與觸發器
-- 試算不得消耗流水號：單據編號改由 API 依組織計算（§2.5），不使用 sequence
+### 2.4 Dry-run mode
 
-### 2.5 資料分類與單據編號（Phase 0 F14、B8）
+- Simple writes (master data): after validating and building `summary`, return right away when `p_dry_run` is `true`, without writing
+- Documents spanning several tables (orders, purchasing, receiving, shipping): **really write once** inside a subtransaction, take the complete validation result and `summary`, then roll back the subtransaction with an exception. A dry run and the real write therefore run exactly the same code and triggers
+- A dry run must not consume sequence numbers: document numbers are computed by the API per organization (§2.5) instead of using a sequence
 
-| 類別 | 資料 |
-|------|------|
-| 主檔（Dim） | 客戶、產品、工廠、用戶、貨架、權限、系統設定 |
-| 交易（Fact） | 訂單、採購單、進貨單（入庫）、出貨單；庫存查詢由交易彙總而來 |
+### 2.5 Data categories and document numbers (Phase 0 F14, B8)
 
-交易單據統一編號：**類別字母＋YYYYMMDD＋四位流水號**，組織內唯一，依台灣日期每日重新起算。
+| Category | Data |
+|----------|------|
+| Master data (Dim) | Customers, products, factories, users, shelves, permissions, system settings |
+| Transactions (Fact) | Orders, purchase orders, receipts (receiving), shippings; inventory queries are aggregated from transactions |
 
-| 單據 | 字母 | 範例 | 欄位 |
-|------|------|------|------|
-| 訂單 | B | `B202610080001` | `orders.order_number` |
-| 採購單 | P | `P202610080001` | `purchase_orders.po_number` |
-| 進貨單 | I | `I202610080001` | `inventories.receipt_number`（A2 新增；既有進貨單依建立日期補號） |
-| 出貨單 | O | `O202610080001` | `shippings.shipping_number` |
+Unified transaction document numbers: **category letter + YYYYMMDD + four-digit sequence**, unique within the organization, restarting daily by Taiwan date.
 
-- 由 `api_next_document_number()` 在交易內以 advisory lock 鎖住「組織＋單據種類＋日期」後取當日最大號＋1，不使用 sequence，因此試算回滾不會跳號
-- 2026-10-08 以前建立的單據保留原編號（例如 `26K1007-097`、`PO-20261007-0027`、`SHIP-261007-001`）
-- 尚未改用 API 的寫入（前端、AI 工具直接寫表）由觸發器編號，用戶端不能自訂編號
+| Document | Letter | Example | Column |
+|----------|--------|---------|--------|
+| Order | B | `B202610080001` | `orders.order_number` |
+| Purchase order | P | `P202610080001` | `purchase_orders.po_number` |
+| Receipt | I | `I202610080001` | `inventories.receipt_number` (added in A2; existing receipts were numbered by creation date) |
+| Shipping | O | `O202610080001` | `shippings.shipping_number` |
 
-## 3. 業務 API
+- `api_next_document_number()` takes an advisory lock on "organization + document type + date" within the transaction, then takes that day's highest number + 1; it doesn't use a sequence, so a rolled-back dry run leaves no gaps
+- Documents created before 2026-10-08 keep their original numbers (for example `26K1007-097`, `PO-20261007-0027`, `SHIP-261007-001`)
+- Writes that don't use the API yet (the frontend or AI tools writing tables directly) are numbered by a trigger; clients can't choose their own numbers
 
-所有寫入 API 都回傳 §2.2 的格式，錯誤依 §2.3。以下只列各 API 特有的內容。
+## 3. Business APIs
 
-### A1 客戶與工廠
+Every write API returns the §2.2 format, with errors per §2.3. Only what is specific to each API is listed below.
 
-Migration：`supabase/migrations/20261008170920_api_a1_customers_factories.sql`；測試：`supabase/tests/api_a1_customers_factories.test.sql`；前端：`src/lib/api/partners.ts`。
+### A1 Customers and factories
 
-客戶與工廠的參數、規則完全相同，只有名稱、權限鍵與錯誤代碼的前綴不同（`customer_*`／`factory_*`）。以下以客戶為例。
+Migration: `supabase/migrations/20261008170920_api_a1_customers_factories.sql`; test: `supabase/tests/api_a1_customers_factories.test.sql`; frontend: `src/lib/api/partners.ts`.
 
-**`create_customer`**（寫入，`canCreateCustomers`）
+Customers and factories have exactly the same parameters and rules; only the names, permission keys and error code prefixes differ (`customer_*` / `factory_*`). Customers are used as the example below.
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
-| `p_organization_id` | uuid | ✅ | 目前選擇的組織 |
-| `p_name` | text | ✅ | 公司名稱；前後空白會去除；同組織內不可重名（不分大小寫） |
-| `p_contact_person` | text | ✅ | 聯絡人 |
-| `p_phone` | text | 二擇一 | 手機；與市話至少填一個 |
-| `p_landline_phone` | text | 二擇一 | 市話 |
-| `p_fax`、`p_email`、`p_address`、`p_note` | text | | 電子郵件需為 `名稱@網域` 格式；空字串視為未填 |
-| `p_dry_run` | boolean | | `true` 時只驗證並回傳內容 |
+**`create_customer`** (write, `canCreateCustomers`)
 
-回傳：`id` 為新客戶 ID；`summary.title` 為「建立客戶」，`fields` 依序為名稱、聯絡人、手機、市話、傳真、電子郵件、地址、備註（只列有值的欄位）。
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `p_organization_id` | uuid | ✅ | The currently selected organization |
+| `p_name` | text | ✅ | Company name; leading and trailing spaces are trimmed; no duplicate names in the same organization (case-insensitive) |
+| `p_contact_person` | text | ✅ | Contact person |
+| `p_phone` | text | One of two | Mobile; at least one of mobile and landline |
+| `p_landline_phone` | text | One of two | Landline |
+| `p_fax`, `p_email`, `p_address`, `p_note` | text | | Email must be `name@domain`; an empty string counts as not filled in |
+| `p_dry_run` | boolean | | When `true`, only validates and returns the content |
 
-**`update_customer`**（寫入，`canEditCustomers`）
+Returns: `id` is the new customer ID; `summary.title` is 「建立客戶」 (Create customer), and `fields` are, in order, name, contact person, mobile, landline, fax, email, address, note (only fields with values).
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
+**`update_customer`** (write, `canEditCustomers`)
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `p_organization_id` | uuid | ✅ | |
-| `p_customer_id` | uuid | ✅ | 必須屬於 `p_organization_id`，否則回報找不到 |
-| `p_changes` | jsonb | ✅ | 要修改的欄位：`name`、`contact_person`、`phone`、`landline_phone`、`fax`、`email`、`address`、`note`。沒出現的欄位不變；空字串或 `null` 清空 |
+| `p_customer_id` | uuid | ✅ | Must belong to `p_organization_id`, otherwise reported as not found |
+| `p_changes` | jsonb | ✅ | Fields to change: `name`, `contact_person`, `phone`, `landline_phone`, `fax`, `email`, `address`, `note`. Fields not present are unchanged; an empty string or `null` clears |
 | `p_dry_run` | boolean | | |
 
-合併後的客戶仍須符合建立時的規則（例如清空手機時必須有市話）。回傳：`summary.title` 為「修改客戶「<原名稱>」」，`fields` 只列出有變更的欄位，值為「舊值 → 新值」（空值顯示為「（空白）」）；沒有任何變更時 `fields` 為空陣列。
+The merged customer must still meet the creation rules (for example, clearing the mobile requires a landline). Returns: `summary.title` is 「修改客戶「<original name>」」 (Edit customer), and `fields` lists only changed fields, valued "old → new" (empty values shown as 「（空白）」, blank); with no changes, `fields` is an empty array.
 
-**`set_customer_active`**（寫入，`canEditCustomers`）
+**`set_customer_active`** (write, `canEditCustomers`)
 
-參數：`p_organization_id`、`p_customer_id`、`p_is_active`（boolean，必填）、`p_dry_run`。停用的客戶仍保留在既有單據上，但不會出現在新訂單的客戶選單。回傳：`summary` 為「停用客戶「<名稱>」」或「啟用客戶「<名稱>」」，`fields` 為「狀態：啟用 → 停用」（狀態沒有改變時為空陣列）。
+Parameters: `p_organization_id`, `p_customer_id`, `p_is_active` (boolean, required), `p_dry_run`. A deactivated customer stays on existing documents but no longer appears in the customer menu for new orders. Returns: `summary` is 「停用客戶「<name>」」 (Deactivate customer) or 「啟用客戶「<name>」」 (Activate customer), and `fields` is 「狀態：啟用 → 停用」 (Status: active → inactive) (an empty array if the status didn't change).
 
-**錯誤代碼**
+**Error codes**
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `42501` | `not_signed_in`／`forbidden` | 請先登入／您的角色沒有權限執行此操作 |
-| `P0002` | `customer_not_found`／`factory_not_found` | 找不到此客戶／工廠（含屬於其他組織的） |
-| `22023` | `name_required` | 請輸入客戶名稱 |
-| `22023` | `contact_person_required` | 請輸入聯絡人 |
-| `22023` | `phone_required` | 手機或市話至少填一個 |
-| `22023` | `invalid_email` | 電子郵件格式不正確 |
-| `22023` | `invalid_changes`／`unknown_field` | 修改內容格式不正確／不支援修改的欄位：… |
-| `22023` | `is_active_required` | 請指定要啟用或停用 |
-| `23505` | `customer_name_taken`／`factory_name_taken` | 已有同名的客戶「…」 |
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `42501` | `not_signed_in` / `forbidden` | Please sign in / Your role doesn't have permission for this |
+| `P0002` | `customer_not_found` / `factory_not_found` | Customer / factory not found (including ones in other organizations) |
+| `22023` | `name_required` | Enter the customer name |
+| `22023` | `contact_person_required` | Enter the contact person |
+| `22023` | `phone_required` | Fill in at least one of mobile or landline |
+| `22023` | `invalid_email` | Invalid email format |
+| `22023` | `invalid_changes` / `unknown_field` | Invalid change format / Field can't be changed: … |
+| `22023` | `is_active_required` | Specify whether to activate or deactivate |
+| `23505` | `customer_name_taken` / `factory_name_taken` | A customer named "…" already exists |
 
-**讀取**：客戶與工廠的列表、單筆查詢維持直接查表。新增欄位 `is_active`；新單據的選單只列出 `is_active = true` 的資料。
+**Reads**: customer and factory lists and single lookups keep querying the tables directly. New column `is_active`; new-document menus list only `is_active = true`.
 
-### A2 訂單
+### A2 Orders
 
-Migration：`supabase/migrations/20261008181853_api_a2_orders.sql`；測試：`supabase/tests/api_a2_orders.test.sql`；前端：`src/lib/api/orders.ts`。
+Migration: `supabase/migrations/20261008181853_api_a2_orders.sql`; test: `supabase/tests/api_a2_orders.test.sql`; frontend: `src/lib/api/orders.ts`.
 
-**單據編號（所有交易單據共用）**：見 §2.5，訂單為 `B202610080001`。試算不會用掉號碼。直接寫表的寫入（目前只剩 AI 的部分建單工具）一律由觸發器以同樣規則編號，使用者不能自訂編號（與改版前相同）；只有 API 內部給的號碼會保留。
+**Document numbers (shared by all transaction documents)**: see §2.5; orders look like `B202610080001`. Dry runs don't use up numbers. Writes straight to the table (now only some of the AI's order-creation tools) are always numbered by the trigger with the same rule, and users can't choose numbers (as before the change); only numbers assigned inside the API are kept.
 
-**`create_order`**（寫入，`canCreateOrders`）
+**`create_order`** (write, `canCreateOrders`)
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
 | `p_organization_id` | uuid | ✅ | |
-| `p_customer_id` | uuid | ✅ | 同組織、啟用中的客戶 |
-| `p_items` | jsonb | ✅ | 至少一項：`[{ product_id, quantity, unit_price, total_rolls?, specifications? }]`；產品須屬同組織且未停用；數量 > 0、單價 ≥ 0 |
-| `p_factory_ids` | uuid[] | | 指定工廠；同組織、啟用中 |
+| `p_customer_id` | uuid | ✅ | An active customer in the same organization |
+| `p_items` | jsonb | ✅ | At least one: `[{ product_id, quantity, unit_price, total_rolls?, specifications? }]`; products must be in the same organization and not deactivated; quantity > 0, unit price ≥ 0 |
+| `p_factory_ids` | uuid[] | | Assigned factories; same organization, active |
 | `p_note` | text | | |
 | `p_dry_run` | boolean | | |
 
-回傳：`id`、`number`（訂單編號；試算時兩者皆為 `null`）。`summary.title` 為「建立訂單」，`fields` 依序為客戶、品項 1…n（「產品 - 顏色（色號）× 數量 公斤，單價 X」）、指定工廠、備註、訂單總額。
+Returns: `id`, `number` (order number; both `null` in a dry run). `summary.title` is 「建立訂單」 (Create order), and `fields` are, in order, customer, lines 1…n (「產品 - 顏色（色號）× 數量 公斤，單價 X」, product - color (color code) × quantity kg, unit price X), assigned factories, note, order total.
 
-**`update_order`**（寫入，`canEditOrders`）
+**`update_order`** (write, `canEditOrders`)
 
-`p_changes` 可包含：
+`p_changes` may contain:
 
-| 鍵 | 說明 |
-|----|------|
-| `items` | 完整的品項清單（與 `save_order_items` 相同）：有 `id` 的更新、沒有的新增、沒列出的刪除。已出貨或已採購的品項不可刪除或更換產品；數量不可低於已出貨量 |
-| `factory_ids` | 完整的工廠清單，取代現有的 |
-| `note` | 備註 |
-| `status` | `pending`、`confirmed`、`factory_ordered`、`completed`；取消請用 `cancel_order` |
-| `payment_status` | `unpaid`、`partial_paid`、`paid` |
-| `shipping_status` | `not_started`、`partial_shipped`、`shipped`（通常由出貨自動計算；只在需要手動覆寫時傳入） |
+| Key | Description |
+|-----|-------------|
+| `items` | The complete line list (same as `save_order_items`): lines with an `id` are updated, lines without one are added, lines not listed are deleted. Shipped or purchased lines can't be deleted or change product; quantity can't drop below what was shipped |
+| `factory_ids` | The complete factory list, replacing the current one |
+| `note` | Note |
+| `status` | `pending`, `confirmed`, `factory_ordered`, `completed`; to cancel, use `cancel_order` |
+| `payment_status` | `unpaid`, `partial_paid`, `paid` |
+| `shipping_status` | `not_started`, `partial_shipped`, `shipped` (normally computed from shippings; pass it only to override manually) |
 
-回傳：`number` 為訂單編號；`summary.title` 為「修改訂單 <編號>」；`fields` 列出有變更的狀態、工廠、備註（「舊 → 新」），以及「移除品項」「修改品項」「新增品項」。已取消的訂單不能修改。
+Returns: `number` is the order number; `summary.title` is 「修改訂單 <number>」 (Edit order); `fields` lists the changed status, factories and note ("old → new"), plus 「移除品項」「修改品項」「新增品項」 (removed / changed / added lines). Cancelled orders can't be edited.
 
-**`cancel_order`**（寫入，`canEditOrders`）
+**`cancel_order`** (write, `canEditOrders`)
 
-參數：`p_organization_id`、`p_order_id`、`p_reason`（選填）、`p_dry_run`。已有出貨紀錄、或有未取消的採購單時不能取消。取消後記錄 `cancelled_at`、`cancel_reason`，訂單不能再修改。
+Parameters: `p_organization_id`, `p_order_id`, `p_reason` (optional), `p_dry_run`. Can't be cancelled once it has shipping records or any purchase order that isn't cancelled. After cancelling, `cancelled_at` and `cancel_reason` are recorded and the order can no longer be edited.
 
-**錯誤代碼**（除共用的 `forbidden`、`not_signed_in`、`unknown_field`、`invalid_changes` 外）
+**Error codes** (besides the shared `forbidden`, `not_signed_in`, `unknown_field`, `invalid_changes`)
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `order_not_found`、`customer_not_found`、`product_not_found`、`factory_not_found`、`item_not_found` | 找不到此訂單／客戶／產品／工廠，訂單項目不屬於此訂單 |
-| `22023` | `customer_inactive`、`product_unavailable`、`factory_inactive` | 客戶「…」已停用、產品「…」已停用、工廠「…」已停用 |
-| `22023` | `items_required`、`invalid_quantity`、`invalid_unit_price` | 訂單至少需要一項產品、數量必須大於 0、單價不可為負數 |
-| `22023` | `use_cancel_order`、`invalid_status`、`invalid_payment_status`、`invalid_shipping_status`、`invalid_factory_ids` | 請使用取消訂單、狀態不正確… |
-| `55000` | `item_shipped`、`item_purchased`、`quantity_below_shipped` | 產品「…」已出貨／已採購，不可刪除或更換；數量不可低於已出貨 … 公斤 |
-| `55000` | `order_cancelled`、`order_already_cancelled`、`order_has_shipments`、`order_has_purchase_orders` | 訂單 … 已取消，不能修改；已有出貨紀錄／有進行中的採購單 …，不能取消 |
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `order_not_found`, `customer_not_found`, `product_not_found`, `factory_not_found`, `item_not_found` | Order / customer / product / factory not found; the order line doesn't belong to this order |
+| `22023` | `customer_inactive`, `product_unavailable`, `factory_inactive` | Customer "…" is deactivated, product "…" is deactivated, factory "…" is deactivated |
+| `22023` | `items_required`, `invalid_quantity`, `invalid_unit_price` | An order needs at least one product, quantity must be greater than 0, unit price can't be negative |
+| `22023` | `use_cancel_order`, `invalid_status`, `invalid_payment_status`, `invalid_shipping_status`, `invalid_factory_ids` | Use cancel order, invalid status… |
+| `55000` | `item_shipped`, `item_purchased`, `quantity_below_shipped` | Product "…" has been shipped / purchased and can't be deleted or replaced; quantity can't be below the … kg already shipped |
+| `55000` | `order_cancelled`, `order_already_cancelled`, `order_has_shipments`, `order_has_purchase_orders` | Order … is cancelled and can't be edited; it has shipping records / active purchase orders … and can't be cancelled |
 
-### A3 採購單
+### A3 Purchase orders
 
-Migration：`supabase/migrations/20261008193554_api_a3_purchase_orders.sql`；測試：`supabase/tests/api_a3_purchase_orders.test.sql`；前端：`src/lib/api/purchases.ts`。
+Migration: `supabase/migrations/20261008193554_api_a3_purchase_orders.sql`; test: `supabase/tests/api_a3_purchase_orders.test.sql`; frontend: `src/lib/api/purchases.ts`.
 
-**`create_purchase_order`**（`canCreatePurchases`）
+**`create_purchase_order`** (`canCreatePurchases`)
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
-| `p_factory_id` | uuid | ✅ | 同組織且未停用的工廠 |
-| `p_items` | jsonb | ✅ | 至少一項：`[{ product_id, ordered_quantity, unit_price, ordered_rolls?, specifications? }]`；產品（顏色）與其產品都須啟用；數量 > 0、單價 ≥ 0 |
-| `p_order_ids` | uuid[] | | 關聯訂單（同組織、未取消）；「待確認」「已確認」的訂單改為「已向工廠下單」 |
-| `p_expected_arrival_date` | date | | 不可早於下單日期 |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `p_factory_id` | uuid | ✅ | A factory in the same organization, not deactivated |
+| `p_items` | jsonb | ✅ | At least one: `[{ product_id, ordered_quantity, unit_price, ordered_rolls?, specifications? }]`; the product (color) and its product must both be active; quantity > 0, unit price ≥ 0 |
+| `p_order_ids` | uuid[] | | Linked orders (same organization, not cancelled); orders that are "pending" or "confirmed" become "ordered from factory" |
+| `p_expected_arrival_date` | date | | Can't be before the order date |
 | `p_note` | text | | |
-| `p_order_date` | date | | 預設為台灣今天 |
+| `p_order_date` | date | | Defaults to today in Taiwan |
 
-回傳：`id`、`number`（採購單編號 P＋YYYYMMDD＋四位流水號；試算時兩者皆為 `null`）。狀態為「已下單」（`confirmed`）。`summary.title` 為「建立採購單」，`fields` 依序為工廠、關聯訂單、品項 1…n（「產品 - 顏色（色號）× 數量 公斤，單價 X」）、下單日期、預計到貨日期、備註、採購總額。
+Returns: `id`, `number` (purchase order number P + YYYYMMDD + four-digit sequence; both `null` in a dry run). Status is "ordered" (`confirmed`). `summary.title` is 「建立採購單」 (Create purchase order), and `fields` are, in order, factory, linked orders, lines 1…n (「產品 - 顏色（色號）× 數量 公斤，單價 X」), order date, expected arrival date, note, purchase total.
 
-**`update_purchase_order`**（`canEditPurchases`）：`p_changes` 可含
+**`update_purchase_order`** (`canEditPurchases`): `p_changes` may contain
 
-| 鍵 | 說明 |
-|----|------|
-| `items` | 完整的品項清單（與 `save_purchase_order_items` 相同）：有 `id` 的更新、沒有的新增、沒列出的刪除。已入庫的品項不可刪除或更換產品；數量不可低於已入庫量 |
-| `order_ids` | 完整的關聯訂單清單；新關聯的訂單改為「已向工廠下單」，移除關聯的訂單若沒有其他進行中的採購單則改回「已確認」 |
-| `factory_id` | 已有入庫紀錄時不可更換 |
-| `order_date`、`expected_arrival_date` | `YYYY-MM-DD`；預計到貨日期可用空字串清除 |
-| `note` | 空字串清除 |
-| `status` | `pending`、`confirmed`、`partial_received`、`completed`；入庫時會自動重算。取消請用 `cancel_purchase_order` |
+| Key | Description |
+|-----|-------------|
+| `items` | The complete line list (same as `save_purchase_order_items`): lines with an `id` are updated, lines without one are added, lines not listed are deleted. Received lines can't be deleted or change product; quantity can't drop below what was received |
+| `order_ids` | The complete list of linked orders; newly linked orders become "ordered from factory", and unlinked orders with no other active purchase order go back to "confirmed" |
+| `factory_id` | Can't be changed once anything is received |
+| `order_date`, `expected_arrival_date` | `YYYY-MM-DD`; the expected arrival date can be cleared with an empty string |
+| `note` | An empty string clears it |
+| `status` | `pending`, `confirmed`, `partial_received`, `completed`; recomputed automatically on receiving. To cancel, use `cancel_purchase_order` |
 
-`summary` 只列有變的欄位，品項以「移除品項／修改品項（舊 → 新）／新增品項」表示。
+`summary` lists only changed fields, with lines shown as 「移除品項／修改品項（舊 → 新）／新增品項」 (removed / changed (old → new) / added lines).
 
-**`cancel_purchase_order`**（`canEditPurchases`）：`p_purchase_order_id`、`p_reason?`。已有入庫紀錄時不可取消。取消後記錄 `cancelled_at`、`cancel_reason`，採購單不能再修改；關聯保留作為紀錄，關聯訂單若沒有其他進行中的採購單，「已向工廠下單」改回「已確認」（之後才能取消該訂單）。
+**`cancel_purchase_order`** (`canEditPurchases`): `p_purchase_order_id`, `p_reason?`. Can't be cancelled once anything is received. After cancelling, `cancelled_at` and `cancel_reason` are recorded and the purchase order can no longer be edited; links are kept as a record, and linked orders with no other active purchase order go from "ordered from factory" back to "confirmed" (only then can that order be cancelled).
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `purchase_order_not_found`、`factory_not_found`、`product_not_found`、`order_not_found`、`item_not_found` | 找不到此採購單／工廠／產品／訂單，採購項目不屬於此採購單 |
-| `22023` | `factory_inactive`、`product_unavailable` | 工廠「…」已停用、產品「…」已停用 |
-| `22023` | `items_required`、`invalid_quantity`、`invalid_unit_price`、`invalid_date`、`invalid_expected_arrival_date` | 採購單至少需要一項產品、採購數量必須大於 0、單價不可為負數、日期格式不正確、預計到貨日期不可早於下單日期 |
-| `22023` | `use_cancel_purchase_order`、`invalid_status`、`invalid_order_ids`、`unknown_field` | 請使用取消採購單、採購單狀態不正確… |
-| `55000` | `item_received`、`quantity_below_received` | 產品「…」已入庫，不可刪除或更換；採購數量不可低於已入庫 … 公斤 |
-| `55000` | `order_cancelled`、`purchase_order_cancelled`、`purchase_order_already_cancelled`、`purchase_order_received` | 訂單 … 已取消；採購單 … 已取消，不能修改；已有入庫紀錄，不能取消或更換工廠 |
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `purchase_order_not_found`, `factory_not_found`, `product_not_found`, `order_not_found`, `item_not_found` | Purchase order / factory / product / order not found; the purchase line doesn't belong to this purchase order |
+| `22023` | `factory_inactive`, `product_unavailable` | Factory "…" is deactivated, product "…" is deactivated |
+| `22023` | `items_required`, `invalid_quantity`, `invalid_unit_price`, `invalid_date`, `invalid_expected_arrival_date` | A purchase order needs at least one product, quantity must be greater than 0, unit price can't be negative, invalid date format, the expected arrival date can't be before the order date |
+| `22023` | `use_cancel_purchase_order`, `invalid_status`, `invalid_order_ids`, `unknown_field` | Use cancel purchase order, invalid purchase order status… |
+| `55000` | `item_received`, `quantity_below_received` | Product "…" has been received and can't be deleted or replaced; quantity can't be below the … kg already received |
+| `55000` | `order_cancelled`, `purchase_order_cancelled`, `purchase_order_already_cancelled`, `purchase_order_received` | Order … is cancelled; purchase order … is cancelled and can't be edited; it has receiving records and can't be cancelled or change factory |
 
-### A4 入庫（進貨單）
+### A4 Receiving (receipts)
 
-Migration：`supabase/migrations/20261008233705_api_a4_receiving.sql`；測試：`supabase/tests/api_a4_receiving.test.sql`；前端：`src/lib/api/inventory.ts`。
+Migration: `supabase/migrations/20261008233705_api_a4_receiving.sql`; test: `supabase/tests/api_a4_receiving.test.sql`; frontend: `src/lib/api/inventory.ts`.
 
-**`receive_inventory`**（`canCreateInventory`）
+**`receive_inventory`** (`canCreateInventory`)
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
-| `p_purchase_order_id` | uuid | ✅ | 同組織、未取消的採購單；工廠沿用採購單 |
-| `p_rolls` | jsonb | ✅ | 至少一卷：`[{ product_id, quantity, warehouse_id, shelf?, quality?, roll_number?, specifications? }]`；產品必須在採購單上；重量 > 0；品質 `A`／`B`／`C`／`D`／`defective`，預設 `A`；不給 `roll_number` 時由系統產生（R＋YYMMDD＋九位數） |
-| `p_arrival_date` | date | | 預設為台灣今天 |
-| `p_note` | text | | |
-
-回傳：`id`、`number`（進貨單編號 I＋YYYYMMDD＋四位流水號；試算時皆為 `null`）。入庫後採購單的已入庫量與狀態自動重算。超過採購量仍可入庫。`summary.title` 為「入庫」，`fields` 依序為採購單、工廠、到貨日期、產品 1…n（「產品 - 顏色 × N 卷，共 X 公斤」）、備註、合計，以及「超過採購量」（有超收時）。
-
-**`update_inventory`**（`canEditInventory`）：`p_changes` 可含 `rolls`（完整的布卷清單：有 `id` 的更新、沒有的新增、沒列出的刪除；已出貨的布卷不可刪除或更換產品，重量不可低於已出貨量；新增或更換的產品必須在採購單上）、`arrival_date`、`note`。`summary` 只列有變的欄位，布卷以「移除布卷／修改布卷（舊 → 新）／新增布卷」表示，例如「R261008123456789 棉布 - 白 100 公斤（A 級，倉庫 一號倉 B-03）」。
-
-**`update_inventory_roll`**（`canEditInventory`）：`p_roll_id`、`p_changes` 可含 `quantity`（入庫重量；已出貨量不變，庫存隨之調整）、`quality`、`warehouse_id`、`shelf`。回傳的 `number` 為布卷編號。
-
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `purchase_order_not_found`、`inventory_not_found`、`roll_not_found`、`product_not_found`、`warehouse_not_found` | 找不到此採購單／入庫紀錄／布卷／產品／倉庫 |
-| `22023` | `rolls_required`、`invalid_quantity`、`invalid_quality`、`invalid_date`、`product_not_on_purchase_order`、`unknown_field` | 入庫紀錄至少需要一卷布、布卷重量必須大於 0、產品「…」不在採購單上… |
-| `23505` | `roll_number_taken` | 布卷編號「…」已被使用 |
-| `55000` | `purchase_order_cancelled`、`roll_shipped`、`quantity_below_shipped` | 採購單 … 已取消，不能入庫；布卷「…」已出貨，不可刪除或更換產品；入庫重量不可低於已出貨 … 公斤 |
-
-### A5 出貨單
-
-Migration：`supabase/migrations/20261009000604_api_a5_shipping.sql`；測試：`supabase/tests/api_a5_shipping.test.sql`；前端：`src/lib/api/shipping.ts`。
-
-出貨單新增 `status`（`shipped`／`cancelled`）、`cancelled_at`、`cancel_reason`。訂單的出貨量與出貨狀態只計算未取消的出貨單。
-
-**`create_shipping`**（`canCreateShipping`）
-
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
-| `p_order_id` | uuid | ✅ | 同組織、未取消的訂單；客戶沿用訂單 |
-| `p_items` | jsonb | ✅ | 至少一卷：`[{ inventory_roll_id, shipped_quantity }]`；布卷須屬同組織，其產品須在訂單上；重量 > 0 且不可超過布卷剩餘庫存 |
-| `p_shipping_date` | date | | 預設為台灣今天 |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `p_purchase_order_id` | uuid | ✅ | A purchase order in the same organization, not cancelled; the factory is taken from it |
+| `p_rolls` | jsonb | ✅ | At least one roll: `[{ product_id, quantity, warehouse_id, shelf?, quality?, roll_number?, specifications? }]`; the product must be on the purchase order; weight > 0; quality `A` / `B` / `C` / `D` / `defective`, default `A`; without `roll_number`, the system generates one (R + YYMMDD + nine digits) |
+| `p_arrival_date` | date | | Defaults to today in Taiwan |
 | `p_note` | text | | |
 
-回傳：`id`、`number`（出貨單編號 O＋YYYYMMDD＋四位流水號；試算時皆為 `null`）。同一個交易內扣除布卷庫存、更新訂單出貨進度。超過訂單量仍可出貨。`summary.title` 為「建立出貨單」，`fields` 依序為訂單、客戶、出貨日期、產品 1…n（「產品 - 顏色 × N 卷，共 X 公斤」）、備註、合計，以及「超過訂單量」（有超出時）。
+Returns: `id`, `number` (receipt number I + YYYYMMDD + four-digit sequence; both `null` in a dry run). After receiving, the purchase order's received quantities and status are recomputed automatically. Receiving more than the purchased quantity is still allowed. `summary.title` is 「入庫」 (Receive), and `fields` are, in order, purchase order, factory, arrival date, products 1…n (「產品 - 顏色 × N 卷，共 X 公斤」, product - color × N rolls, X kg in total), note, total, and 「超過採購量」 (exceeds purchase quantity) when over-received.
 
-**`update_shipping`**（`canEditShipping`）：`p_changes` 可含 `items`（完整的布卷清單：有 `id` 的更新、沒有的新增、沒列出的刪除；只把差額計入庫存）、`shipping_date`、`note`。已取消的出貨單不能修改。`summary` 以「移除布卷／修改布卷（舊 → 新）／新增布卷」表示，例如「R261008123456789 棉布 - 白 40 公斤」。
+**`update_inventory`** (`canEditInventory`): `p_changes` may contain `rolls` (the complete roll list: rolls with an `id` are updated, those without are added, those not listed are deleted; shipped rolls can't be deleted or change product, and weight can't drop below what was shipped; new or changed products must be on the purchase order), `arrival_date`, `note`. `summary` lists only changed fields, with rolls shown as 「移除布卷／修改布卷（舊 → 新）／新增布卷」 (removed / changed (old → new) / added rolls), for example 「R261008123456789 棉布 - 白 100 公斤（A 級，倉庫 一號倉 B-03）」.
 
-**`cancel_shipping`**（`canEditShipping`，決策 B3）：`p_shipping_id`、`p_reason?`。出貨的重量加回各布卷、訂單出貨進度重算；出貨項目保留作為紀錄。訂單的出貨單都取消後，訂單就可以取消（若沒有進行中的採購單）。
+**`update_inventory_roll`** (`canEditInventory`): `p_roll_id`, `p_changes` may contain `quantity` (received weight; the shipped quantity is unchanged and stock adjusts accordingly), `quality`, `warehouse_id`, `shelf`. The returned `number` is the roll number.
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `order_not_found`、`shipping_not_found`、`roll_not_found`、`item_not_found` | 找不到此訂單／出貨單／布卷，出貨項目不屬於此出貨單 |
-| `22023` | `items_required`、`invalid_quantity`、`roll_not_in_order`、`invalid_date`、`unknown_field` | 出貨單至少需要一卷布、出貨重量必須大於 0、布卷「…」的產品不在此訂單中… |
-| `55000` | `order_cancelled`、`shipping_cancelled`、`shipping_already_cancelled`、`insufficient_stock` | 訂單 … 已取消，不能出貨；出貨單 … 已取消；布卷「…」庫存不足，最多可再出貨 … 公斤 |
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `purchase_order_not_found`, `inventory_not_found`, `roll_not_found`, `product_not_found`, `warehouse_not_found` | Purchase order / receiving record / roll / product / warehouse not found |
+| `22023` | `rolls_required`, `invalid_quantity`, `invalid_quality`, `invalid_date`, `product_not_on_purchase_order`, `unknown_field` | A receiving record needs at least one roll, roll weight must be greater than 0, product "…" isn't on the purchase order… |
+| `23505` | `roll_number_taken` | Roll number "…" is already used |
+| `55000` | `purchase_order_cancelled`, `roll_shipped`, `quantity_below_shipped` | Purchase order … is cancelled and can't be received against; roll "…" has been shipped and can't be deleted or change product; received weight can't be below the … kg already shipped |
 
-### A6 產品與顏色
+### A5 Shippings
 
-Migration：`supabase/migrations/20261008185816_api_a6_products.sql`；測試：`supabase/tests/api_a6_products.test.sql`；前端：`src/lib/api/products.ts`、`src/hooks/useProductCatalog.ts`。資料結構見 [requirements/PHASE1_BUSINESS_API.md](./requirements/PHASE1_BUSINESS_API.md) §7。
+Migration: `supabase/migrations/20261009000604_api_a5_shipping.sql`; test: `supabase/tests/api_a5_shipping.test.sql`; frontend: `src/lib/api/shipping.ts`.
 
-**`create_product`**（`canCreateProducts`）
+Shippings gained `status` (`shipped` / `cancelled`), `cancelled_at`, `cancel_reason`. An order's shipped quantity and shipping status count only shippings that aren't cancelled.
 
-| 參數 | 型別 | 必填 | 說明 |
-|------|------|------|------|
-| `p_name` | text | ✅ | 組織內唯一（不分大小寫、去除前後空白） |
-| `p_colors` | jsonb | ✅ | 至少一個：`[{ color, color_code?, color_hex?, stock_threshold? }]`；同一產品下「顏色＋色號」不可重複 |
-| `p_category` | text | | 預設「布料」 |
-| `p_unit_of_measure` | text | | 預設 `KG` |
+**`create_shipping`** (`canCreateShipping`)
 
-回傳：`id`（產品 id）。`summary.title` 為「建立產品」，`fields` 依序為產品名稱、類別、單位、顏色 1…n（「米白（色號 W01），安全庫存 50 公斤」）。
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `p_order_id` | uuid | ✅ | An order in the same organization, not cancelled; the customer is taken from it |
+| `p_items` | jsonb | ✅ | At least one roll: `[{ inventory_roll_id, shipped_quantity }]`; rolls must be in the same organization and their products on the order; weight > 0 and no more than the roll's remaining stock |
+| `p_shipping_date` | date | | Defaults to today in Taiwan |
+| `p_note` | text | | |
 
-**`update_product`**（`canEditProducts`）：`p_product_id`、`p_changes` 可含 `name`、`category`、`unit_of_measure`；同步到所有顏色。`summary` 只列有變的欄位（「舊值 → 新值」）。
+Returns: `id`, `number` (shipping number O + YYYYMMDD + four-digit sequence; both `null` in a dry run). Roll stock is deducted and the order's shipping progress updated in the same transaction. Shipping more than the ordered quantity is still allowed. `summary.title` is 「建立出貨單」 (Create shipping), and `fields` are, in order, order, customer, shipping date, products 1…n (「產品 - 顏色 × N 卷，共 X 公斤」), note, total, and 「超過訂單量」 (exceeds order quantity) when over.
 
-**`set_product_active`**（`canEditProducts`）：`p_product_id`、`p_is_active`。停用後其下所有顏色都不能再加入訂單（既有品項可保留）。
+**`update_shipping`** (`canEditShipping`): `p_changes` may contain `items` (the complete roll list: rolls with an `id` are updated, those without are added, those not listed are deleted; only the difference is applied to stock), `shipping_date`, `note`. Cancelled shippings can't be edited. `summary` shows 「移除布卷／修改布卷（舊 → 新）／新增布卷」, for example 「R261008123456789 棉布 - 白 40 公斤」.
 
-**`add_product_color`**（`canCreateProducts`）：`p_product_id`、`p_color`、`p_color_code?`、`p_color_hex?`、`p_stock_threshold?`；回傳新顏色的 `id`。
+**`cancel_shipping`** (`canEditShipping`, decision B3): `p_shipping_id`, `p_reason?`. The shipped weight is added back to each roll and the order's shipping progress is recomputed; the shipping items are kept as a record. Once all of an order's shippings are cancelled, the order can be cancelled (if it has no active purchase orders).
 
-**`update_product_color`**（`canEditProducts`）：`p_color_id`、`p_changes` 可含 `color`、`color_code`、`color_hex`、`stock_threshold`（空字串或 `null` 清除）。
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `order_not_found`, `shipping_not_found`, `roll_not_found`, `item_not_found` | Order / shipping / roll not found; the shipping item doesn't belong to this shipping |
+| `22023` | `items_required`, `invalid_quantity`, `roll_not_in_order`, `invalid_date`, `unknown_field` | A shipping needs at least one roll, shipped weight must be greater than 0, the product of roll "…" isn't on this order… |
+| `55000` | `order_cancelled`, `shipping_cancelled`, `shipping_already_cancelled`, `insufficient_stock` | Order … is cancelled and can't be shipped; shipping … is cancelled; roll "…" has insufficient stock, at most … kg more can be shipped |
 
-**`set_product_color_active`**（`canEditProducts`）：`p_color_id`、`p_is_active`（對應 `status` 的 `Available`／`Unavailable`）。
+### A6 Products and colors
 
-**唯讀 view `product_catalog`**：每個顏色一列，含 `product_id`、`product_name`、`category`、`unit_of_measure`、`product_is_active`、`color_id`、`color`、`color_code`、`color_hex`、`stock_threshold`、`color_is_active`、`stock_quantity`、`stock_rolls`、`is_low_stock`。訂單等單據的 `product_id` 指的是 `color_id`。
+Migration: `supabase/migrations/20261008185816_api_a6_products.sql`; test: `supabase/tests/api_a6_products.test.sql`; frontend: `src/lib/api/products.ts`, `src/hooks/useProductCatalog.ts`. Data structure: [requirements/PHASE1_BUSINESS_API.md](./requirements/PHASE1_BUSINESS_API.md) §7.
 
-**舊的寫入方式**：直接 insert `products_new` 只給名稱時，會自動歸到同組織的同名產品（不存在就建立），並帶入產品的名稱、類別與單位。
+**`create_product`** (`canCreateProducts`)
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `product_not_found`、`product_color_not_found` | 找不到此產品／顏色 |
-| `22023` | `name_required`、`colors_required`、`color_required` | 請輸入產品名稱、產品至少需要一個顏色、請輸入顏色 |
-| `22023` | `invalid_color_hex`、`invalid_stock_threshold`、`is_active_required` | 色值格式不正確，請使用 #RRGGBB；安全庫存不可為負數 |
-| `22023` | `unknown_field`、`invalid_changes` | 不支援修改的欄位（例如在產品上改顏色） |
-| `23505` | `product_name_taken`、`product_color_taken` | 已有同名的產品「…」，請在該產品下新增顏色；此產品已有顏色「…」 |
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `p_name` | text | ✅ | Unique within the organization (case-insensitive, leading and trailing spaces trimmed) |
+| `p_colors` | jsonb | ✅ | At least one: `[{ color, color_code?, color_hex?, stock_threshold? }]`; "color + color code" can't repeat within a product |
+| `p_category` | text | | Defaults to 「布料」 (fabric) |
+| `p_unit_of_measure` | text | | Defaults to `KG` |
 
-### A6 貨架
+Returns: `id` (product id). `summary.title` is 「建立產品」 (Create product), and `fields` are, in order, product name, category, unit, colors 1…n (「米白（色號 W01），安全庫存 50 公斤」, off-white (color code W01), safety stock 50 kg).
 
-Migration：`supabase/migrations/20261009003415_api_a6_shelves.sql`；測試：`supabase/tests/api_a6_shelves.test.sql`；前端：`src/lib/api/shelves.ts`。貨架存放在 `warehouses`（入庫畫面稱「倉庫」）。
+**`update_product`** (`canEditProducts`): `p_product_id`, `p_changes` may contain `name`, `category`, `unit_of_measure`; synced to all colors. `summary` lists only changed fields ("old value → new value").
 
-| API | 權限鍵 | 參數 | 說明 |
-|-----|--------|------|------|
-| `create_shelf` | `canCreateShelves` | `p_name`、`p_location?` | 名稱組織內唯一（不分大小寫、去除前後空白，B6） |
-| `update_shelf` | `canEditShelves` | `p_shelf_id`、`p_changes`（`name`、`location`；空字串清除位置） | `summary` 只列有變的欄位 |
-| `set_shelf_active` | `canEditShelves` | `p_shelf_id`、`p_is_active` | 停用後不能再放入新布卷，也不能把布卷移過去；已在上面的布卷不受影響（B4）。停用時 `summary` 會列「仍有庫存」 |
+**`set_product_active`** (`canEditProducts`): `p_product_id`, `p_is_active`. Once deactivated, none of its colors can be added to orders (existing lines are kept).
 
-`warehouses` 新增 `is_active`。布卷的貨架檢查在 `save_inventory_rolls`，因此 `receive_inventory`、`update_inventory`、`update_inventory_roll` 都適用。
+**`add_product_color`** (`canCreateProducts`): `p_product_id`, `p_color`, `p_color_code?`, `p_color_hex?`, `p_stock_threshold?`; returns the new color's `id`.
 
-| SQLSTATE | 代碼 | 訊息 |
-|----------|------|------|
-| `P0002` | `shelf_not_found` | 找不到此貨架 |
-| `22023` | `name_required`、`is_active_required`、`unknown_field`、`warehouse_inactive` | 請輸入貨架名稱；貨架「…」已停用 |
-| `23505` | `shelf_name_taken` | 已有同名的貨架「…」 |
+**`update_product_color`** (`canEditProducts`): `p_color_id`, `p_changes` may contain `color`, `color_code`, `color_hex`, `stock_threshold` (an empty string or `null` clears).
 
-## 4. 組織與成員
+**`set_product_color_active`** (`canEditProducts`): `p_color_id`, `p_is_active` (maps to `status` `Available` / `Unavailable`).
 
-這些函式早於業務 API，錯誤沿用一般的 SQLSTATE（不經 `api_fail()`）。
+**Read-only view `product_catalog`**: one row per color, with `product_id`, `product_name`, `category`, `unit_of_measure`, `product_is_active`, `color_id`, `color`, `color_code`, `color_hex`, `stock_threshold`, `color_is_active`, `stock_quantity`, `stock_rolls`, `is_low_stock`. The `product_id` on orders and other documents refers to `color_id`.
 
-| 函式 | 誰可以用 | 說明 |
-|------|----------|------|
-| `set_member_role(_organization_id, _user_id, _role)` | `canEditUsers` | 角色為 `admin`／`editor`／`viewer`；不能改自己、不能改擁有者 |
-| `set_member_active(_organization_id, _user_id, _is_active)` | `canEditUsers` | 停用或啟用成員；不能停用自己或擁有者 |
-| `add_existing_user_to_organization(_email, _organization_id, _role)` | `canCreateUsers` | 邀請已註冊的使用者 |
-| `complete_user_invitation(_user_id, _organization_id, _role, _full_name, _phone)` | `canCreateUsers` | 完成新使用者的邀請 |
-| `get_my_pending_invitations()` | 登入者 | 自己收到、尚未接受的邀請 |
-| `accept_organization_invitation(_organization_id)` | 被邀請者 | 接受邀請 |
-| `get_organization_member_status(_organization_id)` | 組織成員 | 成員的登入與邀請狀態（用戶管理頁） |
-| `transfer_organization_ownership(_organization_id, _new_owner_id, _fallback_role_name)` | 擁有者 | 轉移擁有權，原擁有者改為管理員 |
-| `delete_organization(_organization_id, _confirm_name)` | 擁有者 | 需輸入組織名稱確認 |
-| `user_has_organization_permission(_user_id, _organization_id, _permission)` | 只回答關於自己或自己組織的問題 | 權限判斷的唯一來源；RLS、業務 API、AI 都用它 |
-| `is_organization_owner`、`user_belongs_to_organization`、`can_inspect_organization` | 同上 | 權限判斷的輔助函式 |
+**The old way of writing**: inserting into `products_new` directly with only a name attaches it automatically to the same-named product in the organization (creating it if missing), taking the product's name, category and unit.
 
-建立組織直接寫 `organizations`（觸發器把建立者加為管理員）。
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `product_not_found`, `product_color_not_found` | Product / color not found |
+| `22023` | `name_required`, `colors_required`, `color_required` | Enter the product name, a product needs at least one color, enter the color |
+| `22023` | `invalid_color_hex`, `invalid_stock_threshold`, `is_active_required` | Invalid color value format, use #RRGGBB; safety stock can't be negative |
+| `22023` | `unknown_field`, `invalid_changes` | Field can't be changed (for example, changing a color on the product) |
+| `23505` | `product_name_taken`, `product_color_taken` | A product named "…" already exists, add the color under that product; this product already has the color "…" |
 
-### 4.1 內部函式（不直接呼叫）
+### A6 Shelves
 
-| 函式 | 用途 |
-|------|------|
-| `save_order_items`、`save_purchase_order_items`、`save_inventory_rolls`、`save_shipping_items` | 單據明細的整批儲存與鎖定規則；由業務 API 呼叫。以呼叫者身分執行，直接呼叫時受 RLS 與權限鍵限制 |
-| `recompute_order_shipments`、`recompute_purchase_order_receipts` | 重算訂單出貨進度、採購單入庫進度；由觸發器與業務 API 呼叫 |
-| `order_product_is_purchased` | 訂單品項是否已在進行中的採購單上 |
-| `api_fail`、`api_new_roll_number` | 錯誤回報、布卷編號 |
-| `private.api_assign_document_number` | 直接寫表時的單據編號，只由單據編號觸發器呼叫（不在 public，無法從 `/rpc` 呼叫） |
+Migration: `supabase/migrations/20261009003415_api_a6_shelves.sql`; test: `supabase/tests/api_a6_shelves.test.sql`; frontend: `src/lib/api/shelves.ts`. Shelves are stored in `warehouses` (called 「倉庫」, warehouse, on the receiving screen).
 
-`api_*` 開頭的其他函式都只供業務 API 內部使用，不開放呼叫。
+| API | Permission key | Parameters | Description |
+|-----|----------------|------------|-------------|
+| `create_shelf` | `canCreateShelves` | `p_name`, `p_location?` | Name unique within the organization (case-insensitive, leading and trailing spaces trimmed, B6) |
+| `update_shelf` | `canEditShelves` | `p_shelf_id`, `p_changes` (`name`, `location`; an empty string clears the location) | `summary` lists only changed fields |
+| `set_shelf_active` | `canEditShelves` | `p_shelf_id`, `p_is_active` | Once deactivated, no new rolls can be placed on it or moved to it; rolls already on it are unaffected (B4). When deactivating, `summary` lists 「仍有庫存」 (still has stock) |
 
-## 5. 唯讀資料
+`warehouses` gained `is_active`. The roll shelf check is in `save_inventory_rolls`, so it applies to `receive_inventory`, `update_inventory` and `update_inventory_roll`.
 
-| 名稱 | 說明 |
-|------|------|
-| 業務資料表 | 依查看鍵讀取（[PERMISSIONS.md](./PERMISSIONS.md) §3） |
-| `product_catalog`（view） | 每個顏色一列：產品、顏色、色號、色值、安全庫存、狀態、庫存重量與卷數、是否低庫存。建單選單與產品頁使用 |
-| `inventory_summary`、`inventory_summary_enhanced`（view） | 依產品統計的庫存、品級分布、待入庫量、待出貨量。庫存頁與 AI 使用 |
-| `record_audit_logs` | 編輯紀錄；組織成員可讀 |
+| SQLSTATE | Code | Message (meaning) |
+|----------|------|-------------------|
+| `P0002` | `shelf_not_found` | Shelf not found |
+| `22023` | `name_required`, `is_active_required`, `unknown_field`, `warehouse_inactive` | Enter the shelf name; shelf "…" is deactivated |
+| `23505` | `shelf_name_taken` | A shelf named "…" already exists |
 
-## 6. AI 伺服器（`mcp-server/`）
+## 4. Organizations and members
 
-部署在 Google Cloud Run（[SERVICES.md](./SERVICES.md)）。所有端點都要 `Authorization: Bearer <Supabase JWT>`，並只服務使用者有效所屬的組織。
+These functions predate the business APIs, and their errors use plain SQLSTATEs (not `api_fail()`).
 
-| 端點 | 說明 |
-|------|------|
-| `GET /health` | 健康檢查 |
-| `POST /query` | AI 對話：body 帶 `organization_id`、`session_id`、`message_id` 與訊息；回覆與 `traceId`。寫入類工具只建立待確認的動作 |
-| `POST /query/actions/:id/confirm` | 使用者確認 AI 提出的寫入，確認當下重新檢查成員資格與權限後執行 |
-| `/mcp` | Model Context Protocol 端點，header 帶 `X-Organization-Id` |
+| Function | Who can use it | Description |
+|----------|----------------|-------------|
+| `set_member_role(_organization_id, _user_id, _role)` | `canEditUsers` | Role is `admin` / `editor` / `viewer`; can't change yourself or the owner |
+| `set_member_active(_organization_id, _user_id, _is_active)` | `canEditUsers` | Deactivate or activate a member; can't deactivate yourself or the owner |
+| `add_existing_user_to_organization(_email, _organization_id, _role)` | `canCreateUsers` | Invite a user who has already signed up |
+| `complete_user_invitation(_user_id, _organization_id, _role, _full_name, _phone)` | `canCreateUsers` | Complete a new user's invitation |
+| `get_my_pending_invitations()` | Signed-in user | Invitations you received and haven't accepted |
+| `accept_organization_invitation(_organization_id)` | Invitee | Accept an invitation |
+| `get_organization_member_status(_organization_id)` | Organization members | Members' sign-in and invitation status (user management page) |
+| `transfer_organization_ownership(_organization_id, _new_owner_id, _fallback_role_name)` | Owner | Transfer ownership; the previous owner becomes an admin |
+| `delete_organization(_organization_id, _confirm_name)` | Owner | Requires typing the organization name to confirm |
+| `user_has_organization_permission(_user_id, _organization_id, _permission)` | Only answers about yourself or your own organizations | The single source of permission checks; RLS, business APIs and the AI all use it |
+| `is_organization_owner`, `user_belongs_to_organization`, `can_inspect_organization` | Same as above | Helper functions for permission checks |
 
-AI tools 與架構見 [AGENT.md](./AGENT.md)（AI Session 維護）。
+Creating an organization writes `organizations` directly (a trigger adds the creator as an admin).
+
+### 4.1 Internal functions (not called directly)
+
+| Function | Purpose |
+|----------|---------|
+| `save_order_items`, `save_purchase_order_items`, `save_inventory_rolls`, `save_shipping_items` | Bulk save and locking rules for document lines; called by the business APIs. They run as the caller, so direct calls are limited by RLS and permission keys |
+| `recompute_order_shipments`, `recompute_purchase_order_receipts` | Recompute order shipping progress and purchase order receiving progress; called by triggers and business APIs |
+| `order_product_is_purchased` | Whether an order line is already on an active purchase order |
+| `api_fail`, `api_new_roll_number` | Error reporting, roll numbers |
+| `private.api_assign_document_number` | Document numbers for direct table writes, called only by the document number trigger (not in public, so it can't be called from `/rpc`) |
+
+Other functions prefixed `api_` are for internal use by the business APIs only and can't be called.
+
+## 5. Read-only data
+
+| Name | Description |
+|------|-------------|
+| Business tables | Read by view key ([PERMISSIONS.md](./PERMISSIONS.md) §3) |
+| `product_catalog` (view) | One row per color: product, color, color code, color value, safety stock, status, stock weight and rolls, whether low on stock. Used by order-creation menus and the product page |
+| `inventory_summary`, `inventory_summary_enhanced` (view) | Stock per product, grade breakdown, quantity awaiting receipt, quantity awaiting shipment. Used by the inventory page and the AI |
+| `record_audit_logs` | Edit history; readable by organization members |
+
+## 6. AI server (`mcp-server/`)
+
+Deployed on Google Cloud Run ([SERVICES.md](./SERVICES.md)). Every endpoint requires `Authorization: Bearer <Supabase JWT>` and serves only organizations the user actively belongs to.
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check |
+| `POST /query` | AI conversation: the body carries `organization_id`, `session_id`, `message_id` and the message; returns the reply and `traceId`. Write tools only create pending actions |
+| `POST /query/actions/:id/confirm` | The user confirms a write the AI proposed; membership and permission are re-checked at confirmation before it runs |
+| `POST /query/messages/:id/feedback` | Thumbs up or down on one of your own AI replies: body `{ "value": "up" \| "down" \| null }` (null undoes); returns `{ feedback }`. Stored in `query_messages.metadata.feedback` (`set_query_message_feedback()`) and sent to Langfuse ([AGENT.md](./AGENT.md)). 404 for replies that aren't yours |
+| `/mcp` | Model Context Protocol endpoint, with `X-Organization-Id` in the header |
+
+AI tools and architecture: [AGENT.md](./AGENT.md) (maintained by the AI Session).

@@ -1,32 +1,33 @@
-# 相依性
+# Dependencies
 
-> 現況文件（2026-10-09）。版本以 `package.json` 為準；新增或移除套件時更新本文件。
+> Current-state document (2026-10-16). Versions follow `package.json`; update this document when adding or removing a package.
 
-## 1. 前端（`package.json`）
+## 1. Frontend (`package.json`)
 
-| 用途 | 套件 |
-|------|------|
-| 框架 | `react`、`react-dom`（18）、`react-router-dom`（6） |
-| 資料 | `@supabase/supabase-js`（2）、`@tanstack/react-query`（5） |
-| UI 元件 | `@radix-ui/react-*`（shadcn/ui 的基礎）、`cmdk`（搜尋選單）、`sonner`（提示訊息）、`vaul`、`embla-carousel-react`、`react-day-picker`、`input-otp`、`react-resizable-panels`、`recharts` |
-| 樣式 | `tailwind-merge`、`class-variance-authority`、`clsx`、`tailwindcss-animate`、`lucide-react`（圖示）、`next-themes` |
-| 表單 | `react-hook-form`、`@hookform/resolvers`、`zod` |
-| 其他 | `date-fns`、`react-helmet-async`（頁面標題與 SEO） |
+| Purpose | Packages |
+|---------|----------|
+| Framework | `react`, `react-dom` (18), `react-router-dom` (6) |
+| Data | `@supabase/supabase-js` (2), `@tanstack/react-query` (5) |
+| UI components | `@radix-ui/react-*` (the base of shadcn/ui), `cmdk` (search menu), `sonner` (toasts), `vaul`, `embla-carousel-react`, `react-day-picker`, `input-otp`, `react-resizable-panels`, `recharts` |
+| Styling | `tailwind-merge`, `class-variance-authority`, `clsx`, `tailwindcss-animate`, `lucide-react` (icons), `next-themes` |
+| Forms | `react-hook-form`, `@hookform/resolvers`, `zod` |
+| Other | `date-fns`, `react-helmet-async` (page titles and SEO) |
 
-開發：`vite`、`@vitejs/plugin-react-swc`、`typescript`、`eslint`（含 react-hooks、react-refresh）、`tailwindcss`、`postcss`、`autoprefixer`、`vitest`、`jsdom`、`@testing-library/*`、`lovable-tagger`（僅開發模式）。
+Development: `vite`, `@vitejs/plugin-react-swc`, `typescript`, `eslint` (with react-hooks, react-refresh), `tailwindcss`, `postcss`, `autoprefixer`, `vitest`, `jsdom`, `@testing-library/*`, `lovable-tagger` (development mode only).
 
-## 2. AI 伺服器（`mcp-server/package.json`）
+## 2. AI server (`mcp-server/package.json`)
 
-| 用途 | 套件 |
-|------|------|
-| HTTP | `express`（5） |
-| 模型 | `ai`（Vercel AI SDK 4）、`@openrouter/ai-sdk-provider` |
+| Purpose | Packages |
+|---------|----------|
+| HTTP | `express` (5) |
+| Models | `ai` (Vercel AI SDK 4), `@openrouter/ai-sdk-provider` |
+| Langfuse | `@langfuse/client`, `@langfuse/tracing`, `@langfuse/otel` (6.0.0, pinned); OpenTelemetry: `@opentelemetry/api`, `@opentelemetry/sdk-node`, `@opentelemetry/sdk-trace-base`, `@opentelemetry/core`, `@opentelemetry/exporter-trace-otlp-http`, `@opentelemetry/otlp-exporter-base` (pinned). Requires Node 22 or later |
 | MCP | `@modelcontextprotocol/sdk` |
-| 資料 | `@supabase/supabase-js`、`zod` |
+| Data | `@supabase/supabase-js`, `zod` |
 
-開發：`typescript`、`tsx`、`@types/node`、`@types/express`。
+Development: `typescript`, `tsx`, `@types/node`, `@types/express`.
 
-## 3. 外部依賴
+## 3. External dependencies
 
-- 前端依賴 Supabase 與 AI 伺服器；AI 伺服器依賴 Supabase 與 OpenRouter（[SERVICES.md](./SERVICES.md)）。
-- 業務 API 的參數與錯誤代碼是前端與 AI tools 共同依賴的契約（[API.md](./API.md)、[SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4）。
+- The frontend depends on Supabase and the AI server; the AI server depends on Supabase and OpenRouter, and Langfuse is optional (failing to read a prompt or send a trace does not affect the reply) ([SERVICES.md](./SERVICES.md)).
+- The business APIs' parameters and error codes are a contract that both the frontend and the AI tools depend on ([API.md](./API.md), [SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §4).

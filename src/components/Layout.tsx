@@ -9,7 +9,8 @@ import { RoutePermissionGuard } from '@/components/RoutePermissionGuard';
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      {/* While the Query sidebar is open, the ERP leaves its width free (QueryFloatButton.tsx). */}
+      <div className="min-h-screen flex w-full bg-background pr-[var(--query-sidebar-width,0px)] transition-[padding] duration-300">
         <AppSidebar />
         <SidebarInset className="bg-background">
           <Header />

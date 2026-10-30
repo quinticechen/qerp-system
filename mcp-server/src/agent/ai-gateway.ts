@@ -10,8 +10,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, generateObject, APICallError, NoSuchToolError, type ToolCallRepairFunction, type ToolSet } from "ai";
 import type { LanguageModelV1 } from "@ai-sdk/provider";
+import { propagateAttributes } from "@langfuse/tracing";
 import { normalizeToolName, type ModelCall, type QueryRun } from "./observer.js";
 import { TOOL_GROUPS } from "./permissions.js";
+import { tracingEnabled } from "./langfuse.js";
+import type { PromptLink } from "./prompts.js";
 
 // 模型優先級清單（由上往下降級）
 export const MODEL_PRIORITY = [
@@ -100,6 +103,8 @@ export function modelsFor(ids: readonly string[]): GatewayModel[] {
 export interface GatewayCall extends QueryRun {
   /** Trace label: "router" or "agent:<group>". */
   phase: string;
+  /** The Langfuse prompt version of the system prompt; its generations are linked to it. */
+  prompt?: PromptLink;
   /** Called when an attempt fails, before the next model is tried — discard that attempt's drafts. */
   onAttemptFailed?: () => void;
   /** Checks a finished text reply; returning a reason rejects it and falls back to the next model. */
@@ -184,7 +189,21 @@ const repairToolCall: ToolCallRepairFunction<ToolSet> = async ({ toolCall, tools
   return name !== toolCall.toolName && name in tools ? { ...toolCall, toolName: name } : null;
 };
 
-async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModelV1, abortSignal: AbortSignal) => Promise<T>): Promise<T> {
+/**
+ * AI SDK telemetry for one attempt: Langfuse records each provider call as a generation (model,
+ * tokens, cost, input and output) under the request's trace (langfuse.ts).
+ */
+function telemetry(call: GatewayCall, modelId: string) {
+  return { isEnabled: tracingEnabled(), functionId: call.phase, metadata: { phase: call.phase, model: modelId } };
+}
+
+/** Runs fn with the phase as a trace tag and the prompt version linked to its generations. */
+function inPhase<T>(call: GatewayCall, fn: () => Promise<T>): Promise<T> {
+  if (!tracingEnabled()) return fn();
+  return propagateAttributes({ tags: [call.phase], ...(call.prompt ? { prompt: call.prompt } : {}) }, fn);
+}
+
+async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModelV1, abortSignal: AbortSignal, modelId: string) => Promise<T>): Promise<T> {
   const models = call.models ?? modelsFor(modelIdsFor(call.modelPolicy ?? MODEL_POLICY, call.phase));
   let firstError: unknown = null;
 
@@ -200,7 +219,7 @@ async function withFallback<T>(call: GatewayCall, attempt: (model: LanguageModel
     const observed = () => ({ phase: call.phase, modelId: id, startedAt: started, durationMs: Date.now() - started, calls: recorder.calls });
     try {
       const signal = AbortSignal.timeout(Math.min(call.attemptTimeoutMs ?? ATTEMPT_TIMEOUT_MS, remaining));
-      const result = await callRecorder.run(recorder, () => attempt(model, signal));
+      const result = await callRecorder.run(recorder, () => inPhase(call, () => attempt(model, signal, id)));
       call.observer?.onModelAttempt?.(observed());
       if (id !== models[0].id) console.warn(`[AI Gateway] ${call.phase} 使用降級模型: ${id}`);
       return result;
@@ -229,7 +248,7 @@ type GenerateTextResult = Awaited<ReturnType<typeof generateText>>;
  * meaningful on such a result.
  */
 export async function aiGenerateText(options: GenerateTextOptions, call: GatewayCall): Promise<GenerateTextResult> {
-  return withFallback(call, async (model, abortSignal) => {
+  return withFallback(call, async (model, abortSignal, modelId) => {
     let result: GenerateTextResult;
     try {
       result = await generateText({
@@ -237,6 +256,7 @@ export async function aiGenerateText(options: GenerateTextOptions, call: Gateway
         ...options,
         model,
         abortSignal,
+        experimental_telemetry: telemetry(call, modelId),
         // Falling back to the next model is the retry; same-model retries only add backoff delay.
         maxRetries: 0,
       } as Parameters<typeof generateText>[0]);
@@ -260,8 +280,14 @@ export async function aiGenerateText(options: GenerateTextOptions, call: Gateway
 
 /** generateObject（結構化輸出）with fallback. */
 export async function aiGenerateObject<T>(options: GenerateObjectOptions, call: GatewayCall): Promise<T> {
-  return withFallback(call, async (model, abortSignal) => {
-    const result = await generateObject({ ...options, model, abortSignal, maxRetries: 0 } as Parameters<typeof generateObject>[0]);
+  return withFallback(call, async (model, abortSignal, modelId) => {
+    const result = await generateObject({
+      ...options,
+      model,
+      abortSignal,
+      maxRetries: 0,
+      experimental_telemetry: telemetry(call, modelId),
+    } as Parameters<typeof generateObject>[0]);
     return result.object as T;
   });
 }

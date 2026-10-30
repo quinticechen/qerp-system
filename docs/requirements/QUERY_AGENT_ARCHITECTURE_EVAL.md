@@ -2,7 +2,7 @@
 
 > Date: 2026-10-07
 > Decision: **Maintain Router × gemini-2.5-flash-lite** (User decision)
-> Related Documents: [QUERY_AGENT_PHASE0.md](https://www.google.com/search?q=./QUERY_AGENT_PHASE0.md) (D6, §4.7)
+> Related Documents: [QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md) (D6, §4.7)
 
 ## 1. Objectives & Decision Criteria
 
@@ -38,9 +38,7 @@ Compare Query's agent architectures and primary models to select the production 
 
 | Dimension | Options |
 | --- | --- |
-| **Architecture** | • **Router**: Router uses an LLM to classify intent and rewrite tasks, handing them off to commercial / supply_chain sub-agents (can call both concurrently)<br>
-
-<br>• **Single Agent**: A single agent holds all authorized tools (currently 17), directly processing the raw message |
+| **Architecture** | • **Router**: Router uses an LLM to classify intent and rewrite tasks, handing them off to commercial / supply_chain sub-agents (can call both concurrently)<br>• **Single Agent**: A single agent holds all authorized tools (currently 17), directly processing the raw message |
 | **Primary Model** | `google/gemini-2.5-flash-lite` (Current), `google/gemini-2.5-flash` |
 | **Fallback Order** | Primary model → remaining models in list (flash-lite → flash → claude-haiku-4.5 order, with primary moved to front) |
 

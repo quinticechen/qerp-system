@@ -1,457 +1,457 @@
-# 紡織業 ERP 系統 - 產品需求文件 (PRD)
+# Textile ERP System - Product Requirements Document (PRD)
 
-> 需求文件：專案最初的產品需求（2025-08）。下列部分已被後續決定取代，現況以右側文件為準：
+> Requirement document: the project's original product requirements (2025-08). The parts below have been superseded by later decisions; for the current state, follow the documents on the right:
 >
-> - 角色與權限（§1.3、§2.2、§3.9、§6.3）：改為固定的擁有者、管理員、編輯者、訪客，不提供自訂角色 → [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md)、[PERMISSIONS.md](../PERMISSIONS.md)
-> - 技術選型與架構（§5、§6）：沒有使用 Zustand 與 Edge Functions，業務邏輯在資料庫函式 → [TECH_STACK.md](../TECH_STACK.md)
-> - 資料模型（§7）→ [DATABASE_TABLES.md](../DATABASE_TABLES.md)；功能現況 → [FEATURES.md](../FEATURES.md)
+> - Roles and permissions (§1.3, §2.2, §3.9, §6.3): changed to fixed owner, admin, editor and viewer roles, with no custom roles → [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md), [PERMISSIONS.md](../PERMISSIONS.md)
+> - Technology choices and architecture (§5, §6): Zustand and Edge Functions are not used; business logic lives in database functions → [TECH_STACK.md](../TECH_STACK.md)
+> - Data model (§7) → [DATABASE_TABLES.md](../DATABASE_TABLES.md); current features → [FEATURES.md](../FEATURES.md)
 
-## 1. 產品概述
+## 1. Product overview
 
-### 1.1 產品名稱
-紡織業多租戶組織 ERP 管理系統
+### 1.1 Product name
+Multi-tenant organization ERP management system for the textile industry
 
-### 1.2 產品願景
-為紡織業打造一個全方位、多租戶的企業資源規劃系統，支援組織層級的權限管理，讓不同規模的紡織企業都能高效管理其業務流程。
+### 1.2 Product vision
+Build a comprehensive, multi-tenant enterprise resource planning system for the textile industry, with organization-level permission management, so textile businesses of any size can manage their business processes efficiently.
 
-### 1.3 目標用戶
+### 1.3 Target users
 
-#### 1.3.1 組織層級使用者
-- **組織擁有者**: 企業負責人，擁有組織最高權限
-- **組織管理員**: 負責組織日常管理的高級主管
-- **部門主管**: 各部門負責人，具有部門相關權限
+#### 1.3.1 Organization-level users
+- **Organization owner**: the head of the business, with the highest permissions in the organization
+- **Organization admin**: a senior manager responsible for day-to-day management of the organization
+- **Department head**: the head of each department, with permissions related to their department
 
-#### 1.3.2 功能角色使用者
-- **業務人員**: 負責客戶關係維護、訂單處理
-- **採購人員**: 處理原料採購、供應商管理
-- **倉庫管理員**: 負責庫存管理、出入庫操作
-- **生產助理**: 協助生產計劃執行、數據錄入
-- **會計人員**: 處理財務相關數據查看
+#### 1.3.2 Functional-role users
+- **Sales**: maintains customer relationships, handles orders
+- **Purchasing**: handles raw material purchasing and supplier management
+- **Warehouse manager**: manages inventory, receiving and shipping operations
+- **Production assistant**: helps carry out production plans and enters data
+- **Accountant**: views finance-related data
 
-### 1.4 核心價值主張
-- **多租戶架構**: 支援多個組織獨立運營，數據完全隔離
-- **靈活權限管理**: 組織層級的自定義角色和權限設定
-- **全流程覆蓋**: 從訂單到出貨的完整業務流程管理
-- **實時庫存追蹤**: 精準的庫存數量和質量管理
-- **智能預警系統**: 低庫存、過期等自動提醒功能
-- **數據安全保障**: 基於 RLS 的數據隔離和安全控制
+### 1.4 Core value proposition
+- **Multi-tenant architecture**: multiple organizations operate independently with fully isolated data
+- **Flexible permission management**: organization-level custom roles and permission settings
+- **End-to-end coverage**: complete business process management from order to shipping
+- **Real-time inventory tracking**: accurate inventory quantity and quality management
+- **Smart alerts**: automatic reminders for low stock, expiry, etc.
+- **Data security**: RLS-based data isolation and security controls
 
-## 2. 組織架構需求
+## 2. Organization structure requirements
 
-### 2.1 多租戶組織模型
+### 2.1 Multi-tenant organization model
 
-#### 2.1.1 組織管理
-- **組織創建**: 使用者可以創建新組織，自動成為組織擁有者
-- **組織設定**: 配置組織基本資訊、偏好設定
-- **組織切換**: 支援使用者在多個組織間切換
-- **組織邀請**: 組織擁有者可以邀請新使用者加入
+#### 2.1.1 Organization management
+- **Create organization**: users can create a new organization and automatically become its owner
+- **Organization settings**: configure basic organization information and preferences
+- **Switch organization**: users can switch between several organizations
+- **Organization invitations**: the organization owner can invite new users to join
 
-#### 2.1.2 使用者管理
-- **多組織成員**: 使用者可以屬於多個組織
-- **組織角色**: 每個使用者在不同組織中可以有不同角色
-- **權限繼承**: 基於角色的權限自動繼承機制
+#### 2.1.2 User management
+- **Membership in several organizations**: a user can belong to several organizations
+- **Organization roles**: each user can have a different role in each organization
+- **Permission inheritance**: automatic role-based permission inheritance
 
-### 2.2 權限架構設計
+### 2.2 Permission architecture
 
-#### 2.2.1 三層權限模型
+#### 2.2.1 Three-layer permission model
 ```
-組織層級權限
-├── 組織管理權限 (組織擁有者/管理員)
-├── 功能模組權限 (基於角色分配)
-└── 數據存取權限 (基於組織成員資格)
+Organization-level permissions
+├── Organization management permissions (organization owner / admin)
+├── Feature module permissions (assigned by role)
+└── Data access permissions (based on organization membership)
 ```
 
-#### 2.2.2 預設角色定義
-- **組織擁有者**: 擁有組織內所有權限
-- **管理員**: 擁有大部分功能權限，無組織管理權限
-- **業務**: 客戶、訂單相關權限
-- **助理**: 大部分操作權限，無刪除權限
-- **會計**: 主要查看權限，少部分編輯權限
-- **倉庫管理員**: 庫存、出貨相關權限
+#### 2.2.2 Default roles
+- **Organization owner**: all permissions in the organization
+- **Admin**: most feature permissions, no organization management permissions
+- **Sales**: customer and order permissions
+- **Assistant**: most operation permissions, no delete permission
+- **Accountant**: mainly view permissions, a few edit permissions
+- **Warehouse manager**: inventory and shipping permissions
 
-#### 2.2.3 自定義角色
-- **角色創建**: 組織擁有者可創建自定義角色
-- **權限配置**: 靈活的權限組合設定
-- **角色分配**: 將自定義角色分配給組織成員
+#### 2.2.3 Custom roles
+- **Create roles**: the organization owner can create custom roles
+- **Configure permissions**: flexible combinations of permissions
+- **Assign roles**: assign custom roles to organization members
 
-## 3. 功能需求 (PFR)
+## 3. Functional requirements (PFR)
 
-### 3.1 組織管理模組
+### 3.1 Organization management module
 
-#### 3.1.1 組織基本管理
-- **F001**: 組織創建和基本資訊設定
-- **F002**: 組織設定管理（偏好、配置等）
-- **F003**: 組織成員邀請和管理
-- **F004**: 組織角色和權限管理
+#### 3.1.1 Basic organization management
+- **F001**: Create an organization and set basic information
+- **F002**: Organization settings management (preferences, configuration, etc.)
+- **F003**: Invite and manage organization members
+- **F004**: Manage organization roles and permissions
 
-#### 3.1.2 使用者認證流程
-- **F005**: 登入後組織檢查和選擇
-- **F006**: 無組織使用者導向創建組織流程
-- **F007**: 多組織使用者的組織切換功能
+#### 3.1.2 User authentication flow
+- **F005**: Check and select an organization after sign-in
+- **F006**: Direct users without an organization to the create-organization flow
+- **F007**: Organization switching for users in several organizations
 
-### 3.2 產品管理模組
+### 3.2 Product management module
 
-#### 3.2.1 產品基本資料
-- **F101**: 產品新增、編輯、刪除功能
-- **F102**: 產品分類管理（布料類型、規格等）
-- **F103**: 產品圖片上傳和管理
-- **F104**: 產品狀態管理（可用、停產等）
-- **F105**: 庫存閾值設定和預警
+#### 3.2.1 Basic product data
+- **F101**: Add, edit and delete products
+- **F102**: Product category management (fabric type, specification, etc.)
+- **F103**: Upload and manage product images
+- **F104**: Product status management (available, discontinued, etc.)
+- **F105**: Set stock thresholds and alerts
 
-#### 3.2.2 產品規格管理
-- **F106**: 布料規格定義（寬度、成分、克重等）
-- **F107**: 顏色代碼管理
-- **F108**: 品質等級分類（A、B、C、D、次品）
+#### 3.2.2 Product specification management
+- **F106**: Define fabric specifications (width, composition, weight per area, etc.)
+- **F107**: Color code management
+- **F108**: Quality grade classification (A, B, C, D, defective)
 
-### 3.3 客戶管理模組
+### 3.3 Customer management module
 
-#### 3.3.1 客戶基本資料
-- **F201**: 客戶新增、編輯、刪除功能
-- **F202**: 客戶聯絡資訊管理
-- **F203**: 客戶分類和標籤管理
-- **F204**: 客戶歷史訂單查看
+#### 3.3.1 Basic customer data
+- **F201**: Add, edit and delete customers
+- **F202**: Customer contact information management
+- **F203**: Customer categories and tags
+- **F204**: View a customer's order history
 
-### 3.4 工廠管理模組
+### 3.4 Factory management module
 
-#### 3.4.1 工廠基本資料
-- **F301**: 工廠新增、編輯、刪除功能
-- **F302**: 工廠聯絡資訊和地址管理
-- **F303**: 工廠產能和專長設定
+#### 3.4.1 Basic factory data
+- **F301**: Add, edit and delete factories
+- **F302**: Factory contact information and address management
+- **F303**: Factory capacity and specialty settings
 
-### 3.5 訂單管理模組
+### 3.5 Order management module
 
-#### 3.5.1 訂單處理流程
-- **F401**: 訂單建立和編輯功能
-- **F402**: 訂單狀態追蹤（待確認、生產中、已完成等）
-- **F403**: 訂單產品明細管理
-- **F404**: 訂單與工廠關聯設定
-- **F405**: 訂單出貨狀態管理
+#### 3.5.1 Order process
+- **F401**: Create and edit orders
+- **F402**: Order status tracking (pending, in production, completed, etc.)
+- **F403**: Order line management
+- **F404**: Link orders to factories
+- **F405**: Order shipping status management
 
-#### 3.5.2 訂單進階功能
-- **F406**: 訂單編號自動生成
-- **F407**: 訂單付款狀態追蹤
-- **F408**: 訂單備註和特殊要求管理
+#### 3.5.2 Advanced order features
+- **F406**: Automatic order number generation
+- **F407**: Order payment status tracking
+- **F408**: Order notes and special requirements
 
-### 3.6 採購管理模組
+### 3.6 Purchasing module
 
-#### 3.6.1 採購訂單處理
-- **F501**: 採購單建立和編輯功能
-- **F502**: 採購單狀態管理
-- **F503**: 採購產品明細和規格設定
-- **F504**: 與客戶訂單的關聯設定
-- **F505**: 採購單號自動生成
+#### 3.6.1 Purchase order processing
+- **F501**: Create and edit purchase orders
+- **F502**: Purchase order status management
+- **F503**: Purchase order lines and specifications
+- **F504**: Link to customer orders
+- **F505**: Automatic purchase order number generation
 
-#### 3.6.2 採購進階功能
-- **F506**: 預期到貨日期管理
-- **F507**: 採購成本計算和記錄
+#### 3.6.2 Advanced purchasing features
+- **F506**: Expected arrival date management
+- **F507**: Purchase cost calculation and recording
 
-### 3.7 庫存管理模組
+### 3.7 Inventory module
 
-#### 3.7.1 入庫管理
-- **F601**: 布卷入庫登記
-- **F602**: 布卷編號和位置管理
-- **F603**: 品質等級評定和記錄
-- **F604**: 入庫數量和規格記錄
+#### 3.7.1 Receiving
+- **F601**: Register received rolls
+- **F602**: Roll numbering and location management
+- **F603**: Quality grading and recording
+- **F604**: Record received quantities and specifications
 
-#### 3.7.2 庫存查詢和統計
-- **F605**: 即時庫存查詢功能
-- **F606**: 按產品、品質等級的庫存統計
-- **F607**: 庫存預警和提醒功能
-- **F608**: 庫存歷史記錄查看
+#### 3.7.2 Inventory queries and statistics
+- **F605**: Real-time inventory queries
+- **F606**: Inventory statistics by product and quality grade
+- **F607**: Inventory alerts and reminders
+- **F608**: View inventory history
 
-#### 3.7.3 庫存分配管理
-- **F609**: 布卷預分配功能
-- **F610**: 庫存鎖定和釋放機制
+#### 3.7.3 Inventory allocation
+- **F609**: Pre-allocate rolls
+- **F610**: Inventory lock and release
 
-### 3.8 出貨管理模組
+### 3.8 Shipping module
 
-#### 3.8.1 出貨處理流程
-- **F701**: 出貨單建立和編輯
-- **F702**: 布卷選擇和分配
-- **F703**: 出貨數量確認和記錄
-- **F704**: 自動庫存扣減功能
+#### 3.8.1 Shipping process
+- **F701**: Create and edit shippings
+- **F702**: Select and allocate rolls
+- **F703**: Confirm and record shipped quantities
+- **F704**: Automatic stock deduction
 
-#### 3.8.2 出貨追蹤功能
-- **F705**: 出貨狀態更新
-- **F706**: 出貨歷史記錄
-- **F707**: 出貨單號自動生成
+#### 3.8.2 Shipping tracking
+- **F705**: Shipping status updates
+- **F706**: Shipping history
+- **F707**: Automatic shipping number generation
 
-### 3.9 權限管理模組
+### 3.9 Permission management module
 
-#### 3.9.1 組織角色管理
-- **F801**: 組織角色查看和管理
-- **F802**: 自定義角色創建和編輯
-- **F803**: 角色權限設定和分配
-- **F804**: 使用者角色分配管理
+#### 3.9.1 Organization role management
+- **F801**: View and manage organization roles
+- **F802**: Create and edit custom roles
+- **F803**: Set and assign role permissions
+- **F804**: Manage user role assignments
 
-#### 3.9.2 權限控制機制
-- **F805**: 基於角色的功能存取控制
-- **F806**: 數據查看權限控制
-- **F807**: 操作權限動態檢查
+#### 3.9.2 Permission control
+- **F805**: Role-based feature access control
+- **F806**: Data viewing permission control
+- **F807**: Dynamic checks of operation permissions
 
-### 3.10 系統設定模組
+### 3.10 System settings module
 
-#### 3.10.1 組織偏好設定
-- **F901**: 組織基本資訊設定
-- **F902**: 系統偏好和配置
-- **F903**: 通知和提醒設定
+#### 3.10.1 Organization preferences
+- **F901**: Basic organization information settings
+- **F902**: System preferences and configuration
+- **F903**: Notification and reminder settings
 
-## 4. 非功能性需求 (NFR)
+## 4. Non-functional requirements (NFR)
 
-### 4.1 效能需求
-- **NFR001**: 頁面載入時間 < 3 秒
-- **NFR002**: API 回應時間 < 500ms
-- **NFR003**: 支援同時 100+ 使用者線上操作
-- **NFR004**: 數據庫查詢優化，複雜查詢 < 2 秒
+### 4.1 Performance
+- **NFR001**: Page load time < 3 seconds
+- **NFR002**: API response time < 500ms
+- **NFR003**: Support 100+ concurrent online users
+- **NFR004**: Optimized database queries, complex queries < 2 seconds
 
-### 4.2 可用性需求
-- **NFR005**: 系統可用性 ≥ 99.5%
-- **NFR006**: 支援 24/7 運行
-- **NFR007**: 自動錯誤恢復機制
-- **NFR008**: 數據備份和災難恢復
+### 4.2 Availability
+- **NFR005**: System availability ≥ 99.5%
+- **NFR006**: 24/7 operation
+- **NFR007**: Automatic error recovery
+- **NFR008**: Data backup and disaster recovery
 
-### 4.3 安全性需求
-- **NFR009**: 組織數據完全隔離
-- **NFR010**: 基於 RLS 的數據庫安全控制
-- **NFR011**: JWT 令牌認證機制
-- **NFR012**: HTTPS 加密傳輸
-- **NFR013**: 角色權限動態驗證
+### 4.3 Security
+- **NFR009**: Full isolation of organization data
+- **NFR010**: RLS-based database security controls
+- **NFR011**: JWT token authentication
+- **NFR012**: HTTPS encrypted transport
+- **NFR013**: Dynamic verification of role permissions
 
-### 4.4 擴展性需求
-- **NFR014**: 支援水平擴展架構
-- **NFR015**: 模組化設計，易於功能擴展
-- **NFR016**: 支援多組織租戶模式
-- **NFR017**: API 設計支援未來第三方整合
+### 4.4 Scalability
+- **NFR014**: Horizontally scalable architecture
+- **NFR015**: Modular design, easy to extend with features
+- **NFR016**: Multi-organization tenant model
+- **NFR017**: API design that supports future third-party integration
 
-### 4.5 使用者體驗需求
-- **NFR018**: 響應式設計，支援行動裝置
-- **NFR019**: 直觀的使用者介面設計
-- **NFR020**: 完整的錯誤提示和幫助資訊
-- **NFR021**: 支援中文介面和本地化
+### 4.5 User experience
+- **NFR018**: Responsive design with mobile support
+- **NFR019**: Intuitive user interface design
+- **NFR020**: Complete error messages and help
+- **NFR021**: Chinese interface and localization
 
-## 5. 技術選型
+## 5. Technology choices
 
-### 5.1 前端技術棧
-- **框架**: React 18 + TypeScript
-- **建構工具**: Vite
-- **UI 框架**: Tailwind CSS + shadcn/ui
-- **狀態管理**: React Query + Zustand
-- **路由**: React Router
-- **表單**: React Hook Form + Zod
+### 5.1 Frontend stack
+- **Framework**: React 18 + TypeScript
+- **Build tool**: Vite
+- **UI framework**: Tailwind CSS + shadcn/ui
+- **State management**: React Query + Zustand
+- **Routing**: React Router
+- **Forms**: React Hook Form + Zod
 
-### 5.2 後端技術棧
-- **BaaS 平台**: Supabase
-- **資料庫**: PostgreSQL (Supabase 託管)
-- **認證**: Supabase Auth
-- **檔案存儲**: Supabase Storage
-- **即時功能**: Supabase Realtime
+### 5.2 Backend stack
+- **BaaS platform**: Supabase
+- **Database**: PostgreSQL (hosted by Supabase)
+- **Authentication**: Supabase Auth
+- **File storage**: Supabase Storage
+- **Real-time**: Supabase Realtime
 
-### 5.3 部署和維運
-- **前端部署**: Vercel
-- **後端服務**: Supabase 雲端服務
-- **監控**: Supabase 內建監控
+### 5.3 Deployment and operations
+- **Frontend deployment**: Vercel
+- **Backend services**: Supabase cloud
+- **Monitoring**: Supabase built-in monitoring
 - **CI/CD**: GitHub Actions
 
-### 5.4 開發工具
-- **版本控制**: Git + GitHub
-- **程式碼品質**: ESLint + Prettier
-- **測試**: Jest + React Testing Library
-- **API 測試**: Supabase 測試工具
+### 5.4 Development tools
+- **Version control**: Git + GitHub
+- **Code quality**: ESLint + Prettier
+- **Testing**: Jest + React Testing Library
+- **API testing**: Supabase testing tools
 
-## 6. 系統架構
+## 6. System architecture
 
-### 6.1 多租戶架構模式
+### 6.1 Multi-tenant architecture
 ```
-使用者 → 組織選擇 → 組織 Context → 權限檢查 → 功能存取
+User → Select organization → Organization context → Permission check → Feature access
                 ↓
-        數據隔離 (RLS) → 組織數據 → 業務邏輯
+        Data isolation (RLS) → Organization data → Business logic
 ```
 
-### 6.2 數據隔離策略
-- **行級安全策略 (RLS)**: 確保組織數據隔離
-- **組織 ID 過濾**: 所有業務查詢自動加入組織過濾
-- **權限動態檢查**: 基於使用者組織角色的權限驗證
+### 6.2 Data isolation strategy
+- **Row-level security (RLS)**: ensures organization data isolation
+- **Organization ID filtering**: every business query automatically filters by organization
+- **Dynamic permission checks**: permission verification based on the user's organization role
 
-### 6.3 權限繼承模型
+### 6.3 Permission inheritance model
 ```
-組織擁有者 (所有權限)
+Organization owner (all permissions)
     ↓
-系統角色 (預設權限配置)
+System roles (default permission configuration)
     ↓
-自定義角色 (靈活權限組合)
+Custom roles (flexible permission combinations)
     ↓
-使用者權限 (角色權限聚合)
+User permissions (aggregate of role permissions)
 ```
 
-## 7. 數據模型
+## 7. Data model
 
-### 7.1 組織相關實體
-- **Organizations**: 組織主表
-- **UserOrganizations**: 使用者組織關聯
-- **OrganizationRoles**: 組織角色定義
-- **UserOrganizationRoles**: 使用者角色分配
+### 7.1 Organization entities
+- **Organizations**: main organization table
+- **UserOrganizations**: user–organization links
+- **OrganizationRoles**: organization role definitions
+- **UserOrganizationRoles**: user role assignments
 
-### 7.2 業務實體關係
-- 所有業務實體包含 `organization_id` 欄位
-- 透過 RLS 策略確保數據隔離
-- 支援跨組織數據查詢（在權限允許的情況下）
+### 7.2 Business entity relationships
+- Every business entity has an `organization_id` column
+- RLS policies ensure data isolation
+- Cross-organization data queries are supported (where permissions allow)
 
-## 8. AI Agent「Query」功能需求
+## 8. AI Agent "Query" requirements
 
-### 8.1 功能概覽
+### 8.1 Overview
 
-Query 是內嵌於 ERP 系統的 AI 對話助理，以紡織業吉祥物形象呈現（品牌識別：鬼蝠魟）。使用者登入後，可在系統任意頁面呼叫 Query，用繁體中文自然語言執行 ERP 操作，無需手動瀏覽各功能模組。
+Query is an AI chat assistant embedded in the ERP system, presented as a textile-industry mascot (brand identity: manta ray). After signing in, users can call Query from any page and carry out ERP operations in natural Traditional Chinese, without browsing through each feature module by hand.
 
-### 8.2 使用者體驗需求
+### 8.2 User experience requirements
 
-#### 8.2.1 入口設計
-- **QA-UX001**: 系統全域提供固定懸浮按鈕（右下角），點擊後展開 Query 對話視窗
-- **QA-UX002**: 對話視窗支援最小化，不中斷當前頁面操作
-- **QA-UX003**: 視窗設計採用 Query 吉祥物頭像作為 AI 回覆識別
-- **QA-UX004**: 支援鍵盤快捷鍵呼叫（如 `Cmd+K`）
+#### 8.2.1 Entry point
+- **QA-UX001**: A fixed floating button (bottom right) across the whole system; clicking it opens the Query chat window
+- **QA-UX002**: The chat window can be minimized without interrupting work on the current page
+- **QA-UX003**: The window uses the Query mascot avatar to identify AI replies
+- **QA-UX004**: Can be opened with a keyboard shortcut (e.g. `Cmd+K`)
 
-#### 8.2.2 對話介面
-- **QA-UX005**: 輸入框支援自由文字輸入，無需學習特定指令格式
-- **QA-UX006**: AI 回覆以結構化卡片呈現（表格、清單、摘要），非純文字
-- **QA-UX007**: 操作成功後提供跳轉連結，讓使用者可直接前往對應頁面
-- **QA-UX008**: 保留同一 session 的對話歷史紀錄
-- **QA-UX009**: 支援連續對話（例：「幫我查台灣布業的訂單」→「其中未付款的有哪幾筆？」）
+#### 8.2.2 Chat interface
+- **QA-UX005**: The input box accepts free text, with no command syntax to learn
+- **QA-UX006**: AI replies are presented as structured cards (tables, lists, summaries), not plain text
+- **QA-UX007**: After a successful operation, provide a link straight to the matching page
+- **QA-UX008**: Keep the conversation history within the same session
+- **QA-UX009**: Support follow-up questions (e.g. "find 台灣布業's orders" → "which of them are unpaid?")
 
-### 8.3 功能需求（依 MCP 工具分類）
+### 8.3 Functional requirements (by MCP tool)
 
-#### 8.3.1 產品查詢
-- **QA-F101**: 以關鍵字搜尋產品目錄（名稱、顏色）
-  - 範例：「有沒有藍色的產品？」、「列出所有可用的布料」
-- **QA-F102**: 查詢單一產品完整規格
-  - 範例：「告訴我棉麻布 XL 的詳細資料」
+#### 8.3.1 Product lookup
+- **QA-F101**: Search the product catalog by keyword (name, color)
+  - Examples: "Are there any blue products?", "List all available fabrics"
+- **QA-F102**: Look up a single product's full specification
+  - Example: "Tell me the details of cotton-linen XL"
 
-#### 8.3.2 庫存查詢
-- **QA-F201**: 查詢產品庫存數量（A/B/C/D 級與瑕疵品分級）
-  - 範例：「現在棉麻布還有多少庫存？各等級分別幾卷？」
-- **QA-F202**: 取得庫存不足警示清單
-  - 範例：「現在哪些產品需要補貨？」、「庫存警示有哪些？」
+#### 8.3.2 Inventory lookup
+- **QA-F201**: Look up product stock (by grade A/B/C/D and defective)
+  - Example: "How much cotton-linen is in stock now? How many rolls per grade?"
+- **QA-F202**: Get the low-stock alert list
+  - Examples: "Which products need restocking?", "What are the stock alerts?"
 
-#### 8.3.3 客戶管理
-- **QA-F301**: 搜尋與查詢客戶資料
-  - 範例：「幫我找台灣布業的聯絡資訊」、「列出所有客戶」
-- **QA-F302**: 查詢單一客戶完整資料
-  - 範例：「台灣布業的地址和聯絡人是誰？」
-- **QA-F303**: 新增客戶
-  - 範例：「新增一個客戶，公司名稱是正大紡織，聯絡人陳大明，手機 0912345678」
+#### 8.3.3 Customer management
+- **QA-F301**: Search and look up customer data
+  - Examples: "Find 台灣布業's contact details", "List all customers"
+- **QA-F302**: Look up a single customer's full data
+  - Example: "What's 台灣布業's address and who's the contact?"
+- **QA-F303**: Add a customer
+  - Example: "Add a customer, company 正大紡織, contact 陳大明, mobile 0912345678"
 
-#### 8.3.4 訂單管理
-- **QA-F401**: 查詢訂單列表（支援狀態、付款狀態、客戶篩選）
-  - 範例：「有哪些訂單還沒付款？」、「台灣布業最近的訂單狀況」
-- **QA-F402**: 查詢訂單完整詳情
-  - 範例：「訂單 ORD-001 的品項和出貨狀態是什麼？」
-- **QA-F403**: 建立新銷售訂單
-  - 範例：「幫台灣布業建立一張新訂單，備註急件」
-- **QA-F404**: 更新訂單狀態
-  - 範例：「把 ORD-001 標記為已確認」、「ORD-002 已付清款項」
+#### 8.3.4 Order management
+- **QA-F401**: List orders (filter by status, payment status, customer)
+  - Examples: "Which orders are unpaid?", "Status of 台灣布業's recent orders"
+- **QA-F402**: Look up an order's full details
+  - Example: "What are the lines and shipping status of order ORD-001?"
+- **QA-F403**: Create a new sales order
+  - Example: "Create a new order for 台灣布業, note: urgent"
+- **QA-F404**: Update order status
+  - Examples: "Mark ORD-001 as confirmed", "ORD-002 is paid in full"
 
-#### 8.3.5 採購單管理
-- **QA-F501**: 查詢採購單列表（支援狀態、工廠篩選）
-  - 範例：「目前有哪些採購單還在生產中？」
-- **QA-F502**: 查詢採購單完整詳情
-  - 範例：「PO-2026001 的品項和預計到貨日是什麼？」
+#### 8.3.5 Purchase order management
+- **QA-F501**: List purchase orders (filter by status, factory)
+  - Example: "Which purchase orders are still in production?"
+- **QA-F502**: Look up a purchase order's full details
+  - Example: "What are the lines and expected arrival date of PO-2026001?"
 
-#### 8.3.6 出貨管理
-- **QA-F601**: 查詢出貨記錄（支援訂單、客戶篩選）
-  - 範例：「台灣布業這個月出了哪些貨？」
-- **QA-F602**: 查詢出貨單完整詳情（含卷號）
-  - 範例：「出貨單 SH-001 出了哪些卷？」
+#### 8.3.6 Shipping management
+- **QA-F601**: Look up shipping records (filter by order, customer)
+  - Example: "What did we ship to 台灣布業 this month?"
+- **QA-F602**: Look up a shipping's full details (including roll numbers)
+  - Example: "Which rolls went out on shipping SH-001?"
 
-#### 8.3.7 工廠管理
-- **QA-F701**: 搜尋與查詢工廠資料
-  - 範例：「有哪些合作工廠？」、「找一下正豐工廠的聯絡方式」
+#### 8.3.7 Factory management
+- **QA-F701**: Search and look up factory data
+  - Examples: "Which factories do we work with?", "Find 正豐工廠's contact details"
 
-### 8.4 技術需求
+### 8.4 Technical requirements
 
-#### 8.4.1 架構
-- **QA-T001**: 前端透過 Supabase Auth 取得使用者 JWT，作為 Query API 的認證憑證
-- **QA-T002**: Query 後端呼叫 MCP Server（`https://qerp-system-production.up.railway.app/mcp`），帶入使用者 JWT
-- **QA-T003**: MCP Server 以使用者 JWT 存取 Supabase，RLS 自動確保資料隔離
-- **QA-T004**: AI 推理層使用 Claude API（建議 claude-sonnet-4-6），搭配 MCP tool use
+#### 8.4.1 Architecture
+- **QA-T001**: The frontend gets the user's JWT from Supabase Auth and uses it to authenticate with the Query API
+- **QA-T002**: The Query backend calls the MCP Server (`https://qerp-system-production.up.railway.app/mcp`), passing the user's JWT
+- **QA-T003**: The MCP Server accesses Supabase with the user's JWT, so RLS ensures data isolation automatically
+- **QA-T004**: The AI reasoning layer uses the Claude API (suggested: claude-sonnet-4-6) with MCP tool use
 
-#### 8.4.2 安全
-- **QA-T005**: JWT 不得儲存於 localStorage，應使用 Supabase session
-- **QA-T006**: MCP Server 所有 request 需驗證 JWT 有效性
-- **QA-T007**: Query 僅能存取使用者所屬組織的資料（由 RLS 強制執行）
+#### 8.4.2 Security
+- **QA-T005**: The JWT must not be stored in localStorage; use the Supabase session
+- **QA-T006**: The MCP Server verifies the JWT on every request
+- **QA-T007**: Query can only access data of the user's own organizations (enforced by RLS)
 
-#### 8.4.3 效能
-- **QA-T008**: 首次回應時間 < 3 秒
-- **QA-T009**: 工具呼叫（MCP tool call）回應時間 < 1 秒
+#### 8.4.3 Performance
+- **QA-T008**: Time to first response < 3 seconds
+- **QA-T009**: Tool call (MCP tool call) response time < 1 second
 
-### 8.5 資料流架構
+### 8.5 Data flow
 
 ```
-使用者輸入自然語言
+User types natural language
         ↓
-前端 Query 視窗（帶 Supabase JWT）
+Frontend Query window (with Supabase JWT)
         ↓
-Claude API（claude-sonnet-4-6）
+Claude API (claude-sonnet-4-6)
         ↓ tool_use
-MCP Server（Railway）
+MCP Server (Railway)
   Authorization: Bearer <user-jwt>
         ↓
-Supabase RLS（自動隔離組織資料）
+Supabase RLS (isolates organization data automatically)
         ↓
-回傳結構化結果 → Claude 整理回覆
+Structured results returned → Claude composes the reply
         ↓
-使用者看到自然語言回應 + 結構化卡片
+User sees a natural-language reply + structured cards
 ```
 
-### 8.6 不在本版本範圍內（Out of Scope）
-- 語音輸入
-- 主動推播通知（如庫存警示自動提醒）
-- 批次操作（如一次建立多張訂單）
-- 匯出報表
+### 8.6 Out of scope for this version
+- Voice input
+- Proactive push notifications (e.g. automatic stock alerts)
+- Batch operations (e.g. creating several orders at once)
+- Exporting reports
 
 ---
 
-## 9. 未來發展路線圖
+## 9. Future roadmap
 
-### 8.1 短期目標 (1-3 個月)
-- 完成多租戶組織架構實施
-- 實現核心業務流程管理
-- 建立基礎權限管理系統
-- 完成基本 UI/UX 設計
+### 9.1 Short term (1–3 months)
+- Complete the multi-tenant organization architecture
+- Implement core business process management
+- Build the basic permission management system
+- Complete the basic UI/UX design
 
-### 8.2 中期目標 (3-6 個月)
-- 增加進階報表和分析功能
-- 實現行動端支援
-- 增加第三方系統整合能力
-- 優化效能和擴展性
+### 9.2 Medium term (3–6 months)
+- Add advanced reports and analytics
+- Add mobile support
+- Add third-party system integration
+- Optimize performance and scalability
 
-### 8.3 長期目標 (6-12 個月)
-- AI 驅動的庫存預測
-- 供應鏈優化建議
-- 進階商業智慧分析
-- 國際化和多語言支援
+### 9.3 Long term (6–12 months)
+- AI-driven inventory forecasting
+- Supply chain optimization suggestions
+- Advanced business intelligence
+- Internationalization and multi-language support
 
-## 9. 成功指標
+## 10. Success metrics
 
-### 9.1 業務指標
-- 使用者活躍度 > 80%
-- 系統採用率 > 90%
-- 使用者滿意度 > 4.5/5
-- 業務流程效率提升 > 30%
+### 10.1 Business metrics
+- User activity > 80%
+- System adoption > 90%
+- User satisfaction > 4.5/5
+- Business process efficiency gain > 30%
 
-### 9.2 技術指標
-- 系統可用性 > 99.5%
-- 平均回應時間 < 500ms
-- 錯誤率 < 0.1%
-- 代碼覆蓋率 > 80%
+### 10.2 Technical metrics
+- System availability > 99.5%
+- Average response time < 500ms
+- Error rate < 0.1%
+- Code coverage > 80%
 
-### 9.3 組織管理指標
-- 組織創建成功率 > 95%
-- 權限設定準確性 > 99%
-- 數據隔離完整性 100%
-- 多租戶併發穩定性 > 99%
+### 10.3 Organization management metrics
+- Organization creation success rate > 95%
+- Permission setting accuracy > 99%
+- Data isolation integrity 100%
+- Multi-tenant concurrency stability > 99%
 
 ---
 
-**文檔版本**: 3.0  
-**最後更新**: 2026-04-16  
-**負責人**: 產品團隊  
-**審查週期**: 每週一次
+**Document version**: 3.0  
+**Last updated**: 2026-04-16  
+**Owner**: Product team  
+**Review cycle**: Weekly

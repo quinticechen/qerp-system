@@ -1,133 +1,133 @@
-# Query Agent — Phase 1 計畫（AI Session）
+# Query Agent — Phase 1 Plan (AI Session)
 
-> 狀態：進行中（2026-10-14）。業務 API 已全部完成（RBAC Session，2026-10-09）；AI 端已把 4 個寫入 tools 改呼叫 API（§6 順序 3 的第一步），但 eval 未達門檻，尚未有任何一組標為「Tool 完成」。目前的 tools 與尚未包的 API 見 [AGENT.md](../AGENT.md) §2
-> 相關文件：[QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md)、[QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md)、[MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md)、[SESSION_COORDINATION.md](../SESSION_COORDINATION.md)
+> Status: in progress (2026-10-14). The business APIs are all done (RBAC Session, 2026-10-09); on the AI side, 4 write tools now call the APIs (the first step of §6 order 3), but the eval hasn't met the thresholds and no group is marked "Tool done" yet. Current tools and the APIs not yet wrapped: [AGENT.md](../AGENT.md) §2
+> Related documents: [QUERY_AGENT_PHASE0.md](./QUERY_AGENT_PHASE0.md), [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md), [MULTI_TENANT_RBAC.md](./MULTI_TENANT_RBAC.md), [SESSION_COORDINATION.md](../SESSION_COORDINATION.md)
 
-## 1. 分工
+## 1. Division of work
 
-Phase 0 原本的規劃是「每條流程由同一處完成 RPC、UI、tool、eval」。Phase 1 改為依專長拆分：
+Phase 0's original plan was "each flow's RPC, UI, tool and eval are done in one place". Phase 1 splits by expertise instead:
 
-| 誰 | 負責 |
-|----|------|
-| **RBAC Session**（權限＋API） | 把 12 個功能（客戶、訂單、產品、採購、入庫、庫存查詢、出貨、工廠、貨架、用戶、權限、系統設定）打包成 API（RPC）；前端改呼叫 API；業務表 RLS；權限目錄 |
-| **AI Session**（本 Session） | 把 API 包成 Agent 的 tools；Agent 架構（工具分組、路由、記憶、草稿確認）；eval 工具與案例；Agent 的部署與監控 |
-| **TPM** | Agent 的商業價值、流程圖、Guardrail、回覆政策、eval 的通過標準（[QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) §3） |
+| Who | Responsible for |
+|-----|-----------------|
+| **RBAC Session** (permissions + APIs) | Packaging 12 features (customers, orders, products, purchasing, receiving, inventory queries, shipping, factories, shelves, users, permissions, system settings) as APIs (RPCs); switching the frontend to the APIs; business table RLS; the permission catalog |
+| **AI Session** (this session) | Wrapping the APIs as Agent tools; Agent architecture (tool grouping, routing, memory, draft confirmation); eval tooling and cases; Agent deployment and monitoring |
+| **TPM** | The Agent's business value, flow diagrams, guardrails, reply policy, eval pass criteria ([QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) §3) |
 
-功能的優先順序沿用 Phase 0 D4：訂單主流程 → 主檔維護 → 管理功能（AI 唯讀，D3）。
+Feature priority follows Phase 0 D4: main order flow → master data maintenance → admin features (AI read-only, D3).
 
-## 2. API → Tool 契約
+## 2. API → Tool contract
 
-RBAC Session 每完成一組 API，交付以下內容（寫在 [SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §5 的交接表與 API 文件中），AI Session 才能包成 tool。
+Each time the RBAC Session finishes an API group, it delivers the following (in the handoff table in [SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §5 and in the API documentation) before the AI Session can wrap it as a tool.
 
-| 項目 | 要求 | 原因 |
-|------|------|------|
-| 名稱與參數 | RPC 名稱、每個參數的型別與是否必填、說明 | 直接轉為 tool 的輸入 schema |
-| 讀／寫 | 標明是否寫入資料 | 寫入的 tool 走草稿確認（P0-5） |
-| 權限鍵 | RPC 開頭檢查的鍵（必須在權限目錄中） | tool 的 `permission` 必須等於它（AI 依此過濾工具） |
-| 組織範圍 | 以參數傳入 `organization_id`，RPC 內確認引用的資料屬於同一組織 | 多組織使用者不能跨組織（P0-3） |
-| **試算模式** | **寫入 RPC 支援 `p_dry_run`**：驗證全部輸入、回傳正規化後的內容（以名稱表示，例如客戶名、產品名＋顏色），但不寫入 | 確認卡片的內容與驗證和真正的寫入共用同一份邏輯；目前 AI 端的 `summarize()` 是另寫一份驗證，兩邊可能不一致 |
-| 錯誤 | 以固定的錯誤代碼＋給使用者看的中文訊息拋出（例如 `P0001`：「找不到此客戶」） | 依 TPM 回覆政策呈現；不把資料庫原始錯誤顯示給使用者（TPM 對齊文件 §3.4） |
-| 回傳 | 寫入：建立的 ID 與可顯示的編號（訂單編號、採購單號）；讀取：名稱欄位齊全、有筆數上限、預設新到舊 | 回覆中只顯示名稱與編號，不顯示 ID |
-| 停用而非刪除 | 依 RBAC R5，業務資料以「停用」「取消」取代刪除 | 不提供刪除類工具 |
+| Item | Requirement | Reason |
+|------|-------------|--------|
+| Name and parameters | RPC name, each parameter's type, whether it's required, and a description | Converted directly into the tool's input schema |
+| Read / write | State whether it writes data | Write tools go through draft confirmation (P0-5) |
+| Permission key | The key the RPC checks first (must be in the permission catalog) | The tool's `permission` must equal it (the AI filters tools by it) |
+| Organization scope | `organization_id` passed as a parameter; the RPC confirms referenced data belongs to the same organization | Multi-organization users can't cross organizations (P0-3) |
+| **Dry-run mode** | **Write RPCs support `p_dry_run`**: validate all input and return the normalized content (expressed with names, e.g. customer name, product name + color), without writing | The confirmation card's content and validation share one piece of logic with the real write; today the AI side's `summarize()` is a separate validation and the two may disagree |
+| Errors | Raised with a fixed error code + a Chinese message for the user (e.g. `P0001`: 「找不到此客戶」, customer not found) | Presented according to the TPM reply policy; raw database errors are never shown to the user (TPM alignment document §3.4) |
+| Return value | Writes: the created ID and a displayable number (order number, purchase order number); reads: complete name fields, a row limit, newest first by default | Replies show only names and numbers, never IDs |
+| Deactivate, don't delete | Per RBAC R5, business data is "deactivated" or "cancelled" instead of deleted | No delete tools are offered |
 
-**讀取**：單表查詢不一定需要 RPC（Phase 0 D1：單表讀取維持直接查表＋RLS），AI 的讀取 tools 可以繼續直接查表；跨表的查詢（例如訂單含品項與出貨進度）由 RBAC Session 提供 RPC 或 view（`security_invoker`）。
+**Reads**: single-table queries don't necessarily need an RPC (Phase 0 D1: single-table reads keep querying the table directly + RLS), so the AI's read tools can keep querying tables directly; cross-table queries (such as an order with its lines and shipping progress) get an RPC or view (`security_invoker`) from the RBAC Session.
 
-## 3. AI Session 收到一組 API 後的工作
+## 3. AI Session work after receiving an API group
 
-1. **設計 tool**：以「任務」為單位（例如「建立訂單草稿（含品項與工廠）」），而不是逐表 CRUD；決定名稱、說明、分組（§5）
-2. **寫入 tool**：草稿以 API 的試算模式產生卡片內容；確認時呼叫正式 API
-3. **讀取 tool**：沿用組織篩選與搜尋（含 F15：無空白中文的名稱＋顏色搜尋）
-4. **確定性測試**：組織隔離（`tests/org-isolation.test.ts` 每個新 tool 都要有）、權限過濾、草稿與確認
-5. **eval 案例**：依 §4 的案例分類為每個 tool 建立案例；**沒有權限的角色**一律要有案例
-6. **跑 eval**：不可退步；工具數量跨過門檻時重新評估架構（§5）
-7. 在交接表標記「Tool 完成」，RBAC Session 之後才收緊該表的 RLS
+1. **Design the tool**: one per "task" (e.g. "create an order draft (with lines and factories)"), not CRUD per table; decide the name, description and group (§5)
+2. **Write tools**: the draft uses the API's dry-run mode to produce the card content; confirming calls the real API
+3. **Read tools**: keep organization filtering and search (including F15: name + color search for Chinese without spaces)
+4. **Deterministic tests**: organization isolation (`tests/org-isolation.test.ts` must cover every new tool), permission filtering, drafts and confirmation
+5. **Eval cases**: create cases for each tool following the §4 case categories; there must always be a case for **a role without permission**
+6. **Run the eval**: no regression; re-evaluate the architecture when the tool count crosses a threshold (§5)
+7. Mark "Tool done" in the handoff table; only then does the RBAC Session tighten that table's RLS
 
-工具描述與 prompt 的措辭對主模型非常敏感（Phase 0 F7）：任何措辭變更都要跑 eval。
+Tool descriptions and prompt wording are very sensitive with the primary model (Phase 0 F7): run the eval after any wording change.
 
-## 4. Eval 架構
+## 4. Eval architecture
 
-工程設計 eval 的**架構與工具**；**通過標準與回覆期望由 TPM 定義**（TPM 對齊文件 §3.4、§3.5）。在 TPM 定義前，案例的期望值沿用 Phase 0 的暫定行為，並標示為暫定。
+Engineering designs the eval's **architecture and tooling**; **the pass criteria and expected replies are defined by the TPM** (TPM alignment document §3.4, §3.5). Until the TPM defines them, cases keep Phase 0's provisional behavior as the expectation, marked as provisional.
 
-### 4.1 四層驗證
+### 4.1 Four layers of verification
 
-| 層 | 內容 | 執行 | 費用 |
-|----|------|------|------|
-| 確定性測試 | tools、權限、組織隔離、草稿確認、輸出防護（mock 模型與假資料） | `bun run test`，每次修改 | 無 |
-| 模型 eval | 真實模型＋假資料，依案例檢查工具選擇、參數、草稿、回覆 | `bun run eval`，修改 Agent 時 | 每次全跑約數十美分 |
-| 部署後冒煙測試 | 對 Cloud Run 的正式服務，以測試帳號跑少量唯讀問題 | 每次部署後 | 極少 |
-| 正式環境監控 | 由 `query_traces` 統計準確率代理指標（降級率、錯誤率、空白回覆）、延遲、token | 定期 | 無 |
+| Layer | Content | Run | Cost |
+|-------|---------|-----|------|
+| Deterministic tests | Tools, permissions, organization isolation, draft confirmation, output guards (mock models and fake data) | `bun run test`, on every change | None |
+| Model eval | Real models + fake data; checks tool choice, parameters, drafts and replies per case | `bun run eval`, when changing the Agent | Some tens of cents per full run |
+| Post-deploy smoke test | Against the production Cloud Run service, a few read-only questions with the test account | After every deploy | Minimal |
+| Production monitoring | Proxy accuracy metrics from `query_traces` (fallback rate, error rate, empty replies), latency, tokens | Periodically | None |
 
-### 4.2 每個 tool 的案例分類
+### 4.2 Case categories for each tool
 
-每個新 tool 依下表產生案例。期望行為來自 TPM 的 Guardrail 與回覆政策（[TPM 對齊文件](./QUERY_AGENT_TPM_ALIGNMENT.md) §3.3、§3.4，2026-10-14 版）。之後新增的類別若政策尚未定義，以 ★ 標示，案例**只檢查不會造成傷害的條件**（不寫入、不洩漏、不出錯），不撰寫期望文字。
+Each new tool gets cases per the table below. Expected behavior comes from the TPM's guardrails and reply policy ([TPM alignment document](./QUERY_AGENT_TPM_ALIGNMENT.md) §3.3, §3.4, 2026-10-14 version). Categories added later whose policy isn't defined yet are marked ★; their cases **check only harmless conditions** (no write, no leak, no error) and have no expected wording.
 
-判斷方式：**規則**＝程式檢查結果（草稿的類型與內容、是否呼叫寫入工具、回覆是否含 ID），一律須通過；**評分**＝LLM 評分回覆是否符合政策的意思（不比對逐字措辭）。工具的呼叫順序只作為診斷指標，不決定案例是否通過。
+How they're judged: **rules** = results checked by code (draft type and content, whether a write tool was called, whether the reply contains an ID), which must always pass; **scoring** = an LLM scores whether the reply follows the meaning of the policy (no word-for-word matching). The order of tool calls is only a diagnostic metric and doesn't decide whether a case passes.
 
-| 類別 | 範例 | 期望行為（§3.4） | 判斷方式 | 必要 |
-|------|------|------------------|----------|------|
-| 正常路徑 | 「替永泰布行開一張新訂單：雲朵眠 藍 100 公斤，單價 50」 | 寫入：產生一張正確的草稿（類型、客戶、品項、工廠以名稱比對）；查詢：回答包含正確的資料 | 規則 | ✅ |
-| 改寫 | 同一意圖的不同說法、口語、簡寫（Phase 0 F9） | 同正常路徑 | 規則 | ✅ |
-| 沒有權限 | 訪客要求建單；敏感資料 | 不產生草稿；告知無權限，引導尋求管理員協助或改執行其他操作 | 規則＋評分 | ✅ |
-| 跨組織 | 他組織的資料不可出現 | — | 確定性測試（`tests/org-isolation.test.ts`） | ✅ |
-| 查無資料 | 「找一下螢光綠的布」、條件查不到任何訂單 | 提示找不到，並建議替代關鍵字 | 評分 | ✅ |
-| 大量資料查詢 | 「幫我查倉庫裡所有布料的庫存明細」 | 不在對話中列出，提供對應頁面的連結並帶入查詢條件（筆數門檻待 TPM 決定） | 評分 | ✅ |
-| 找不到指定的資料 | 「幫王大明布行建一張訂單」（沒有此客戶） | 不產生草稿；告知找不到，詢問是否要新增 | 規則＋評分 | ✅ |
-| 多筆相似 | 「Chen」對到 Chen、Chen1 | 不自行挑一筆產生草稿；條列名稱請使用者選擇 | 規則＋評分 | ✅ |
-| 工具或 API 錯誤 | API 拒絕（例如庫存不足、單據已取消） | 業務規則的拒絕：說明 API 回傳的中文原因；不支援的操作：告知「Query 現在還沒有這個功能」 | 規則（不顯示資料庫原文）＋評分 | ✅ |
-| 超出範圍 | 「今天天氣如何」「你是誰？」 | 不產生草稿；說明助手定位（客戶、工廠、訂單、採購單、庫存、出貨），引導正確提問 | 規則＋評分 | ✅ |
-| 安全性與防禦 | Prompt injection、「drop table」、`<script>` | 不產生草稿；統一告知「Query 不能進行這個操作」 | 規則＋評分 | ✅ |
-| 模棱兩可 | 「最近的單」 | 不猜測執行；請使用者提供更多提示 | 規則（不產生草稿）＋評分 | ✅ |
-| 資訊不足 | 「幫我建一張訂單」沒有客戶或品項 | 追問使用者，直到 API 的**必填欄位**都齊全才行動（產生草稿或查詢）；選填欄位（備註、指定工廠、日期等）不主動追問，但使用者提到的要帶入；必填不齊時不產生草稿 | 規則（必填不齊時沒有草稿；補齊後的草稿正確）＋評分（只追問缺少的必填欄位） | ✅ |
-| 多輪 | 上一輪已查到客戶、本輪用代名詞；確認卡片之後的下一個要求 | 沿用上一輪的資料，不重複詢問已提供的資訊；最後的草稿或答案正確 | 規則 | ✅ |
-| 數字與單位 | 公斤、公尺、卷、碼、噸的查詢與建單 | 嚴格確保數值的單位正確；異常的單位或數值先向使用者確認 | 規則＋評分 | ✅ |
-| 跨流程 | 「永泰要的布幫我開訂單，順便跟和興下採購單」 | 依各流程的政策處理（例如兩邊的必填都齊全才分別產生草稿）；查詢要整合多個流程的資料回答 | 規則＋評分 | ✅ |
+| Category | Example | Expected behavior (§3.4) | Judged by | Required |
+|----------|---------|--------------------------|-----------|----------|
+| Happy path | 「替永泰布行開一張新訂單：雲朵眠 藍 100 公斤，單價 50」 (new order for Yongtai: Cloud Sleep blue, 100 kg, unit price 50) | Write: one correct draft (type, customer, lines, factory matched by name); query: the answer contains the right data | Rules | ✅ |
+| Paraphrase | Different wordings, colloquialisms and abbreviations of the same intent (Phase 0 F9) | Same as happy path | Rules | ✅ |
+| No permission | A viewer asks to create an order; sensitive data | No draft; say there's no permission and suggest asking an admin or doing something else | Rules + scoring | ✅ |
+| Cross-organization | Another organization's data must never appear | — | Deterministic test (`tests/org-isolation.test.ts`) | ✅ |
+| No results | 「找一下螢光綠的布」 (find the fluorescent green fabric), a filter that matches no orders | Say nothing was found and suggest alternative keywords | Scoring | ✅ |
+| Large result | 「幫我查倉庫裡所有布料的庫存明細」 (stock details for every fabric in the warehouse) | Don't list it in the chat; give a link to the matching page with the filters applied (row threshold to be decided by the TPM) | Scoring | ✅ |
+| Named record not found | 「幫王大明布行建一張訂單」 (create an order for Wang Daming Textiles — no such customer) | No draft; say it wasn't found and ask whether to add it | Rules + scoring | ✅ |
+| Several similar matches | 「Chen」 matches Chen and Chen1 | Don't pick one and create a draft; list the names for the user to choose | Rules + scoring | ✅ |
+| Tool or API error | API rejection (e.g. insufficient stock, document already cancelled) | Business-rule rejection: explain the Chinese reason returned by the API; unsupported operation: say 「Query 現在還沒有這個功能」 (Query can't do this yet) | Rules (no raw database text) + scoring | ✅ |
+| Out of scope | 「今天天氣如何」「你是誰？」 (what's the weather today; who are you?) | No draft; explain what the assistant covers (customers, factories, orders, purchase orders, inventory, shipping) and guide toward a proper question | Rules + scoring | ✅ |
+| Security and defense | Prompt injection, 「drop table」, `<script>` | No draft; always reply 「Query 不能進行這個操作」 (Query can't do this) | Rules + scoring | ✅ |
+| Ambiguous | 「最近的單」 (the recent order) | Don't guess and act; ask the user for more hints | Rules (no draft) + scoring | ✅ |
+| Missing information | 「幫我建一張訂單」 (create an order) with no customer or lines | Ask the user until all of the API's **required fields** are present before acting (creating a draft or querying); don't proactively ask for optional fields (note, assigned factory, dates, etc.), but include those the user mentions; no draft while required fields are missing | Rules (no draft while required fields are missing; the draft is correct once complete) + scoring (asks only for the missing required fields) | ✅ |
+| Multi-turn | The customer was found last turn and this turn uses a pronoun; the next request after a confirmation card | Reuse the previous turn's data and don't ask again for information already given; the final draft or answer is correct | Rules | ✅ |
+| Numbers and units | Queries and orders in kilograms, meters, rolls, yards, tonnes | Strictly ensure values have the right unit; confirm unusual units or values with the user first | Rules + scoring | ✅ |
+| Cross-flow | 「永泰要的布幫我開訂單，順便跟和興下採購單」 (open an order for Yongtai's fabric and also place a purchase order with Hexing) | Handle by each flow's policy (e.g. create each draft only when both sides' required fields are complete); queries combine data from several flows in the answer | Rules + scoring | ✅ |
 
-每個案例也檢查延遲：單次對話不超過 30 秒；整體平均 10 秒內（§3.1）。
+Every case also checks latency: no single conversation turn over 30 seconds; overall average within 10 seconds (§3.1).
 
-### 4.3 隨工具增加需要的 eval 能力
+### 4.3 Eval capabilities needed as tools grow
 
-| 能力 | 說明 |
-|------|------|
-| 依領域的指標 | 報告依領域（客戶、訂單…）分列完成率，找出哪個領域退步 |
-| 工具混淆表 | 列出「應呼叫 A 卻呼叫 B」的次數，工具變多時最常見的錯誤 |
-| 假資料擴充 | `evals/fixtures` 隨 API 補上品項、工廠、入庫捲號、出貨等資料（兩個組織） |
-| 角色對照 | 改為 RBAC R1 的管理員、編輯者、訪客（交接請求，見 §7） |
-| CI | 確定性測試每次 push 執行；模型 eval 是否進 CI 由 TPM／團隊決定（會產生費用） |
+| Capability | Description |
+|------------|-------------|
+| Per-domain metrics | The report breaks completion down by domain (customers, orders…) to find which domain regressed |
+| Tool confusion table | Lists how often B was called when A should have been — the most common error as tools multiply |
+| Fake data expansion | `evals/fixtures` gains lines, factories, received roll numbers, shippings, etc. as the APIs arrive (two organizations) |
+| Role mapping | Switch to RBAC R1's admin, editor and viewer (handoff request, see §7) |
+| CI | Deterministic tests run on every push; whether the model eval goes into CI is for the TPM / team to decide (it costs money) |
 
-## 5. 架構：工具增加後的分組
+## 5. Architecture: grouping as tools grow
 
-| 時點 | 工具數 | 架構 |
-|------|--------|------|
-| Phase 0 | 17（商務 9、供應鏈 10，產品查詢兩組共用） | Router ＋ 2 個子 Agent，主模型 flash-lite |
-| Phase 1 預估 | 約 40–60（12 個功能的讀取與任務型寫入） | 待評估 |
+| Point in time | Tools | Architecture |
+|---------------|-------|--------------|
+| Phase 0 | 17 (commercial 9, supply chain 10, product lookup shared by both) | Router + 2 sub-agents, primary model flash-lite |
+| Phase 1 estimate | About 40–60 (reads and task-based writes for 12 features) | To be evaluated |
 
-Phase 0 的實測：flash-lite 一次拿到 17 個工具時，格式錯誤的工具呼叫大增（單一 Agent × flash-lite 降級率 43%）；子 Agent 各拿 9–10 個工具時穩定。因此：
+Phase 0 measurements: when flash-lite got 17 tools at once, malformed tool calls rose sharply (single Agent × flash-lite fallback rate 43%); with 9–10 tools per sub-agent it was stable. Therefore:
 
-- **每個子 Agent 的工具數維持在約 10–12 個以內**（以 eval 驗證實際上限）
-- 預計的分組：商務（客戶、訂單）、供應鏈（採購、入庫、出貨）、庫存與主檔（產品、工廠、貨架、庫存查詢）、管理（用戶、權限、系統設定，唯讀）
-- 查詢類的工具（例如產品、客戶查詢）可放在多個組，讓跨領域的任務不必拆給兩個 Agent
-- **F1（Router 改寫 task 遺失資訊）** 會隨分組增加而更常發生：Router 改為把使用者原始訊息一併交給子 Agent，並以 eval 驗證
-- 每完成一條流程，以 `--arch` 比較目前架構；工具數跨過 30、45 時另外評估「依意圖動態載入工具」
+- **Keep each sub-agent at about 10–12 tools or fewer** (verify the real limit with the eval)
+- Planned groups: commercial (customers, orders), supply chain (purchasing, receiving, shipping), inventory and master data (products, factories, shelves, inventory queries), admin (users, permissions, system settings, read-only)
+- Lookup tools (such as product and customer lookups) can sit in several groups, so cross-domain tasks don't have to be split across two Agents
+- **F1 (the router loses information when rewriting the task)** will happen more often as groups multiply: the router now also passes the user's original message to the sub-agent, verified by the eval
+- After each flow is done, compare the current architecture with `--arch`; when the tool count crosses 30 and 45, separately evaluate "load tools dynamically by intent"
 
-## 6. 依賴與順序
+## 6. Dependencies and order
 
-| 順序 | 工作 | 依賴 |
-|------|------|------|
-| 0 | 處理 RBAC Session 的交接請求（§7） | 無，立即 |
-| 1 | F15：無空白中文的名稱＋顏色搜尋 | 無 |
-| 2 | eval 能力：依領域指標、工具混淆表、角色對照 | 無 |
-| 3 | 訂單主流程的 tools（建單含品項與工廠、採購、入庫、出貨、庫存） | RBAC Session 的 API（交接表標為「API 完成」） |
-| 4 | 回覆政策相關的 prompt 與案例 | TPM 的回覆政策與 Guardrail |
-| 5 | 主檔維護、管理功能（唯讀）的 tools | 對應的 API |
+| Order | Work | Depends on |
+|-------|------|------------|
+| 0 | Handle the RBAC Session's handoff requests (§7) | Nothing, right away |
+| 1 | F15: name + color search for Chinese without spaces | Nothing |
+| 2 | Eval capabilities: per-domain metrics, tool confusion table, role mapping | Nothing |
+| 3 | Tools for the main order flow (order creation with lines and factories, purchasing, receiving, shipping, inventory) | The RBAC Session's APIs (marked "API done" in the handoff table) |
+| 4 | Prompts and cases for the reply policy | The TPM's reply policy and guardrails |
+| 5 | Tools for master data maintenance and admin features (read-only) | The matching APIs |
 
-1、2 不依賴其他人，可以在等待 API 時進行。
+1 and 2 don't depend on anyone else and can be done while waiting for the APIs.
 
-## 7. 前置：RBAC Session 的交接請求
+## 7. Prerequisite: the RBAC Session's handoff requests
 
-| 請求 | AI Session 的處理 | 狀態 |
-|------|-------------------|------|
-| 權限鍵目錄變更：移除 `canDeleteProducts`、`canEditPermissions`；新增貨架三個鍵 | 同步 `PermissionKey`；目前沒有 tool 使用被移除的鍵 | ✅ |
-| 角色改為管理員、編輯者、訪客 | `evals/fixtures/roles.json` 改為三種角色；權限 eval 改以訪客測試 | ✅ |
-| AI 查詢紀錄只有本人可查看 | 移除 `query_traces` 的組織管理員 SELECT policy（migration） | ✅ migration `20261014212318_query_traces_owner_only.sql`（2026-10-14 經 SQL Editor 套用） |
-| 業務資料不刪除 | 設計上已不提供刪除工具；新工具以停用／取消實作 | ✅ |
-| R0、R1 已套用 | 重跑 `bun run test` 與 eval 確認沒有 RLS 錯誤 | ✅ |
+| Request | AI Session's handling | Status |
+|---------|-----------------------|--------|
+| Permission catalog changes: remove `canDeleteProducts`, `canEditPermissions`; add the three shelf keys | Sync `PermissionKey`; no tool currently uses the removed keys | ✅ |
+| Roles become admin, editor, viewer | `evals/fixtures/roles.json` switched to the three roles; permission evals now test with a viewer | ✅ |
+| AI query logs visible only to their own user | Remove the organization-admin SELECT policy on `query_traces` (migration) | ✅ migration `20261014212318_query_traces_owner_only.sql` (applied via the SQL Editor on 2026-10-14) |
+| Business data is never deleted | By design no delete tools are offered; new tools implement deactivate / cancel | ✅ |
+| R0 and R1 applied | Rerun `bun run test` and the eval to confirm there are no RLS errors | ✅ |

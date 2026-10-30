@@ -1,0 +1,94 @@
+# Query Agent eval（docs/requirements/QUERY_AGENT_LANGFUSE.md §2.6，決定 L4）
+# 只手動觸發：GitHub → Actions → Query Agent Eval → Run workflow。不擋合併。
+# 結果是 Langfuse 的一次 experiment（dataset query-agent），報告另存為這次執行的 artifact。
+name: Query Agent Eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 這次執行的名稱（報告檔名與 Langfuse 的 run 名稱）
+        required: true
+        default: ci
+      prompt_label:
+        description: Langfuse prompt 標籤（production、candidate…）；填 code 用程式內建的 prompt
+        required: true
+        default: production
+      runs:
+        description: 每個案例執行幾次
+        required: true
+        default: "3"
+      filter:
+        description: 只跑 id 包含這段文字的案例（空白 = 全部）
+        required: false
+        default: ""
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+
+      - run: npm ci
+
+      # npm scripts read mcp-server/.env; the database check reads the test account from the root .env.
+      - name: Write .env from secrets
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          VERIFY_EMAIL: ${{ secrets.VERIFY_EMAIL }}
+          VERIFY_PASSWORD: ${{ secrets.VERIFY_PASSWORD }}
+        run: |
+          {
+            echo "OPENROUTER_API_KEY=$OPENROUTER_API_KEY"
+            echo "LANGFUSE_PUBLIC_KEY=$LANGFUSE_PUBLIC_KEY"
+            echo "LANGFUSE_SECRET_KEY=$LANGFUSE_SECRET_KEY"
+            echo "LANGFUSE_BASE_URL=$LANGFUSE_BASE_URL"
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+          } > .env
+          {
+            echo "VERIFY_EMAIL=$VERIFY_EMAIL"
+            echo "VERIFY_PASSWORD=$VERIFY_PASSWORD"
+          } > ../.env
+
+      - name: Tests
+        run: npm run test
+
+      - name: Eval
+        env:
+          LABEL: ${{ inputs.label }}
+          PROMPT_LABEL: ${{ inputs.prompt_label }}
+          RUNS: ${{ inputs.runs }}
+          FILTER: ${{ inputs.filter }}
+        run: |
+          set -o pipefail
+          args=(--label "$LABEL" --runs "$RUNS")
+          if [ "$PROMPT_LABEL" != "code" ]; then args+=(--prompt-label "$PROMPT_LABEL"); fi
+          if [ -n "$FILTER" ]; then args+=(--filter "$FILTER"); fi
+          npm run eval -- "${args[@]}" | tee eval-output.txt
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: query-agent-eval-${{ inputs.label }}-${{ github.run_number }}
+          path: |
+            mcp-server/evals/reports/
+            mcp-server/evals/snapshots/
+            mcp-server/eval-output.txt
+          if-no-files-found: ignore

@@ -257,12 +257,13 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         # Conversations persist in Supabase, so the panel may reopen an old session.
         # Start a fresh one — this also guards against the new session snapping back
         # to the previous one before the session list refetches.
-        page.locator("button[aria-label='對話紀錄']").click()
-        page.get_by_role("button", name="新對話").click()
+        page.locator("button[aria-label='新增對話']").click()
         page.wait_for_timeout(1_500)
 
         # Scope to the rounded chips — the header button can also contain a session title.
-        suggestion_btn = page.locator("button.rounded-full", has_text="查詢所有客戶")
+        # A suggestion chip shown by QueryChat.tsx (update together with its list)
+        SUGGESTION = "查詢工廠或客戶資料"
+        suggestion_btn = page.locator("button.rounded-full", has_text=SUGGESTION)
         check("Quick-reply suggestions visible", suggestion_btn.count() > 0, page, "04_suggestions")
 
         chat_input = page.locator("textarea[placeholder^='輸入訊息']")
@@ -278,7 +279,7 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         page.wait_for_timeout(1_500)  # let React state update & optimistic bubble render
 
         # User message: any element containing the suggestion text that isn't a button
-        user_msg_visible = page.get_by_text("查詢所有客戶", exact=True).last.is_visible()
+        user_msg_visible = page.get_by_text(SUGGESTION, exact=True).last.is_visible()
         check("User message bubble rendered", user_msg_visible, page, "05_user_msg")
 
         # The backend rejects /query without the organization selected in the UI (P0-3)
@@ -345,15 +346,29 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
         except PWTimeout:
             check("Second AI reply received", False, page, "08_second_reply_timeout")
 
-        # ── 6. Clear conversation ─────────────────────────────────────────────
-        section("6. Clear & Close")
+        # ── 6. Header actions ─────────────────────────────────────────────────
+        section("6. Header actions & Close")
         try:
-            page.locator("button[title='清除對話']").click()
-            page.wait_for_timeout(400)
-            welcome_back = page.get_by_text("你好！我是").is_visible()
-            check("Clear resets to welcome message", welcome_back, page, "09_cleared")
+            # Delete asks first (it cannot be undone); cancel keeps the conversation.
+            page.locator("button[aria-label='刪除對話']").click()
+            confirm = page.get_by_role("alertdialog")
+            confirm.wait_for(timeout=3_000)
+            check("Delete asks for confirmation (cannot be undone)", "無法復原" in confirm.inner_text(), page, "09a_delete_confirm")
+            confirm.get_by_role("button", name="取消").click()
+            page.wait_for_timeout(300)
+            check("Cancel keeps the conversation", page.get_by_text("目前有哪些庫存低於門檻？", exact=True).count() > 0)
+
+            page.locator("button[aria-label='歷史紀錄']").click()
+            history_open = page.get_by_text("對話紀錄", exact=True).is_visible()
+            check("History opens the conversation list", history_open, page, "09b_history")
+            page.keyboard.press("Escape")
+
+            page.locator("button[aria-label='新增對話']").click()
+            page.wait_for_timeout(1_000)
+            welcome_back = page.get_by_text("你好！我是").is_visible() and page.get_by_text("目前有哪些庫存低於門檻？", exact=True).count() == 0
+            check("New conversation starts at the welcome message", welcome_back, page, "09_cleared")
         except Exception as e:
-            check("Clear resets to welcome message", False)
+            check("Header actions", False)
             print(f"  Error: {e}")
 
         # Close panel by clicking the float button again (toggle)

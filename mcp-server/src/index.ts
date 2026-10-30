@@ -4,11 +4,23 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { handleQuery } from "./agent/query-handler.js";
 import { confirmAction, cancelAction } from "./agent/actions.js";
+import { parseFeedbackValue, setFeedback } from "./agent/feedback.js";
 import { authGuard, AccessError } from "./agent/auth-guard.js";
 import { getTools } from "./tools/index.js";
 import { registerMcpTools } from "./tools/adapters.js";
+import { flushTracing, PRODUCTION_SAMPLE_RATE, shutdownTracing, startTracing } from "./agent/langfuse.js";
 
 const PORT = parseInt(process.env.PORT || "3100", 10);
+
+// Query traces to Langfuse (docs/requirements/QUERY_AGENT_LANGFUSE.md §2.1): real data, so
+// de-identified and sampled. Cloud Run sets K_SERVICE; LANGFUSE_SAMPLE_RATE=1 sends every request
+// (e.g. on a developer's machine).
+const sampleRate = Number(process.env.LANGFUSE_SAMPLE_RATE ?? PRODUCTION_SAMPLE_RATE);
+startTracing({
+  environment: process.env.K_SERVICE ? "production" : "development",
+  sampleRate: Number.isFinite(sampleRate) ? sampleRate : PRODUCTION_SAMPLE_RATE,
+  mask: true,
+});
 
 // Origins allowed to call this server from a browser
 const ALLOWED_ORIGINS = new Set([
@@ -67,9 +79,10 @@ const httpServer = http.createServer(async (req, res) => {
   }
 
   const actionRoute = req.url?.match(/^\/query\/actions\/([0-9a-f-]{36})\/(confirm|cancel)$/i);
+  const feedbackRoute = req.url?.match(/^\/query\/messages\/([0-9a-f-]{36})\/feedback$/i);
 
-  // ── Auth：所有 /mcp、/query 與確認操作都需要 JWT ───────────────────────────
-  if (req.url === "/mcp" || req.url === "/query" || actionRoute) {
+  // ── Auth：所有 /mcp、/query、確認操作與回饋都需要 JWT ───────────────────────
+  if (req.url === "/mcp" || req.url === "/query" || actionRoute || feedbackRoute) {
     const jwt = extractJwt(req.headers.authorization);
     if (!jwt) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -84,6 +97,19 @@ const httpServer = http.createServer(async (req, res) => {
       try {
         const [, actionId, verb] = actionRoute;
         const result = verb === "confirm" ? await confirmAction(supabase, actionId) : await cancelAction(supabase, actionId);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (err: unknown) {
+        sendError(res, err);
+      }
+      return;
+    }
+
+    // ── POST /query/messages/:id/feedback — 回覆的讚／倒讚 { value: "up" | "down" | null } ──
+    if (feedbackRoute && req.method === "POST") {
+      try {
+        const body = await readBody(req);
+        const result = await setFeedback(supabase, feedbackRoute[1], parseFeedbackValue(body.value ?? null));
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
       } catch (err: unknown) {
@@ -113,6 +139,8 @@ const httpServer = http.createServer(async (req, res) => {
       } catch (err: unknown) {
         sendError(res, err);
       }
+      // After the response: the reply never waits on Langfuse.
+      void flushTracing().catch((err: unknown) => console.warn("[Langfuse] 送出 trace 失敗:", err));
       return;
     }
 
@@ -148,4 +176,10 @@ httpServer.listen(PORT, () => {
   console.log(`Weave Flow ERP MCP Server running on http://localhost:${PORT}`);
   console.log(`  MCP Protocol: POST /mcp`);
   console.log(`  AI Query:     POST /query`);
+});
+
+// Cloud Run sends SIGTERM before stopping an instance: send the traces still buffered.
+process.once("SIGTERM", () => {
+  httpServer.close();
+  void shutdownTracing().finally(() => process.exit(0));
 });
