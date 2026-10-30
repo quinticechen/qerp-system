@@ -1,48 +1,48 @@
-# 畫面一致性規範
+# UI Consistency Rules
 
-> 需求文件（RBAC Session）。狀態：已完成（2026-10-09）。使用者決定：所有頁面的資料視窗樣式與行為一致，寫成規定。
+> Requirement document (RBAC Session). Status: done (2026-10-09). User decision: the record dialogs on every page look and behave the same, written down as a rule.
 
-## 1. 資料視窗（查看、編輯、新增）
+## 1. Record dialog (view, edit, create)
 
-每一筆資料（客戶、工廠、產品、顏色、貨架、訂單、採購單、入庫紀錄、布卷、出貨單、使用者）點開後都用同一個元件 `RecordDialog`（`src/components/common/RecordDialog.tsx`），有三種模式：
+Every record (customers, factories, products, colors, shelves, orders, purchase orders, receiving records, rolls, shippings, users) opens in the same component, `RecordDialog` (`src/components/common/RecordDialog.tsx`), which has three modes:
 
-| 模式 | 右上 | 內容 | 左下 | 右下 |
-|------|------|------|------|------|
-| 查看（打開時一定是查看） | 編輯紀錄、關閉 | 所有欄位，沒填的顯示「-」 | — | 編輯（有權限、且資料未作廢時才出現） |
-| 編輯（按「編輯」後） | 關閉 | 與新增相同的表單 | 作廢（單據）或停用／啟用（主檔、成員） | 取消、更新 |
-| 新增 | 關閉 | 表單 | — | 取消、建立 |
+| Mode | Top right | Content | Bottom left | Bottom right |
+|------|-----------|---------|-------------|--------------|
+| View (always the mode on open) | Edit history, Close | All fields; empty ones show "-" | — | Edit (only with permission, and only if the record is not voided) |
+| Edit (after pressing "Edit") | Close | The same form as Create | Void (documents) or Deactivate / Activate (master data, members) | Cancel, Update |
+| Create | Close | Form | — | Cancel, Create |
 
-- 「取消」回到查看並放棄修改；編輯中按「關閉」也放棄修改。
-- 更新成功後回到查看模式，視窗不關閉，顯示更新後的資料（列表依 id 傳入最新資料）。
-- 已作廢的單據沒有「編輯」按鈕。
-- 視窗內容區可捲動，標題與底部按鈕固定，內容再多也不會超出螢幕。
-- 動作按鈕（編輯、作廢、停用／啟用、編輯紀錄）只用圖示，名稱放在 `aria-label` 與 `title`；表單送出按鈕（取消、更新、建立）用文字。
+- "Cancel" returns to View and discards the changes; pressing "Close" while editing also discards the changes.
+- After a successful update, the dialog returns to View mode without closing and shows the updated data (the list passes in the latest data by id).
+- Voided documents have no "Edit" button.
+- The dialog's content area scrolls while the title and bottom buttons stay fixed, so no amount of content overflows the screen.
+- Action buttons (Edit, Void, Deactivate / Activate, Edit history) are icon-only, with the name in `aria-label` and `title`; form submit buttons (Cancel, Update, Create) use text.
 
-不屬於「資料」的對話框不套用：確認步驟（轉移擁有權、刪除組織）、忘記密碼、個人設定的變更密碼。
+Dialogs that are not about a record are exempt: confirmation steps (transfer ownership, delete organization), forgot password, and change password in personal settings.
 
-## 2. 共用元件
+## 2. Shared components
 
-| 元件 | 用途 |
-|------|------|
-| `RecordDialog` | 上述三種模式的版面 |
-| `DetailSection` | 區塊標題（`text-base font-semibold`）；`fields` 時為兩欄的欄位清單 |
-| `DetailField` | 查看模式的一個欄位：標籤 `text-sm font-medium text-gray-600`、值 `text-sm text-gray-900` |
-| `FormField` | 編輯與新增模式的一個欄位：與 `DetailField` 相同的標籤樣式，加上必填星號、提示與錯誤 |
-| `ActiveToggleButton` | 停用／啟用（編輯模式左下） |
-| `CancelRecordButton` | 作廢單據，含取消原因確認（編輯模式左下） |
-| `ProductLinesView` | 訂單、採購單的產品明細（查看模式） |
-| `NumberInput` | 所有數字欄位：只接受數字，預設空白、可清空，滑鼠滾輪不會改變數值 |
-| `RecordIdButton` | 編輯紀錄卡片右上角的記錄 ID 圖示，滑過才出現，點擊複製 |
+| Component | Purpose |
+|-----------|---------|
+| `RecordDialog` | The layout for the three modes above |
+| `DetailSection` | Section heading (`text-base font-semibold`); with `fields`, a two-column field list |
+| `DetailField` | One field in View mode: label `text-sm font-medium text-gray-600`, value `text-sm text-gray-900` |
+| `FormField` | One field in Edit and Create mode: the same label style as `DetailField`, plus the required asterisk, hint and error |
+| `ActiveToggleButton` | Deactivate / Activate (bottom left in Edit mode) |
+| `CancelRecordButton` | Void a document, with a cancel-reason confirmation (bottom left in Edit mode) |
+| `ProductLinesView` | Product lines of orders and purchase orders (View mode) |
+| `NumberInput` | Every number field: accepts digits only, empty by default, can be cleared, and the mouse wheel does not change the value |
+| `RecordIdButton` | The record ID icon at the top right of an edit-history card; appears on hover, copies on click |
 
-新增表單的區塊標題用 `Label`（與新增訂單相同），不使用 `CardTitle`（字級過大）。
+Section headings in create forms use `Label` (the same as the new-order form), not `CardTitle` (too large).
 
-## 3. 同次修正
+## 3. Fixes made in the same change
 
-- 新增客戶、工廠後列表立即出現（不需重新整理）。
-- 客戶、工廠詳情顯示所有欄位。
-- 訂單、採購單列表新增「備註」欄；採購單列表新增「最近入庫」，詳情的每個產品顯示已入庫量與入庫日期，並列出入庫紀錄。
-- 入庫紀錄詳情移除沒有資料的「負責人」。
-- 新增訂單的「新增客戶」「新增工廠」改為圖示按鈕。
-- 邀請新使用者時電話在註冊當下寫入（`supabase/migrations/20261009163659_signup_profile_phone.sql`），編輯紀錄不再多出一筆「修改用戶資料」。
-- 編輯紀錄的記錄 ID 改為卡片右上角的圖示。
-- 狀態文字統一由 `src/lib/statusLabels.ts` 提供，頁面、資料視窗與編輯紀錄用同樣的字。
+- New customers and factories appear in the list immediately (no refresh needed).
+- Customer and factory details show every field.
+- Order and purchase order lists gain a "Note" column; the purchase order list gains "Latest receiving", and the details show, for each product, the quantity received and the receiving date, and list the receiving records.
+- Receiving record details drop the empty "Person in charge" field.
+- "Add customer" and "Add factory" in the new-order form became icon buttons.
+- When inviting a new user, the phone number is written at sign-up (`supabase/migrations/20261009163659_signup_profile_phone.sql`), so the edit history no longer gets an extra "修改用戶資料" (user profile changed) entry.
+- The record ID in the edit history became an icon at the top right of the card.
+- Status text comes from `src/lib/statusLabels.ts` everywhere, so pages, record dialogs and the edit history use the same words.

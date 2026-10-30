@@ -1,108 +1,108 @@
-# 資料表盤點
+# Database Table Inventory
 
-> 2026-10-09 盤點（RBAC Session）。依據：Supabase 正式資料庫的資料表、筆數、policy、觸發器與函式引用，以及前端 `src/`、AI 伺服器 `mcp-server/src/` 的程式引用。筆數為盤點當下的數字。
+> Inventory taken 2026-10-09 (RBAC Session). Based on: the tables, row counts, policies, triggers and function references in the production Supabase database, and the code references in the frontend `src/` and the AI server `mcp-server/src/`. Row counts are as of the inventory.
 
-## 1. 摘要
+## 1. Summary
 
-| 狀態 | 資料表 |
-|------|--------|
-| 使用中（業務） | `customers`、`factories`、`product_groups`、`products_new`、`warehouses`、`orders`、`order_products`、`order_factories`、`purchase_orders`、`purchase_order_items`、`purchase_order_relations`、`inventories`、`inventory_rolls`、`shippings`、`shipping_items` |
-| 使用中（組織與權限） | `organizations`、`user_organizations`、`role_permissions`、`profiles`、`user_operation_logs` |
-| 使用中（紀錄） | `record_audit_logs` |
-| 使用中（AI 查詢，AI Session 負責） | `query_sessions`、`query_messages`、`query_pending_actions`、`query_traces` |
+| Status | Tables |
+|--------|--------|
+| In use (business) | `customers`, `factories`, `product_groups`, `products_new`, `warehouses`, `orders`, `order_products`, `order_factories`, `purchase_orders`, `purchase_order_items`, `purchase_order_relations`, `inventories`, `inventory_rolls`, `shippings`, `shipping_items` |
+| In use (organizations and permissions) | `organizations`, `user_organizations`, `role_permissions`, `profiles`, `user_operation_logs` |
+| In use (records) | `record_audit_logs` |
+| In use (AI query, owned by the AI Session) | `query_sessions`, `query_messages`, `query_pending_actions`, `query_traces` |
 
-唯讀 view：`product_catalog`、`inventory_summary`、`inventory_summary_enhanced`（皆為 `security_invoker`，依呼叫者的權限讀取）。
+Read-only views: `product_catalog`, `inventory_summary`, `inventory_summary_enhanced` (all `security_invoker`, reading with the caller's permissions).
 
-## 2. 業務流程
+## 2. Business flow
 
 ```
-主檔：客戶 customers、工廠 factories、產品 product_groups ─┬─ 顏色 products_new、貨架 warehouses
-                                                        │
-訂單 orders（B） ── 品項 order_products ── 指定工廠 order_factories
-   │  ▲ 出貨進度由出貨自動重算
+Master data: customers, factories, products product_groups ─┬─ colors products_new, shelves warehouses
+                                                          │
+Orders orders (B) ── lines order_products ── assigned factories order_factories
+   │  ▲ shipping progress recomputed from shippings
    │  └──────────────────────────────────────────────┐
-   ▼ purchase_order_relations（多對多）                │
-採購單 purchase_orders（P） ── 品項 purchase_order_items │
-   │  ▲ 已入庫量由入庫自動重算                          │
+   ▼ purchase_order_relations (many-to-many)          │
+Purchase orders purchase_orders (P) ── lines purchase_order_items
+   │  ▲ received quantity recomputed from receiving   │
    ▼                                                  │
-進貨單 inventories（I） ── 布卷 inventory_rolls（庫存） ─┤
-                                    │ 扣庫存             │
-                                    ▼                   │
-出貨單 shippings（O） ── 出貨布卷 shipping_items ────────┘
+Receipts inventories (I) ── rolls inventory_rolls (stock) ─┤
+                                    │ deduct stock       │
+                                    ▼                    │
+Shippings shippings (O) ── shipped rolls shipping_items ─┘
 ```
 
-- 所有業務寫入都經過業務 API（[API.md](./API.md)），以函式擁有者身分執行；資料表本身的 RLS 依權限鍵控制（[PERMISSIONS.md](./PERMISSIONS.md)）。前端已沒有直接寫業務資料表的地方；AI tools 仍有幾處直接寫表（SESSION_COORDINATION.md §6）。
-- 業務資料不實際刪除：主檔停用（`is_active`、顏色 `status`），單據取消（`status = cancelled` 加 `cancelled_at`、`cancel_reason`）。
-- 單據編號為「字母＋YYYYMMDD＋四位流水號」，組織內唯一、依台灣日期（[API.md](./API.md) §2.5）。
+- All business writes go through the business APIs ([API.md](./API.md)), running as the function owner; the tables' own RLS is controlled by permission key ([PERMISSIONS.md](./PERMISSIONS.md)). The frontend no longer writes business tables directly; a few AI tools still write tables directly (SESSION_COORDINATION.md §6).
+- Business data is never actually deleted: master data is deactivated (`is_active`, color `status`), documents are cancelled (`status = cancelled` plus `cancelled_at`, `cancel_reason`).
+- Document numbers are "letter + YYYYMMDD + four-digit sequence", unique within the organization, by Taiwan date ([API.md](./API.md) §2.5).
 
-## 3. 使用中的資料表
+## 3. Tables in use
 
-### 3.1 主檔
+### 3.1 Master data
 
-| 資料表 | 筆數 | 用途與規則 | 寫入 |
-|--------|------|------------|------|
-| `customers` 客戶 | 10 | 名稱組織內唯一；聯絡人必填，手機或市話至少一個；`is_active` 停用後不出現在新訂單 | A1 API |
-| `factories` 工廠 | 9 | 規則同客戶；停用後不能指定給新訂單或新採購單 | A1 API |
-| `product_groups` 產品 | 7 | 產品名稱、類別、單位、`is_active`；名稱組織內唯一 | A6 API（用戶端只能讀） |
-| `products_new` 顏色 | 34 | 產品下的顏色、色號、色值、安全庫存、`status`（Available／Unavailable）；同產品下「顏色＋色號」唯一。訂單、採購、布卷、出貨都指向這張表 | A6 API |
-| `warehouses` 貨架 | 4 | 貨架名稱（組織內唯一）、位置、`is_active`；停用後不能放新布卷 | A6 貨架 API |
+| Table | Rows | Purpose and rules | Written by |
+|-------|------|-------------------|------------|
+| `customers` customers | 10 | Name unique within the organization; contact person required, at least one of mobile or landline; once `is_active` is off, they don't appear in new orders | A1 API |
+| `factories` factories | 9 | Same rules as customers; once deactivated, can't be assigned to new orders or purchase orders | A1 API |
+| `product_groups` products | 7 | Product name, category, unit, `is_active`; name unique within the organization | A6 API (clients read only) |
+| `products_new` colors | 34 | A product's colors: color, color code, color value, safety stock, `status` (Available / Unavailable); "color + color code" unique within a product. Orders, purchasing, rolls and shippings all point to this table | A6 API |
+| `warehouses` shelves | 4 | Shelf name (unique within the organization), location, `is_active`; once deactivated, no new rolls can be placed | A6 shelf API |
 
-### 3.2 單據
+### 3.2 Documents
 
-| 資料表 | 筆數 | 用途與規則 | 寫入 |
-|--------|------|------------|------|
-| `orders` 訂單 | 6 | 客戶、狀態（待確認 → 已確認 → 已向工廠下單 → 已完成／已取消）、付款狀態、出貨狀態（由出貨重算）；有出貨或進行中採購單時不能取消 | A2 API |
-| `order_products` 訂單品項 | 9 | 產品（顏色）、數量、單價、卷數、規格；`shipped_quantity` 與 `status` 由出貨重算；已出貨或已採購的品項鎖定 | A2 API（`save_order_items`） |
-| `order_factories` 指定工廠 | 8 | 訂單與工廠的多對多 | A2 API |
-| `purchase_orders` 採購單 | 3 | 工廠、下單日、預計到貨日、狀態（待確認／已下單／部分入庫／已完成由入庫重算／已取消）；已入庫時不能取消或換工廠 | A3 API |
-| `purchase_order_items` 採購品項 | 5 | 產品、採購量、單價；`received_quantity` 與 `status` 由入庫重算 | A3 API（`save_purchase_order_items`） |
-| `purchase_order_relations` 採購關聯訂單 | 3 | 採購單與訂單的多對多；建立關聯時訂單改為「已向工廠下單」，最後一張進行中的採購單取消後改回「已確認」 | A3 API |
-| `inventories` 進貨單 | 2 | 依採購單入庫的一批貨；工廠沿用採購單；編號 `receipt_number` | A4 API |
-| `inventory_rolls` 布卷（庫存） | 4 | 每一卷布：產品、貨架與位置、品級、入庫重量 `quantity`、剩餘重量 `current_quantity`；入庫或修改時觸發採購進度重算 | A4 API（`save_inventory_rolls`）；出貨扣減 |
-| `shippings` 出貨單 | 2 | 訂單、客戶（沿用訂單）、出貨日、總重量與卷數、`status`（shipped／cancelled） | A5 API |
-| `shipping_items` 出貨布卷 | 3 | 每一卷出了多少；寫入時扣布卷庫存並觸發訂單出貨進度重算；取消出貨時保留作為紀錄 | A5 API（`save_shipping_items`） |
+| Table | Rows | Purpose and rules | Written by |
+|-------|------|-------------------|------------|
+| `orders` orders | 6 | Customer, status (pending → confirmed → ordered from factory → completed / cancelled), payment status, shipping status (recomputed from shippings); can't be cancelled with shippings or active purchase orders | A2 API |
+| `order_products` order lines | 9 | Product (color), quantity, unit price, rolls, specification; `shipped_quantity` and `status` recomputed from shippings; shipped or purchased lines are locked | A2 API (`save_order_items`) |
+| `order_factories` assigned factories | 8 | Many-to-many between orders and factories | A2 API |
+| `purchase_orders` purchase orders | 3 | Factory, order date, expected arrival date, status (pending / ordered / partly received / completed, recomputed from receiving / cancelled); can't be cancelled or change factory once received | A3 API |
+| `purchase_order_items` purchase lines | 5 | Product, quantity, unit price; `received_quantity` and `status` recomputed from receiving | A3 API (`save_purchase_order_items`) |
+| `purchase_order_relations` purchase-order links to orders | 3 | Many-to-many between purchase orders and orders; linking sets the order to "ordered from factory", and cancelling the last active purchase order sets it back to "confirmed" | A3 API |
+| `inventories` receipts | 2 | A batch of goods received against a purchase order; factory taken from the purchase order; number `receipt_number` | A4 API |
+| `inventory_rolls` rolls (stock) | 4 | Each roll: product, shelf and position, grade, received weight `quantity`, remaining weight `current_quantity`; receiving or editing triggers a recompute of purchase progress | A4 API (`save_inventory_rolls`); deducted by shipping |
+| `shippings` shippings | 2 | Order, customer (taken from the order), shipping date, total weight and rolls, `status` (shipped / cancelled) | A5 API |
+| `shipping_items` shipped rolls | 3 | How much of each roll was shipped; writing deducts roll stock and triggers a recompute of the order's shipping progress; kept as a record when a shipping is cancelled | A5 API (`save_shipping_items`) |
 
-### 3.3 組織、成員與權限
+### 3.3 Organizations, members and permissions
 
-| 資料表 | 筆數 | 用途與規則 | 寫入 |
-|--------|------|------------|------|
-| `organizations` 組織 | 4 | 名稱、描述 `description`（建立組織時填寫）、擁有者 `owner_id`、`is_active`；建立時觸發器把擁有者加為成員 | 建立組織、轉移擁有權、刪除組織（RPC） |
-| `user_organizations` 成員 | 7 | 使用者在組織中的成員資格與角色 `role`（admin／editor／viewer，一人一個）、邀請與接受時間；`protect_membership_columns` 觸發器防止自行修改 | 邀請、接受、`set_member_role`、`set_member_active`（RPC） |
-| `role_permissions` 角色權限 | 65 | 三個固定角色各有哪些權限鍵（全域，不分組織）；擁有者取得管理員的權限。`user_has_organization_permission()` 讀這張表，RLS、API、AI 都經由它判斷 | migration |
-| `profiles` 使用者資料 | 6 | 姓名、電話、`is_active`；註冊時由觸發器建立 | 個人設定、用戶管理 |
-| `user_operation_logs` 使用者操作紀錄 | 16 | 邀請、加入組織、轉移擁有權等成員操作的紀錄（與 `record_audit_logs` 的資料變更紀錄不同） | 成員相關 RPC |
+| Table | Rows | Purpose and rules | Written by |
+|-------|------|-------------------|------------|
+| `organizations` organizations | 4 | Name, `description` (filled in when creating the organization), owner `owner_id`, `is_active`; on creation, a trigger adds the owner as a member | Create organization, transfer ownership, delete organization (RPC) |
+| `user_organizations` members | 7 | A user's membership and `role` in an organization (admin / editor / viewer, one per person), invitation and acceptance times; the `protect_membership_columns` trigger prevents self-modification | Invite, accept, `set_member_role`, `set_member_active` (RPC) |
+| `role_permissions` role permissions | 65 | Which permission keys each of the three fixed roles has (global, not per organization); the owner gets the admin's permissions. `user_has_organization_permission()` reads this table, and RLS, APIs and the AI all decide through it | migration |
+| `profiles` user profiles | 6 | Name, phone, `is_active`; created by a trigger at sign-up | Personal settings, user management |
+| `user_operation_logs` user activity log | 16 | Records of member actions such as inviting, joining an organization and transferring ownership (distinct from the data-change records in `record_audit_logs`) | Member RPCs |
 
-### 3.4 紀錄
+### 3.4 Records
 
-| 資料表 | 筆數 | 用途 |
-|--------|------|------|
-| `record_audit_logs` 編輯紀錄 | 251 | 業務資料與成員資料每次新增、修改、刪除的前後內容與修改者，由 `log_record_change()` 觸發器寫入；畫面上的「編輯紀錄」讀這張表 |
+| Table | Rows | Purpose |
+|-------|------|---------|
+| `record_audit_logs` edit history | 251 | Before/after content and editor for every insert, update and delete of business and member data, written by the `log_record_change()` trigger; the "Edit history" on screen reads this table |
 
-### 3.5 AI 查詢（AI Session 負責）
+### 3.5 AI query (owned by the AI Session)
 
-| 資料表 | 筆數 | 用途 |
-|--------|------|------|
-| `query_sessions` | 35 | 使用者與 AI 的對話 |
-| `query_messages` | 74 | 對話中的每則訊息；`metadata` 有 `trace_id`、`entities`、確認卡片的 `action_id`，以及使用者的讚／倒讚 `feedback`。沒有 UPDATE policy，`feedback` 只能經 `set_query_message_feedback()`（`private` 實作，只限自己的 AI 回覆；migration `20261016060000_query_message_feedback.sql`）修改 |
-| `query_pending_actions` | 3 | AI 提出、等待使用者確認的寫入動作 |
-| `query_traces` | 16 | 每次 AI 回覆的模型、工具呼叫、耗時（除錯用，只有本人可看） |
+| Table | Rows | Purpose |
+|-------|------|---------|
+| `query_sessions` | 35 | Conversations between users and the AI |
+| `query_messages` | 74 | Each message in a conversation; `metadata` holds `trace_id`, `entities`, the confirmation card's `action_id`, and the user's thumbs up/down `feedback`. There is no UPDATE policy; `feedback` can only be changed through `set_query_message_feedback()` (`private` implementation, own AI replies only; migration `20261016060000_query_message_feedback.sql`) |
+| `query_pending_actions` | 3 | Write actions proposed by the AI, awaiting the user's confirmation |
+| `query_traces` | 16 | Each AI reply's models, tool calls and latency (for debugging, visible only to their own user) |
 
-## 4. 棄用與未使用
+## 4. Deprecated and unused
 
-### 4.1 欄位
+### 4.1 Columns
 
-| 欄位 | 狀況 |
-|------|------|
-| `products_new.name`、`category`、`unit_of_measure` | 兩層產品之後由 `product_groups` 同步過來的副本；以 `product_groups` 為準。AI tools 與 view 仍讀這些欄位，改讀 `product_groups` 後再移除 |
+| Column | Status |
+|--------|--------|
+| `products_new.name`, `category`, `unit_of_measure` | Since two-level products, these are copies synced from `product_groups`; `product_groups` is authoritative. AI tools and views still read these columns; remove them once those read `product_groups` |
 
-## 5. 清理紀錄
+## 5. Cleanup log
 
-**2026-10-09**（使用者決定，`supabase/migrations/20261009102350_cleanup_deprecated.sql`，測試 `supabase/tests/cleanup_deprecated.test.sql`）：棄用的資料表連同舊的編輯紀錄一起移除，不再顯示 R1 之前的角色編輯紀錄。
+**2026-10-09** (user decision, `supabase/migrations/20261009102350_cleanup_deprecated.sql`, test `supabase/tests/cleanup_deprecated.test.sql`): deprecated tables were removed together with their old edit history, so pre-R1 role edit history is no longer shown.
 
-- 移除資料表：`organization_roles`、`user_organization_roles`（R1 改為固定角色後不再讀寫）、`shipment_history`（從未有資料，出貨紀錄在 `shipping_items`），以及它們在 `record_audit_logs` 中的紀錄。
-- 移除欄位：`purchase_orders.order_id`（舊的一對一欄位，全部為空值，改用 `purchase_order_relations`）、`user_organizations.invited_role_id`（邀請直接寫 `role`）、`organizations.settings`（沒有功能讀寫）。
-- 移除函式 `create_default_organization_roles`；`order_product_is_purchased`、`api_release_orders`、`cancel_order`、`cancel_purchase_order` 改為只看 `purchase_order_relations`。
+- Removed tables: `organization_roles`, `user_organization_roles` (no longer read or written after R1 switched to fixed roles), `shipment_history` (never had data; shipping records are in `shipping_items`), and their records in `record_audit_logs`.
+- Removed columns: `purchase_orders.order_id` (old one-to-one column, all null, replaced by `purchase_order_relations`), `user_organizations.invited_role_id` (invitations write `role` directly), `organizations.settings` (no feature read or wrote it).
+- Removed the function `create_default_organization_roles`; `order_product_is_purchased`, `api_release_orders`, `cancel_order` and `cancel_purchase_order` now look only at `purchase_order_relations`.
 
-**2026-10-09**（`supabase/migrations/20261009133702_function_hardening.sql`，測試 `supabase/tests/function_hardening.test.sql`）：刪除沒有任何呼叫的函式 `is_admin`、`get_user_organizations`、`ensure_user_profile`、`generate_order_number`；固定 `handle_new_user`、`set_current_quantity`、`update_updated_at`、`update_updated_by` 的 `search_path`；觸發器函式不再開放用戶端呼叫。
+**2026-10-09** (`supabase/migrations/20261009133702_function_hardening.sql`, test `supabase/tests/function_hardening.test.sql`): deleted the functions nothing called, `is_admin`, `get_user_organizations`, `ensure_user_profile`, `generate_order_number`; pinned the `search_path` of `handle_new_user`, `set_current_quantity`, `update_updated_at`, `update_updated_by`; trigger functions can no longer be called by clients.
 
-**2026-10-09**（`supabase/migrations/20261009140512_private_definer_functions.sql`，測試 `supabase/tests/private_definer_functions.test.sql`）：以函式擁有者身分執行的業務 API、組織與成員 RPC、權限函式移到不公開的 `private` schema，`public` 留同名的包裝函式（[API.md](./API.md) §2.1）；`api_assign_document_number` 移到 `private`，不再能從 `/rpc` 呼叫。
+**2026-10-09** (`supabase/migrations/20261009140512_private_definer_functions.sql`, test `supabase/tests/private_definer_functions.test.sql`): business APIs, organization and member RPCs, and permission functions that run as the function owner moved to the non-public `private` schema, with same-named wrappers left in `public` ([API.md](./API.md) §2.1); `api_assign_document_number` moved to `private` and can no longer be called from `/rpc`.

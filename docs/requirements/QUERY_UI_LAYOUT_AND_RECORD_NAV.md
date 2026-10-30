@@ -1,61 +1,61 @@
-# Query：確認後打開紀錄、電腦版的顯示方式
+# Query: Open the Record After Confirming, and Desktop Display Modes
 
-> 狀態：已完成（2026-10-15）。負責：AI Session（Query 前端）；業務頁面以網址打開紀錄的部分由 AI Session 代為實作（RBAC Session 閒置，使用者直接交代），見 [SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §6。
-> 取代 [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) §3.2 2026-10-14 的「跳到紀錄預覽」決定。
-> 完成後更新：[FEATURES.md](../FEATURES.md) §5、[AGENT.md](../AGENT.md)。
+> Status: done (2026-10-15). Owner: AI Session (Query frontend); opening records from the URL on the business pages was implemented by the AI Session on the RBAC Session's behalf (the RBAC Session was idle and the user asked directly), see [SESSION_COORDINATION.md](../SESSION_COORDINATION.md) §6.
+> Supersedes the 2026-10-14 "jump to a record preview" decision in [QUERY_AGENT_TPM_ALIGNMENT.md](./QUERY_AGENT_TPM_ALIGNMENT.md) §3.2.
+> Update on completion: [FEATURES.md](../FEATURES.md) §5, [AGENT.md](../AGENT.md).
 
-## 1. 確認後打開剛寫入的紀錄
+## 1. Open the record just written after confirming
 
-### 1.1 流程
+### 1.1 Flow
 
-1. Agent 在必填欄位齊全時建立草稿，對話中出現確認卡片，卡片上有「確認」「取消」
-2. 使用者按「確認」→ 後端以業務 API 寫入（`POST /query/actions/:id/confirm`，與現在相同）
-3. 寫入成功後，ERP 切換到該紀錄所屬的頁面，並打開那筆紀錄的資料視窗（查看模式）。例如建立訂單 → `/order`，打開新訂單
-4. 按「取消」、草稿過期或寫入失敗時不切換頁面
+1. When all required fields are present, the Agent creates a draft, and a confirmation card with "Confirm" and "Cancel" appears in the conversation
+2. The user presses "Confirm" → the backend writes through the business API (`POST /query/actions/:id/confirm`, as today)
+3. After a successful write, the ERP switches to the page the record belongs to and opens that record's dialog (view mode). For example, creating an order → `/order`, opening the new order
+4. Pressing "Cancel", an expired draft, or a failed write does not switch pages
 
-### 1.2 工具與頁面的對應
+### 1.2 Tools to pages
 
-確認的回應帶有寫入紀錄的 `id`（業務 API 的回傳，[API.md](../API.md) §2.2）。
+The confirm response carries the written record's `id` (returned by the business API, [API.md](../API.md) §2.2).
 
-| 工具 | 頁面 | 打開 |
-|------|------|------|
-| `create_customer`、`update_customer`、`set_customer_active` | `/customer` | 客戶 |
-| `create_factory`、`update_factory`、`set_factory_active` | `/factory` | 工廠 |
-| `create_order`、`update_order_status`、`update_order`、`cancel_order` | `/order` | 訂單 |
-| `create_purchase_order`、`update_purchase_order`、`cancel_purchase_order` | `/purchase` | 採購單 |
-| `receive_inventory`、`update_inventory` | `/inventory`（入庫記錄分頁） | 進貨單 |
-| `update_inventory_roll` | `/inventory` | 不打開（布卷沒有獨立的資料視窗） |
-| `create_shipping`、`update_shipping`、`cancel_shipping` | `/shipping` | 出貨單 |
-| `create_product`、`update_product`、`set_product_active` | `/product` | 產品 |
-| `add_product_color`、`update_product_color`、`set_product_color_active` | `/product` | 顏色 |
-| `create_shelf`、`update_shelf`、`set_shelf_active` | `/shelf` | 貨架 |
+| Tool | Page | Opens |
+|------|------|-------|
+| `create_customer`, `update_customer`, `set_customer_active` | `/customer` | Customer |
+| `create_factory`, `update_factory`, `set_factory_active` | `/factory` | Factory |
+| `create_order`, `update_order_status`, `update_order`, `cancel_order` | `/order` | Order |
+| `create_purchase_order`, `update_purchase_order`, `cancel_purchase_order` | `/purchase` | Purchase order |
+| `receive_inventory`, `update_inventory` | `/inventory` (receiving records tab) | Receipt |
+| `update_inventory_roll` | `/inventory` | Nothing (rolls have no dialog of their own) |
+| `create_shipping`, `update_shipping`, `cancel_shipping` | `/shipping` | Shipping |
+| `create_product`, `update_product`, `set_product_active` | `/product` | Product |
+| `add_product_color`, `update_product_color`, `set_product_color_active` | `/product` | Color |
+| `create_shelf`, `update_shelf`, `set_shelf_active` | `/shelf` | Shelf |
 
-### 1.3 頁面如何打開紀錄
+### 1.3 How a page opens a record
 
-網址帶 `?open=<紀錄 id>`（入庫另帶 `tab=records`）。頁面讀到後打開該紀錄的資料視窗，並從網址移除參數，重新整理或返回時不會再打開。紀錄還沒載入時，等資料到了再打開；不在目前清單中（例如被篩選掉）時不打開。
+The URL carries `?open=<record id>` (receiving also carries `tab=records`). The page reads it, opens that record's dialog, and removes the parameters from the URL so a refresh or going back doesn't open it again. If the record hasn't loaded yet, it opens once the data arrives; if it isn't in the current list (for example, filtered out), it doesn't open.
 
-### 1.4 Query 面板的配合
+### 1.4 The Query panel's part
 
-- 浮動、側邊欄：切換頁面後面板保持開啟，使用者可以繼續對話
-- 全螢幕：切換頁面後改為側邊欄，讓使用者看得到打開的紀錄
-- 手機：關閉對話頁，回到 ERP 的該頁面
+- Floating, sidebar: the panel stays open after the page switch, so the user can keep chatting
+- Full screen: switches to the sidebar after the page switch, so the user can see the opened record
+- Mobile: closes the chat page and returns to that ERP page
 
-## 2. 電腦版的顯示方式
+## 2. Desktop display modes
 
-| 方式 | 版面 | 預設 |
-|------|------|------|
-| 浮動（Floating） | 現在的樣子：右下角 380×580 的面板 | ✅ |
-| 側邊欄（Sidebar） | Query 佔滿右側全高，ERP 整體往左縮，不被遮住；寬度預設與浮動相同（380px），拖曳左邊緣調整（320px 到畫面寬度的一半） | |
-| 全螢幕（Full Screen） | Query 佔滿整個畫面 | |
+| Mode | Layout | Default |
+|------|--------|---------|
+| Floating | As it is now: a 380×580 panel at the bottom right | ✅ |
+| Sidebar | Query takes the full height on the right, and the whole ERP shrinks to the left instead of being covered; width defaults to the same as floating (380px), resized by dragging the left edge (320px to half the screen width) | |
+| Full screen | Query fills the whole screen | |
 
-- 標題列右側的按鈕由左到右：歷史紀錄、顯示方式、新增對話、刪除對話、關閉（2026-10-15 使用者指定）。「顯示方式」的圖示為目前的方式，點擊後出現三個圖示供切換；所有按鈕只有圖示，名稱放在 `aria-label` 與 `title`
-- 刪除對話（標題列或歷史紀錄中的刪除）前請使用者確認，說明無法復原
-- 記住使用者上次選的方式與側邊欄寬度（瀏覽器本機，讀不到時用預設值）
-- 側邊欄與全螢幕開啟時不顯示右下角的 Query 按鈕；以標題列的關閉按鈕關閉
-- 手機維持現在的全螢幕對話頁，不提供切換
+- Buttons on the right of the title bar, left to right: History, Display mode, New conversation, Delete conversation, Close (specified by the user on 2026-10-15). The "Display mode" icon shows the current mode, and clicking it reveals three icons to switch between; every button is icon-only, with the name in `aria-label` and `title`
+- Deleting a conversation (from the title bar or in History) asks the user to confirm and explains it cannot be undone
+- Remember the user's last mode and sidebar width (in the browser's local storage; use the defaults if they can't be read)
+- While the sidebar or full screen is open, the Query button at the bottom right is hidden; close it with the title bar's Close button
+- Mobile keeps the current full-screen chat page and offers no switching
 
-## 3. 驗證
+## 3. Verification
 
-- `scripts/verify-query-ui.py`（Query 面板的開關、對話）
-- 前端型別檢查與 build
-- 手動：三種顯示方式切換、側邊欄拖曳、確認卡片後跳頁並打開紀錄（訂單、客戶、產品顏色、入庫）
+- `scripts/verify-query-ui.py` (opening/closing the Query panel, chatting)
+- Frontend type check and build
+- Manual: switching the three display modes, dragging the sidebar, jumping to the page and opening the record after confirming a card (order, customer, product color, receiving)

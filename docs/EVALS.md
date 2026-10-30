@@ -1,16 +1,16 @@
-# Eval 服務
+# Eval Service
 
-> 現況文件（2026-10-16），由 **AI Session** 維護。完整的執行方式、指標與實驗紀錄見 [QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md)。
+> Current-state document (2026-10-16), maintained by the **AI Session**. For full instructions, metrics and the experiment log, see [QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md).
 
-| 項目 | 說明 |
-|------|------|
-| 目的 | 每次修改 Agent（prompt、模型、架構、tools、權限）都重跑，確認沒有退步 |
-| 執行 | 在 `mcp-server/`：`bun run eval -- --label <改了什麼>`；`--config evals/configs/<設定>.json` 比較其他架構或模型 |
-| 案例 | Langfuse Dataset `query-agent`（案例的來源，可在網頁上編輯）；每次執行存一份快照到 `mcp-server/evals/snapshots/` |
-| 資料 | 以記憶體中的假資料庫（`evals/fake-supabase.ts`）執行，呼叫真的模型；執行前先檢查假資料與模擬的 API 是否與資料庫一致（`evals/db-check.ts`） |
-| 報告 | 每次執行是 Langfuse 的一次 experiment（官方 SDK 的 experiment runner），分數都帶 score config；`mcp-server/evals/reports/` 另存本機報告 |
-| GitHub | Actions 的「Query Agent Eval」，只手動觸發，不擋合併（`.github/workflows/query-agent-eval.yml`） |
-| LLM 評審 | 以人工標註校準（標註佇列 `policy-calibration`、資料集與 prompt `judge-calibration/policy-compliance`，`bun run judge`）；約 85% 一致後由 Langfuse 管理的評分器評 eval 與正式環境。校準前只記錄 |
-| 評分 | 看結果：草稿與回答中的事實，加上不可違反的規則；呼叫了哪些工具只作為診斷 |
-| 通過標準 | 不退步：上一次完整執行中通過的案例必須仍通過（CLAUDE.md）；門檻見 QUERY_AGENT_EVALS.md §2.3 |
-| 確定性測試 | `bun run test`：tools、權限、組織隔離等不需模型的測試 |
+| Item | Description |
+|------|-------------|
+| Purpose | Rerun after every change to the Agent (prompt, model, architecture, tools, permissions) to confirm nothing regressed |
+| Running | In `mcp-server/`: `bun run eval -- --label <what changed>`; `--config evals/configs/<config>.json` to compare other architectures or models |
+| Cases | Langfuse Dataset `query-agent` (the source of the cases, editable on the web); each run saves a snapshot to `mcp-server/evals/snapshots/` |
+| Data | Runs against an in-memory fake database (`evals/fake-supabase.ts`) and calls real models; before running, it checks that the fake data and simulated APIs match the database (`evals/db-check.ts`) |
+| Reports | Each run is one Langfuse experiment (the official SDK's experiment runner), and every score carries a score config; a local report is also saved to `mcp-server/evals/reports/` |
+| GitHub | The "Query Agent Eval" Action, triggered manually only; it does not block merges (`.github/workflows/query-agent-eval.yml`) |
+| LLM judge | Calibrated against human labels (annotation queue `policy-calibration`, dataset and prompt `judge-calibration/policy-compliance`, `bun run judge`); once agreement reaches about 85%, a Langfuse-managed evaluator scores the eval and production. Until calibrated, its score is recorded only |
+| Scoring | Based on outcomes: the draft and the facts in the reply, plus rules that must never be broken; which tools were called is diagnostic only |
+| Pass bar | No regression: cases that passed in the previous full run must still pass (CLAUDE.md); thresholds in QUERY_AGENT_EVALS.md §2.3 |
+| Deterministic tests | `bun run test`: tests that need no model, such as tools, permissions and organization isolation |
