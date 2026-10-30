@@ -198,6 +198,16 @@ test("list_inventory_rolls lists only rolls with stock in this organization", as
   assert.deepEqual((r.data as { roll_number: string }[]).map((x) => x.roll_number), ["R001", "R002"]);
 });
 
+test("list_inventory_rolls finds a roll by its number (gen-cross-13: 「R-20261014-01 那卷夠不夠」)", async () => {
+  const { ctx } = setup();
+  const r = await tool("list_inventory_rolls").run(ctx, { roll_number: "r002" });
+  assert.ok(r.ok);
+  assert.deepEqual((r.data as { roll_number: string }[]).map((x) => x.roll_number), ["R002"]);
+  const none = await tool("list_inventory_rolls").run(ctx, { roll_number: "R999" });
+  assert.ok(none.ok);
+  assert.deepEqual(none.data, []);
+});
+
 test("list_shelves hides inactive shelves unless asked", async () => {
   const { ctx } = setup();
   const active = await tool("list_shelves").run(ctx, {});

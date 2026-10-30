@@ -86,6 +86,40 @@ The gaps overlap: one new case usually fills a tool gap and a category gap at on
 - Add `answer_includes` to the 43 "no draft only" cases wherever the reply has a fixed fact (a name, a number with its unit). Cases without one, such as most 資訊不足 cases, wait for the calibrated judge.
 - Add the unit to the draft fields of every write case whose utterance gives a unit (e.g. `"品項 1": "棉麻平織 - 米白 × 50 公尺"`), so a changed unit fails the outcome check instead of only lowering the judge score.
 
+### 3.5 Batch 1: cross-flow (2026-10-30)
+
+15 cases `gen-cross-01`–`gen-cross-15` on the `real` fixture, each needing facts from two or more flows. Every number in `answer_includes` is computed from the fixture and shown in the case's `metadata.note`, for example: 40S雙面布藏青 (40S double-knit, navy) has 200 + 300 = 500 kg on unshipped orders against 450 kg in stock, so it is 50 kg short.
+
+| Kind | Cases |
+|------|-------|
+| Compare orders with stock (enough / short, by how much) | 01, 02, 03, 13 |
+| Add stock and purchase orders not yet received | 04, 09, 14 |
+| Find the purchase orders behind an order's product | 10 |
+| Write only if a condition holds: draft when stock is enough, none when it is short | 05, 06, 07 |
+| Write and report a fact from another flow | 08, 11 |
+| Multi-turn: last turn gave the need, this turn compares stock | 12 |
+| Viewer: may see the shortfall, may not draft the purchase order | 15 |
+
+**First results** (3 runs per case; generated cases are not scored yet, so the totals are counted from the reports):
+
+| Run | Passed | Note |
+|-----|--------|------|
+| `20261030T1521-cross-router` (router + summary) | 20 / 45 | |
+| `20261030T1525-cross-single` (single agent) | 17 / 45 | |
+| `20261030T1536-cross-router-roll-number` (router + summary, after the fix below) | 20 / 45 | 13: 0/3 → 3/3; 01 and 06 fell from 3/3 to 0/3 in runs with rate limits and empty replies |
+
+What fails:
+- **Tool gap (fixed):** `list_inventory_rolls` could not look a roll up by its number, so both architectures said R-20261014-01 does not exist. It now takes `roll_number`.
+- **Misreading tool results:** the tools return the data (checked directly), but the reply says 「查無資料」 ("no data") or "the purchase order does not exist" (09, 14).
+- **No arithmetic across records:** lists the orders but never adds up what remains to ship (02, 03).
+- **The summary fills gaps by guessing:** when the warehouse sub-agent returns nothing, the summary still states a shortfall (06: "100 kg short" with no stock figure; the stock is 45 kg).
+- **Wrong write:** in 05, the router + summary run created two unrequested orders, 3 runs out of 3, instead of one purchase order for the shortfall.
+- **Asks for an ID** and changes kilograms to meters (15).
+
+These are the targets for the next prompt and model work. The architecture choice stays open until they are fixed: neither architecture handles cross-flow work reliably yet.
+
+**Format limit:** `expectedOutput.draft` holds one draft, and the outcome check requires exactly one. A message that should leave two drafts, such as 「開訂單，同時跟和興下採購單」 ("open an order and place a purchase order with 和興 at the same time"), cannot be expressed yet. It needs `expectedOutput.drafts` (a list) in `evals/cases.ts` and `evals/checks.ts`.
+
 ## 4. Reply rubric (draft for the TPM)
 
 The judge and the human labels use the same three verdicts (score config `policy-compliance`):
@@ -136,7 +170,7 @@ These show why the judge decides nothing until it agrees with the TPM's labels (
 |---|------|-----|--------|
 | 1 | Coverage table and rubric draft (this document) | AI Session | ✅ 2026-10-30 |
 | 2 | Review §4: confirm or change each row | TPM | 多筆相似 decided 2026-10-30 (a lookup lists every match) |
-| 3 | Draft the cases for the gaps in §3, in batches by sub-agent group, as Langfuse items with `source: generated`, without `reviewed_by` | AI Session | |
+| 3 | Draft the cases for the gaps in §3, in batches by sub-agent group, as Langfuse items with `source: generated`, without `reviewed_by` | AI Session | Batch 1, cross-flow: `gen-cross-01`–`15` added 2026-10-30 (§3.5) |
 | 4 | Review each batch in Langfuse; set `reviewed_by` | TPM | |
 | 5 | §3.4: add `answer_includes` and units to existing cases | AI Session drafts, TPM reviews | |
 | 6 | Put the rubric into the judge (`evals/judge.ts`); new baseline with 3 runs per case | AI Session | |

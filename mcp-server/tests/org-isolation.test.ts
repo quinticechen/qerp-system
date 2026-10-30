@@ -41,6 +41,7 @@ const READ_CALLS: [string, Record<string, unknown>][] = [
   ["list_receivings", {}],
   ["list_inventory_rolls", {}],
   ["list_inventory_rolls", { search: "藍0922" }],
+  ["list_inventory_rolls", { roll_number: "R" }],
 ];
 
 test("every read tool is covered by the isolation check", () => {

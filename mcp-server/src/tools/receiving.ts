@@ -58,14 +58,15 @@ export const receivingTools = [
     domain: "inventory",
     kind: "read",
     permission: "canViewInventory",
-    description: "列出還有庫存的布卷（卷號、剩餘公斤、品質、貨架），可依產品名稱、顏色或貨架篩選；出貨前用來挑選布卷",
+    description: "列出還有庫存的布卷（卷號、剩餘公斤、品質、貨架），可依卷號、產品名稱、顏色或貨架篩選；出貨前用來挑選布卷，也用來查某一卷還剩多少",
     input: z.object({
       search: z.string().optional().describe("產品名稱或顏色"),
+      roll_number: z.string().optional().describe("卷號，例如 R-001"),
       product_id: z.string().uuid().optional().describe("產品 UUID"),
       shelf: z.string().optional().describe("貨架名稱或儲位，例如 A區-01"),
       limit: z.number().optional(),
     }),
-    execute: async (ctx, { search, product_id, shelf, limit }) => {
+    execute: async (ctx, { search, roll_number, product_id, shelf, limit }) => {
       const batches = await batchIds(ctx);
       if (!batches) return fail("查詢失敗");
       let productIds: string[] | undefined;
@@ -78,6 +79,7 @@ export const receivingTools = [
         productIds = data.map((r) => r.id);
       }
       let q = ctx.supabase.from("inventory_rolls").select("id, roll_number, current_quantity, quality, shelf, products_new(name, color), warehouses(name)").in("inventory_id", batches).gt("current_quantity", 0).order("roll_number").limit(limit ?? 30);
+      if (roll_number) q = q.ilike("roll_number", `%${roll_number.trim()}%`);
       if (product_id) q = q.eq("product_id", product_id);
       if (productIds) q = q.in("product_id", productIds);
       if (shelf) {
