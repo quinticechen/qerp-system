@@ -20,7 +20,7 @@ const USAGE = { promptTokens: 1, completionTokens: 1 };
 const RAW = { rawPrompt: null, rawSettings: {} };
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const roles: Record<string, FakeAccess> = JSON.parse(readFileSync(new URL("../evals/fixtures/roles.json", import.meta.url), "utf8"));
 
 const text = (t: string): Generated => ({ text: t, finishReason: "stop", usage: USAGE, rawCall: RAW });

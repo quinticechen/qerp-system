@@ -33,11 +33,10 @@ test("name and color match with a separator, without a space, or with a trailing
 });
 
 test("the phrasings from the regressed eval cases find the product and its stock", async () => {
-  const basic = ctxFor("basic");
-  const inventory = await tool("get_inventory_summary").run(basic, { search: "雲朵眠 - 藍0922" });
+  const real = ctxFor("real");
+  const inventory = await tool("get_inventory_summary").run(real, { search: "雲朵眠 - 藍" });
   assert.ok(inventory.ok && (inventory.data as { total_stock: number }[]).some((r) => r.total_stock === 320), "pp-inventory / q-inventory-search");
 
-  const real = ctxFor("real");
   for (const search of ["雲朵眠 - 藍色", "雲朵眠 藍色", "雲朵眠藍色", "雲朵眠 藍的"]) {
     const products = await tool("list_products").run(real, { search });
     assert.ok(products.ok && (products.data as { color: string }[]).some((p) => p.color === "藍"), search);

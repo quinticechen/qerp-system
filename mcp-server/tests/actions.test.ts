@@ -15,7 +15,7 @@ const ORG_ID = "0e000000-0000-4000-8000-000000000001";
 const SESSION_ID = "5e000000-0000-4000-8000-000000000001";
 const ACTION_ID = "ac000000-0000-4000-8000-000000000001";
 
-const basic: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const roles: Record<string, FakeAccess> = JSON.parse(readFileSync(new URL("../evals/fixtures/roles.json", import.meta.url), "utf8"));
 
 const inFuture = () => new Date(Date.now() + 10 * 60_000).toISOString();
@@ -27,8 +27,8 @@ function action(overrides: Record<string, unknown> = {}) {
     organization_id: ORG_ID,
     session_id: SESSION_ID,
     tool: "create_order",
-    payload: { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] },
-    summary: { title: "建立銷售訂單", fields: [{ label: "客戶", value: "Client name test0922" }] },
+    payload: { customer_id: "c1000000-0000-4000-8000-000000000003", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] },
+    summary: { title: "建立銷售訂單", fields: [{ label: "客戶", value: "億豐紡織" }] },
     status: "pending",
     result: null,
     error: null,
@@ -39,7 +39,7 @@ function action(overrides: Record<string, unknown> = {}) {
 
 function setup(actionOverrides: Record<string, unknown> = {}, role = "owner") {
   const tables: Tables = {
-    ...basic,
+    ...fixtures,
     query_sessions: [{ id: SESSION_ID, user_id: USER_ID, organization_id: ORG_ID, title: "對話" }],
     query_messages: [],
     query_pending_actions: [action(actionOverrides)],
@@ -111,7 +111,7 @@ test("permission removed since drafting: confirm is refused and the draft stays 
 });
 
 test("a write that fails is recorded as failed, reported, and not retried by confirming again", async () => {
-  const { client, writes } = setup({ payload: { customer_id: "c0000000-0000-4000-8000-000000000099", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] } });
+  const { client, writes } = setup({ payload: { customer_id: "c1000000-0000-4000-8000-000000000099", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] } });
   const outcome = await confirmAction(client, ACTION_ID);
 
   assert.equal(outcome.status, "failed");

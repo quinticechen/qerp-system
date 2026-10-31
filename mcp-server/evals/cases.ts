@@ -43,7 +43,7 @@ const HistoryMessage = z.object({
 
 const Input = z.object({
   role: z.string().default("editor"),
-  fixtures: z.string().default("basic"),
+  fixtures: z.string().default("real"),
   history: z.array(HistoryMessage).default([]),
   message: z.string().min(1),
 });

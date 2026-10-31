@@ -52,6 +52,39 @@
       "organization_id": "0e000000-0000-4000-8000-000000000001"
     },
     {
+      "id": "c1000000-0000-4000-8000-000000000005",
+      "name": "永豐學生服-台北店",
+      "contact_person": "陳大文",
+      "phone": "0912-100-005",
+      "landline_phone": null,
+      "email": null,
+      "address": null,
+      "is_active": true,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "c1000000-0000-4000-8000-000000000006",
+      "name": "永豐學生服-台中店",
+      "contact_person": "陳小文",
+      "phone": "0912-100-006",
+      "landline_phone": null,
+      "email": null,
+      "address": null,
+      "is_active": true,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "c1000000-0000-4000-8000-000000000101",
+      "name": "協成布行",
+      "contact_person": "蔡協成",
+      "phone": "0912-100-101",
+      "landline_phone": null,
+      "email": null,
+      "address": null,
+      "is_active": false,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
       "id": "c1000000-0000-4000-8000-000000000099",
       "name": "他組織客戶",
       "contact_person": "外部",
@@ -83,6 +116,45 @@
       "email": null,
       "is_active": true,
       "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000003",
+      "name": "永盛織造",
+      "contact_person": "李主任",
+      "phone": null,
+      "landline_phone": "04-2211-0003",
+      "email": null,
+      "is_active": true,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000004",
+      "name": "永盛染整",
+      "contact_person": "周課長",
+      "phone": null,
+      "landline_phone": "04-2211-0004",
+      "email": null,
+      "is_active": true,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000101",
+      "name": "建隆針織",
+      "contact_person": "洪主任",
+      "phone": null,
+      "landline_phone": "04-2211-0101",
+      "email": null,
+      "is_active": false,
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "name": "他組織工廠",
+      "contact_person": "外部",
+      "phone": "0900-000-001",
+      "email": null,
+      "is_active": true
     }
   ],
   "products_new": [
@@ -157,6 +229,40 @@
       "stock_thresholds": null,
       "organization_id": "0e000000-0000-4000-8000-000000000001",
       "group_id": "70000000-0000-4000-8000-000000000003"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000101",
+      "name": "精梳胚布",
+      "category": "胚布",
+      "color": "本白",
+      "color_code": null,
+      "unit_of_measure": "KG",
+      "status": "Unavailable",
+      "stock_thresholds": null,
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "group_id": "70000000-0000-4000-8000-000000000101"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000102",
+      "name": "70D尼龍",
+      "category": "布料",
+      "color": "紅",
+      "color_code": null,
+      "unit_of_measure": "KG",
+      "status": "Unavailable",
+      "stock_thresholds": null,
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "group_id": "70000000-0000-4000-8000-000000000003"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "name": "他組織布料",
+      "category": "寢具布",
+      "color": "藍",
+      "color_code": "X-1",
+      "status": "Available",
+      "group_id": "70000000-0000-4000-8000-000000000099"
     }
   ],
   "inventory_summary_enhanced": [
@@ -212,8 +318,8 @@
       "product_status": "Available",
       "total_stock": 450,
       "total_rolls": 21,
-      "a_grade_stock": 450,
-      "b_grade_stock": 0,
+      "a_grade_stock": 407,
+      "b_grade_stock": 43,
       "c_grade_stock": 0,
       "d_grade_stock": 0,
       "defective_stock": 0,
@@ -249,6 +355,21 @@
       "defective_stock": 0,
       "stock_thresholds": null,
       "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "product_id": "a1000000-0000-4000-8000-000000000099",
+      "product_name": "他組織布料",
+      "color": "藍",
+      "product_status": "Available",
+      "total_stock": 1,
+      "total_rolls": 1,
+      "a_grade_stock": 1,
+      "b_grade_stock": 0,
+      "c_grade_stock": 0,
+      "d_grade_stock": 0,
+      "defective_stock": 0,
+      "stock_thresholds": 999,
+      "organization_id": "0e000000-0000-4000-8000-000000000099"
     }
   ],
   "orders": [
@@ -346,7 +467,7 @@
       "id": "d1000000-0000-4000-8000-000000000004",
       "order_number": "B202610090004",
       "customer_id": "c1000000-0000-4000-8000-000000000004",
-      "status": "confirmed",
+      "status": "factory_ordered",
       "payment_status": "unpaid",
       "shipping_status": "not_started",
       "created_at": "2026-10-09T09:00:00Z",
@@ -368,6 +489,126 @@
           "products_new": {
             "name": "40S雙面布",
             "color": "藏青"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d1000000-0000-4000-8000-000000000101",
+      "order_number": "B202609210001",
+      "customer_id": "c1000000-0000-4000-8000-000000000003",
+      "status": "completed",
+      "payment_status": "paid",
+      "shipping_status": "shipped",
+      "created_at": "2026-09-21T09:00:00Z",
+      "customers": {
+        "name": "億豐紡織"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "order_products": [
+        {
+          "id": "91000000-0000-4000-8000-000000000101",
+          "order_id": "d1000000-0000-4000-8000-000000000101",
+          "product_id": "a1000000-0000-4000-8000-000000000005",
+          "quantity": 100,
+          "unit_price": 90,
+          "total_rolls": null,
+          "specifications": null,
+          "shipped_quantity": 100,
+          "created_at": "2026-09-21T09:00:00Z",
+          "products_new": {
+            "name": "70D尼龍",
+            "color": "黑"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d1000000-0000-4000-8000-000000000102",
+      "order_number": "B202609250001",
+      "customer_id": "c1000000-0000-4000-8000-000000000003",
+      "status": "cancelled",
+      "payment_status": "unpaid",
+      "shipping_status": "not_started",
+      "created_at": "2026-09-25T09:00:00Z",
+      "customers": {
+        "name": "億豐紡織"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "order_products": [
+        {
+          "id": "91000000-0000-4000-8000-000000000102",
+          "order_id": "d1000000-0000-4000-8000-000000000102",
+          "product_id": "a1000000-0000-4000-8000-000000000003",
+          "quantity": 80,
+          "unit_price": 82,
+          "total_rolls": null,
+          "specifications": null,
+          "shipped_quantity": 0,
+          "created_at": "2026-09-25T09:00:00Z",
+          "products_new": {
+            "name": "雲朵眠",
+            "color": "白"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d1000000-0000-4000-8000-000000000103",
+      "order_number": "B202610150001",
+      "customer_id": "c1000000-0000-4000-8000-000000000002",
+      "status": "pending",
+      "payment_status": "unpaid",
+      "shipping_status": "not_started",
+      "created_at": "2026-10-15T09:00:00Z",
+      "customers": {
+        "name": "東興布業"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "order_products": [
+        {
+          "id": "91000000-0000-4000-8000-000000000103",
+          "order_id": "d1000000-0000-4000-8000-000000000103",
+          "product_id": "a1000000-0000-4000-8000-000000000006",
+          "quantity": 120,
+          "unit_price": 65,
+          "total_rolls": null,
+          "specifications": null,
+          "shipped_quantity": 0,
+          "created_at": "2026-10-15T09:00:00Z",
+          "products_new": {
+            "name": "70D尼龍",
+            "color": "白"
+          }
+        }
+      ]
+    },
+    {
+      "id": "d1000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "order_number": "B-OTHER-001",
+      "customer_id": "c1000000-0000-4000-8000-000000000099",
+      "status": "pending",
+      "payment_status": "unpaid",
+      "shipping_status": "not_started",
+      "created_at": "2026-10-20T09:00:00Z",
+      "customers": {
+        "name": "他組織客戶"
+      },
+      "order_products": [
+        {
+          "id": "91000000-0000-4000-8000-000000000099",
+          "order_id": "d1000000-0000-4000-8000-000000000099",
+          "product_id": "a1000000-0000-4000-8000-000000000099",
+          "quantity": 10,
+          "unit_price": 10,
+          "total_rolls": null,
+          "specifications": null,
+          "shipped_quantity": 10,
+          "created_at": "2026-10-20T09:00:00Z",
+          "products_new": {
+            "name": "他組織布料",
+            "color": "藍"
           }
         }
       ]
@@ -523,6 +764,201 @@
           }
         }
       ]
+    },
+    {
+      "id": "e1000000-0000-4000-8000-000000000101",
+      "po_number": "P202608200001",
+      "factory_id": "f1000000-0000-4000-8000-000000000001",
+      "status": "completed",
+      "order_date": "2026-08-20",
+      "expected_arrival_date": "2026-08-22",
+      "created_at": "2026-08-20T09:00:00Z",
+      "factories": {
+        "name": "和興染整"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_items": [
+        {
+          "id": "92000000-0000-4000-8000-000000000101",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000101",
+          "product_id": "a1000000-0000-4000-8000-000000000004",
+          "ordered_quantity": 412,
+          "ordered_rolls": null,
+          "unit_price": 118,
+          "specifications": null,
+          "received_quantity": 412,
+          "created_at": "2026-08-20T09:00:00Z",
+          "products_new": {
+            "name": "40S雙面布",
+            "color": "藏青"
+          }
+        }
+      ]
+    },
+    {
+      "id": "e1000000-0000-4000-8000-000000000102",
+      "po_number": "P202609150001",
+      "factory_id": "f1000000-0000-4000-8000-000000000001",
+      "status": "completed",
+      "order_date": "2026-09-15",
+      "expected_arrival_date": "2026-09-18",
+      "created_at": "2026-09-15T09:00:00Z",
+      "factories": {
+        "name": "和興染整"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_items": [
+        {
+          "id": "92000000-0000-4000-8000-000000000102",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+          "product_id": "a1000000-0000-4000-8000-000000000001",
+          "ordered_quantity": 300,
+          "ordered_rolls": null,
+          "unit_price": 75,
+          "specifications": null,
+          "received_quantity": 298.5,
+          "created_at": "2026-09-15T09:00:00Z",
+          "products_new": {
+            "name": "雲朵眠",
+            "color": "藍"
+          }
+        },
+        {
+          "id": "92000000-0000-4000-8000-000000000103",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+          "product_id": "a1000000-0000-4000-8000-000000000002",
+          "ordered_quantity": 45,
+          "ordered_rolls": null,
+          "unit_price": 75,
+          "specifications": null,
+          "received_quantity": 45,
+          "created_at": "2026-09-15T09:00:00Z",
+          "products_new": {
+            "name": "雲朵眠",
+            "color": "粉"
+          }
+        },
+        {
+          "id": "92000000-0000-4000-8000-000000000104",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+          "product_id": "a1000000-0000-4000-8000-000000000003",
+          "ordered_quantity": 180,
+          "ordered_rolls": null,
+          "unit_price": 75,
+          "specifications": null,
+          "received_quantity": 180,
+          "created_at": "2026-09-15T09:00:00Z",
+          "products_new": {
+            "name": "雲朵眠",
+            "color": "白"
+          }
+        }
+      ]
+    },
+    {
+      "id": "e1000000-0000-4000-8000-000000000103",
+      "po_number": "P202609200001",
+      "factory_id": "f1000000-0000-4000-8000-000000000002",
+      "status": "completed",
+      "order_date": "2026-09-20",
+      "expected_arrival_date": "2026-09-23",
+      "created_at": "2026-09-20T09:00:00Z",
+      "factories": {
+        "name": "順大織廠"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_items": [
+        {
+          "id": "92000000-0000-4000-8000-000000000105",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000103",
+          "product_id": "a1000000-0000-4000-8000-000000000005",
+          "ordered_quantity": 700,
+          "ordered_rolls": null,
+          "unit_price": 88,
+          "specifications": null,
+          "received_quantity": 700,
+          "created_at": "2026-09-20T09:00:00Z",
+          "products_new": {
+            "name": "70D尼龍",
+            "color": "黑"
+          }
+        },
+        {
+          "id": "92000000-0000-4000-8000-000000000106",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000103",
+          "product_id": "a1000000-0000-4000-8000-000000000006",
+          "ordered_quantity": 240,
+          "ordered_rolls": null,
+          "unit_price": 58,
+          "specifications": null,
+          "received_quantity": 240,
+          "created_at": "2026-09-20T09:00:00Z",
+          "products_new": {
+            "name": "70D尼龍",
+            "color": "白"
+          }
+        }
+      ]
+    },
+    {
+      "id": "e1000000-0000-4000-8000-000000000104",
+      "po_number": "P202610050001",
+      "factory_id": "f1000000-0000-4000-8000-000000000002",
+      "status": "cancelled",
+      "order_date": "2026-10-05",
+      "expected_arrival_date": "2026-10-12",
+      "created_at": "2026-10-05T09:00:00Z",
+      "factories": {
+        "name": "順大織廠"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_items": [
+        {
+          "id": "92000000-0000-4000-8000-000000000107",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000104",
+          "product_id": "a1000000-0000-4000-8000-000000000003",
+          "ordered_quantity": 100,
+          "ordered_rolls": null,
+          "unit_price": 70,
+          "specifications": null,
+          "received_quantity": 0,
+          "created_at": "2026-10-05T09:00:00Z",
+          "products_new": {
+            "name": "雲朵眠",
+            "color": "白"
+          }
+        }
+      ]
+    },
+    {
+      "id": "e1000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "po_number": "P-OTHER-001",
+      "factory_id": "f1000000-0000-4000-8000-000000000099",
+      "status": "pending",
+      "order_date": "2026-10-20",
+      "expected_arrival_date": "2026-10-20",
+      "created_at": "2026-10-20T09:00:00Z",
+      "factories": {
+        "name": "他組織工廠"
+      },
+      "purchase_order_items": [
+        {
+          "id": "92000000-0000-4000-8000-000000000099",
+          "purchase_order_id": "e1000000-0000-4000-8000-000000000099",
+          "product_id": "a1000000-0000-4000-8000-000000000099",
+          "ordered_quantity": 10,
+          "ordered_rolls": null,
+          "unit_price": 10,
+          "specifications": null,
+          "received_quantity": 0,
+          "created_at": "2026-10-20T09:00:00Z",
+          "products_new": {
+            "name": "他組織布料",
+            "color": "藍"
+          }
+        }
+      ]
     }
   ],
   "shippings": [
@@ -542,6 +978,59 @@
         "order_number": "B202610080003"
       },
       "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000101",
+      "shipping_number": "O202609240001",
+      "shipping_date": "2026-09-24",
+      "status": "shipped",
+      "order_id": "d1000000-0000-4000-8000-000000000101",
+      "customer_id": "c1000000-0000-4000-8000-000000000003",
+      "total_shipped_rolls": 2,
+      "total_shipped_quantity": 100,
+      "customers": {
+        "name": "億豐紡織"
+      },
+      "orders": {
+        "order_number": "B202609210001"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000102",
+      "shipping_number": "O202610110001",
+      "shipping_date": "2026-10-11",
+      "status": "cancelled",
+      "order_id": "d1000000-0000-4000-8000-000000000003",
+      "customer_id": "c1000000-0000-4000-8000-000000000001",
+      "total_shipped_rolls": 1,
+      "total_shipped_quantity": 30,
+      "customers": {
+        "name": "永泰布行"
+      },
+      "orders": {
+        "order_number": "B202610080003"
+      },
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "cancelled_at": "2026-10-11T15:00:00Z",
+      "cancel_reason": "客戶改期"
+    },
+    {
+      "id": "b1000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "shipping_number": "O-OTHER-001",
+      "shipping_date": "2026-10-20",
+      "order_id": "d1000000-0000-4000-8000-000000000099",
+      "customer_id": "c1000000-0000-4000-8000-000000000099",
+      "total_shipped_rolls": 1,
+      "total_shipped_quantity": 10,
+      "customers": {
+        "name": "他組織客戶"
+      },
+      "orders": {
+        "order_number": "B-OTHER-001"
+      },
+      "status": "shipped"
     }
   ],
   "product_groups": [
@@ -566,6 +1055,22 @@
       "organization_id": "0e000000-0000-4000-8000-000000000001",
       "name": "70D尼龍",
       "category": "布料",
+      "unit_of_measure": "KG",
+      "is_active": true
+    },
+    {
+      "id": "70000000-0000-4000-8000-000000000101",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "name": "精梳胚布",
+      "category": "胚布",
+      "unit_of_measure": "KG",
+      "is_active": false
+    },
+    {
+      "id": "70000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "name": "他組織布料",
+      "category": "寢具布",
       "unit_of_measure": "KG",
       "is_active": true
     }
@@ -629,6 +1134,66 @@
       "products_new": {
         "name": "40S雙面布",
         "color": "藏青"
+      }
+    },
+    {
+      "id": "91000000-0000-4000-8000-000000000101",
+      "order_id": "d1000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "quantity": 100,
+      "unit_price": 90,
+      "total_rolls": null,
+      "specifications": null,
+      "shipped_quantity": 100,
+      "created_at": "2026-09-21T09:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      }
+    },
+    {
+      "id": "91000000-0000-4000-8000-000000000102",
+      "order_id": "d1000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "quantity": 80,
+      "unit_price": 82,
+      "total_rolls": null,
+      "specifications": null,
+      "shipped_quantity": 0,
+      "created_at": "2026-09-25T09:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      }
+    },
+    {
+      "id": "91000000-0000-4000-8000-000000000103",
+      "order_id": "d1000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "quantity": 120,
+      "unit_price": 65,
+      "total_rolls": null,
+      "specifications": null,
+      "shipped_quantity": 0,
+      "created_at": "2026-10-15T09:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      }
+    },
+    {
+      "id": "91000000-0000-4000-8000-000000000099",
+      "order_id": "d1000000-0000-4000-8000-000000000099",
+      "product_id": "a1000000-0000-4000-8000-000000000099",
+      "quantity": 10,
+      "unit_price": 10,
+      "total_rolls": null,
+      "specifications": null,
+      "shipped_quantity": 10,
+      "created_at": "2026-10-20T09:00:00Z",
+      "products_new": {
+        "name": "他組織布料",
+        "color": "藍"
       }
     }
   ],
@@ -707,6 +1272,126 @@
         "name": "雲朵眠",
         "color": "藍"
       }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000101",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "ordered_quantity": 412,
+      "ordered_rolls": null,
+      "unit_price": 118,
+      "specifications": null,
+      "received_quantity": 412,
+      "created_at": "2026-08-20T09:00:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000102",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "ordered_quantity": 300,
+      "ordered_rolls": null,
+      "unit_price": 75,
+      "specifications": null,
+      "received_quantity": 298.5,
+      "created_at": "2026-09-15T09:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000103",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000002",
+      "ordered_quantity": 45,
+      "ordered_rolls": null,
+      "unit_price": 75,
+      "specifications": null,
+      "received_quantity": 45,
+      "created_at": "2026-09-15T09:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "粉"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000104",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "ordered_quantity": 180,
+      "ordered_rolls": null,
+      "unit_price": 75,
+      "specifications": null,
+      "received_quantity": 180,
+      "created_at": "2026-09-15T09:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000105",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "ordered_quantity": 700,
+      "ordered_rolls": null,
+      "unit_price": 88,
+      "specifications": null,
+      "received_quantity": 700,
+      "created_at": "2026-09-20T09:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000106",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "ordered_quantity": 240,
+      "ordered_rolls": null,
+      "unit_price": 58,
+      "specifications": null,
+      "received_quantity": 240,
+      "created_at": "2026-09-20T09:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000107",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000104",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "ordered_quantity": 100,
+      "ordered_rolls": null,
+      "unit_price": 70,
+      "specifications": null,
+      "received_quantity": 0,
+      "created_at": "2026-10-05T09:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      }
+    },
+    {
+      "id": "92000000-0000-4000-8000-000000000099",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000099",
+      "product_id": "a1000000-0000-4000-8000-000000000099",
+      "ordered_quantity": 10,
+      "ordered_rolls": null,
+      "unit_price": 10,
+      "specifications": null,
+      "received_quantity": 0,
+      "created_at": "2026-10-20T09:00:00Z",
+      "products_new": {
+        "name": "他組織布料",
+        "color": "藍"
+      }
     }
   ],
   "warehouses": [
@@ -722,6 +1407,27 @@
       "organization_id": "0e000000-0000-4000-8000-000000000001",
       "name": "B-02",
       "location": "成品倉庫二樓",
+      "is_active": true
+    },
+    {
+      "id": "93000000-0000-4000-8000-000000000101",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "name": "E-01",
+      "location": "成品倉庫三樓",
+      "is_active": true
+    },
+    {
+      "id": "93000000-0000-4000-8000-000000000102",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "name": "舊倉-01",
+      "location": "舊倉庫",
+      "is_active": false
+    },
+    {
+      "id": "93000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "name": "他組織貨架",
+      "location": null,
       "is_active": true
     }
   ],
@@ -772,6 +1478,70 @@
       },
       "factories": {
         "name": "和興染整"
+      }
+    },
+    {
+      "id": "94000000-0000-4000-8000-000000000101",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000101",
+      "factory_id": "f1000000-0000-4000-8000-000000000001",
+      "receipt_number": "I202608220001",
+      "arrival_date": "2026-08-22",
+      "note": null,
+      "created_at": "2026-08-22T10:00:00Z",
+      "purchase_orders": {
+        "po_number": "P202608200001"
+      },
+      "factories": {
+        "name": "和興染整"
+      }
+    },
+    {
+      "id": "94000000-0000-4000-8000-000000000102",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000102",
+      "factory_id": "f1000000-0000-4000-8000-000000000001",
+      "receipt_number": "I202609180001",
+      "arrival_date": "2026-09-18",
+      "note": null,
+      "created_at": "2026-09-18T10:00:00Z",
+      "purchase_orders": {
+        "po_number": "P202609150001"
+      },
+      "factories": {
+        "name": "和興染整"
+      }
+    },
+    {
+      "id": "94000000-0000-4000-8000-000000000103",
+      "organization_id": "0e000000-0000-4000-8000-000000000001",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000103",
+      "factory_id": "f1000000-0000-4000-8000-000000000002",
+      "receipt_number": "I202609230001",
+      "arrival_date": "2026-09-23",
+      "note": null,
+      "created_at": "2026-09-23T10:00:00Z",
+      "purchase_orders": {
+        "po_number": "P202609200001"
+      },
+      "factories": {
+        "name": "順大織廠"
+      }
+    },
+    {
+      "id": "94000000-0000-4000-8000-000000000099",
+      "organization_id": "0e000000-0000-4000-8000-000000000099",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000099",
+      "factory_id": "f1000000-0000-4000-8000-000000000099",
+      "receipt_number": "I-OTHER-001",
+      "arrival_date": "2026-10-21",
+      "note": null,
+      "created_at": "2026-10-21T10:00:00Z",
+      "purchase_orders": {
+        "po_number": "P-OTHER-001"
+      },
+      "factories": {
+        "name": "他組織工廠"
       }
     }
   ],
@@ -870,6 +1640,994 @@
       "warehouses": {
         "name": "A區-01"
       }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000101",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "1",
+      "roll_number": "R260822030756217",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "B",
+      "created_at": "2026-08-22T10:00:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000102",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "2",
+      "roll_number": "R260822031060734",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "B",
+      "created_at": "2026-08-22T10:01:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000103",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "3",
+      "roll_number": "R260822031365251",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:02:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000104",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "4",
+      "roll_number": "R260822031669768",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:03:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000105",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "5",
+      "roll_number": "R260822031974285",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:04:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000106",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "6",
+      "roll_number": "R260822032278802",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:05:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000107",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "7",
+      "roll_number": "R260822032583319",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:06:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000108",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "8",
+      "roll_number": "R260822032887836",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:07:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000109",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "9",
+      "roll_number": "R260822033192353",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:08:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000110",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "10",
+      "roll_number": "R260822033496870",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:09:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000111",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "11",
+      "roll_number": "R260822033801387",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:10:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000112",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "12",
+      "roll_number": "R260822034105904",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:11:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000113",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "13",
+      "roll_number": "R260822034410421",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:12:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000114",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "14",
+      "roll_number": "R260822034714938",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:13:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000115",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "15",
+      "roll_number": "R260822035019455",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:14:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000116",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "16",
+      "roll_number": "R260822035323972",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:15:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000117",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "17",
+      "roll_number": "R260822035628489",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:16:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000118",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "18",
+      "roll_number": "R260822035933006",
+      "quantity": 21.5,
+      "current_quantity": 21.5,
+      "quality": "A",
+      "created_at": "2026-08-22T10:17:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000119",
+      "inventory_id": "94000000-0000-4000-8000-000000000101",
+      "product_id": "a1000000-0000-4000-8000-000000000004",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "19",
+      "roll_number": "R260822036237523",
+      "quantity": 25,
+      "current_quantity": 25,
+      "quality": "A",
+      "created_at": "2026-08-22T10:18:00Z",
+      "products_new": {
+        "name": "40S雙面布",
+        "color": "藏青"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000120",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "1",
+      "roll_number": "R260918036542040",
+      "quantity": 43,
+      "current_quantity": 43,
+      "quality": "A",
+      "created_at": "2026-09-18T10:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000121",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "2",
+      "roll_number": "R260918036846557",
+      "quantity": 43,
+      "current_quantity": 43,
+      "quality": "A",
+      "created_at": "2026-09-18T10:01:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000122",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "3",
+      "roll_number": "R260918037151074",
+      "quantity": 43,
+      "current_quantity": 43,
+      "quality": "A",
+      "created_at": "2026-09-18T10:02:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000123",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "4",
+      "roll_number": "R260918037455591",
+      "quantity": 42.5,
+      "current_quantity": 42.5,
+      "quality": "A",
+      "created_at": "2026-09-18T10:03:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000124",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "5",
+      "roll_number": "R260918037760108",
+      "quantity": 42.5,
+      "current_quantity": 42.5,
+      "quality": "A",
+      "created_at": "2026-09-18T10:04:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000125",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "6",
+      "roll_number": "R260918038064625",
+      "quantity": 42.5,
+      "current_quantity": 42.5,
+      "quality": "A",
+      "created_at": "2026-09-18T10:05:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000126",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000001",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "7",
+      "roll_number": "R260918038369142",
+      "quantity": 42,
+      "current_quantity": 42,
+      "quality": "A",
+      "created_at": "2026-09-18T10:06:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000127",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000002",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "1",
+      "roll_number": "R260918038673659",
+      "quantity": 45,
+      "current_quantity": 45,
+      "quality": "A",
+      "created_at": "2026-09-18T10:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "粉"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000128",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "1",
+      "roll_number": "R260918038978176",
+      "quantity": 45,
+      "current_quantity": 45,
+      "quality": "A",
+      "created_at": "2026-09-18T10:00:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000129",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "2",
+      "roll_number": "R260918039282693",
+      "quantity": 45,
+      "current_quantity": 45,
+      "quality": "A",
+      "created_at": "2026-09-18T10:01:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000130",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "3",
+      "roll_number": "R260918039587210",
+      "quantity": 45,
+      "current_quantity": 45,
+      "quality": "A",
+      "created_at": "2026-09-18T10:02:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000131",
+      "inventory_id": "94000000-0000-4000-8000-000000000102",
+      "product_id": "a1000000-0000-4000-8000-000000000003",
+      "warehouse_id": "93000000-0000-4000-8000-000000000014",
+      "shelf": "4",
+      "roll_number": "R260918039891727",
+      "quantity": 45,
+      "current_quantity": 45,
+      "quality": "A",
+      "created_at": "2026-09-18T10:03:00Z",
+      "products_new": {
+        "name": "雲朵眠",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "B-02"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000132",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "1",
+      "roll_number": "R260923040196244",
+      "quantity": 50,
+      "current_quantity": 0,
+      "quality": "A",
+      "created_at": "2026-09-23T10:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000133",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "2",
+      "roll_number": "R260923040500761",
+      "quantity": 50,
+      "current_quantity": 0,
+      "quality": "A",
+      "created_at": "2026-09-23T10:01:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000134",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "3",
+      "roll_number": "R260923040805278",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:02:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000135",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "4",
+      "roll_number": "R260923041109795",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:03:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000136",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "5",
+      "roll_number": "R260923041414312",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:04:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000137",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "6",
+      "roll_number": "R260923041718829",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:05:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000138",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "7",
+      "roll_number": "R260923042023346",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:06:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000139",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "8",
+      "roll_number": "R260923042327863",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:07:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000140",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "9",
+      "roll_number": "R260923042632380",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:08:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000141",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "10",
+      "roll_number": "R260923042936897",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:09:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000142",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "11",
+      "roll_number": "R260923043241414",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:10:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000143",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "12",
+      "roll_number": "R260923043545931",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:11:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000144",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "13",
+      "roll_number": "R260923043850448",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:12:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000145",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000005",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "14",
+      "roll_number": "R260923044154965",
+      "quantity": 50,
+      "current_quantity": 50,
+      "quality": "A",
+      "created_at": "2026-09-23T10:13:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "黑"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000146",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "1",
+      "roll_number": "R260923044459482",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:00:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000147",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "2",
+      "roll_number": "R260923044763999",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:01:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000148",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "3",
+      "roll_number": "R260923045068516",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:02:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000149",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "4",
+      "roll_number": "R260923045373033",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:03:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000150",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "5",
+      "roll_number": "R260923045677550",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:04:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000151",
+      "inventory_id": "94000000-0000-4000-8000-000000000103",
+      "product_id": "a1000000-0000-4000-8000-000000000006",
+      "warehouse_id": "93000000-0000-4000-8000-000000000101",
+      "shelf": "6",
+      "roll_number": "R260923045982067",
+      "quantity": 40,
+      "current_quantity": 40,
+      "quality": "A",
+      "created_at": "2026-09-23T10:05:00Z",
+      "products_new": {
+        "name": "70D尼龍",
+        "color": "白"
+      },
+      "warehouses": {
+        "name": "E-01"
+      }
+    },
+    {
+      "id": "95000000-0000-4000-8000-000000000099",
+      "inventory_id": "94000000-0000-4000-8000-000000000099",
+      "product_id": "a1000000-0000-4000-8000-000000000099",
+      "warehouse_id": "93000000-0000-4000-8000-000000000099",
+      "shelf": null,
+      "roll_number": "R-OTHER-01",
+      "quantity": 10,
+      "current_quantity": 0,
+      "quality": "A",
+      "created_at": "2026-10-21T10:00:00Z",
+      "products_new": {
+        "name": "他組織布料",
+        "color": "藍"
+      },
+      "warehouses": {
+        "name": "他組織貨架"
+      }
     }
   ],
   "shipping_items": [
@@ -892,6 +2650,54 @@
       "inventory_rolls": {
         "roll_number": "R-1011-02"
       }
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000101",
+      "shipping_id": "b1000000-0000-4000-8000-000000000101",
+      "inventory_roll_id": "95000000-0000-4000-8000-000000000132",
+      "shipped_quantity": 50,
+      "created_at": "2026-09-24T11:00:00Z",
+      "inventory_rolls": {
+        "roll_number": "R260923040196244"
+      }
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000102",
+      "shipping_id": "b1000000-0000-4000-8000-000000000101",
+      "inventory_roll_id": "95000000-0000-4000-8000-000000000133",
+      "shipped_quantity": 50,
+      "created_at": "2026-09-24T11:00:00Z",
+      "inventory_rolls": {
+        "roll_number": "R260923040500761"
+      }
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000103",
+      "shipping_id": "b1000000-0000-4000-8000-000000000102",
+      "inventory_roll_id": "95000000-0000-4000-8000-000000000019",
+      "shipped_quantity": 30,
+      "created_at": "2026-10-11T11:00:00Z",
+      "inventory_rolls": {
+        "roll_number": "R-1011-01"
+      }
+    },
+    {
+      "id": "96000000-0000-4000-8000-000000000099",
+      "shipping_id": "b1000000-0000-4000-8000-000000000099",
+      "inventory_roll_id": "95000000-0000-4000-8000-000000000099",
+      "shipped_quantity": 10,
+      "created_at": "2026-10-20T11:00:00Z",
+      "inventory_rolls": {
+        "roll_number": "R-OTHER-01"
+      }
+    }
+  ],
+  "purchase_order_relations": [
+    {
+      "id": "97000000-0000-4000-8000-000000000101",
+      "purchase_order_id": "e1000000-0000-4000-8000-000000000004",
+      "order_id": "d1000000-0000-4000-8000-000000000004",
+      "created_at": "2026-10-14T09:00:00Z"
     }
   ]
 }

@@ -17,7 +17,7 @@ import { createFakeSupabase, type Tables } from "../evals/fake-supabase.js";
 
 const EVAL_USER_ID = "0a000000-0000-4000-8000-000000000001";
 const EVAL_ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 
 function fakeContext() {
   const fake = createFakeSupabase(fixtures, EVAL_USER_ID);
@@ -57,10 +57,10 @@ test("MCP marks read tools read-only and write tools not", async () => {
 
 test("MCP call runs the shared implementation", async () => {
   const client = await connectMcp(fakeContext().ctx);
-  const result = await client.callTool({ name: "list_factories", arguments: { search: "092202" } });
+  const result = await client.callTool({ name: "list_factories", arguments: { search: "順大" } });
   assert.equal(result.isError, false);
-  assert.match(textOf(result), /Factory 092202/);
-  assert.doesNotMatch(textOf(result), /永興織造/);
+  assert.match(textOf(result), /順大織廠/);
+  assert.doesNotMatch(textOf(result), /和興染整/);
 });
 
 test("invalid input is rejected before touching the database", async () => {
@@ -74,15 +74,15 @@ test("invalid input is rejected before touching the database", async () => {
 test("product search matches name and color across words (F2)", async () => {
   const { ctx } = fakeContext();
   const listProducts = getAllTools().find((t) => t.name === "list_products")!;
-  const result = await listProducts.run(ctx, { search: "雲朵眠 test0922 藍0922" });
+  const result = await listProducts.run(ctx, { search: "雲朵眠 藍" });
   assert.ok(result.ok);
-  assert.deepEqual((result.data as { color: string }[]).map((p) => p.color), ["藍0922"]);
+  assert.deepEqual((result.data as { color: string }[]).map((p) => p.color), ["藍"]);
 });
 
 test("inventory search matches product name and color across words (F2)", async () => {
   const { ctx } = fakeContext();
   const summary = getAllTools().find((t) => t.name === "get_inventory_summary")!;
-  const result = await summary.run(ctx, { search: "雲朵眠 藍0922" });
+  const result = await summary.run(ctx, { search: "雲朵眠 藍" });
   assert.ok(result.ok);
   assert.deepEqual((result.data as { total_stock: number }[]).map((r) => r.total_stock), [320]);
 });

@@ -122,7 +122,7 @@ test("deadline already passed: no model is called", async () => {
 
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const ALL_TOOLS = [...new Set([...TOOL_GROUPS.commercial, ...TOOL_GROUPS.supply_chain])];
 
 function setup() {
@@ -165,13 +165,13 @@ test("a call to a tool the model was not given ends with a standard reply, not a
 
 test("a tool call written as text (Gemini tool_code) falls back to the next model", async () => {
   const a = scripted("a", reply("tool_code\nprint(default_api.list_orders(payment_status='unpaid'))"));
-  const b = scripted("b", reply("未付款的訂單：ORD-20261001-001"));
+  const b = scripted("b", reply("未付款的訂單：B202610010001"));
   const result = await aiGenerateText(PROMPT, { phase: "test", models: [a, b] });
-  assert.equal(result.text, "未付款的訂單：ORD-20261001-001");
+  assert.equal(result.text, "未付款的訂單：B202610010001");
   assert.ok(!TOOL_CALL_AS_TEXT.test("default_api 是什麼？"), "mentioning the name alone is fine");
 });
 
-const CREATE_ORDER = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
+const CREATE_ORDER = toolCall("create_order", { customer_id: "c1000000-0000-4000-8000-000000000003", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
 const businessInserts = (writes: { op: string; table: string }[]) =>
   writes.filter((w) => w.op === "insert" && !w.table.startsWith("query_"));
 
@@ -184,7 +184,7 @@ test("the agent loop never writes: create_order becomes a draft (P0-5)", async (
   assert.deepEqual(businessInserts(writes), [], "no business rows written");
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].tool, "create_order");
-  assert.deepEqual(drafts[0].summary.fields.find((f) => f.label === "客戶")?.value, "毅進團體服", "card shows the name, not the id");
+  assert.deepEqual(drafts[0].summary.fields.find((f) => f.label === "客戶")?.value, "億豐紡織", "card shows the name, not the id");
 });
 
 test("a failed attempt's drafts are discarded; only the answering attempt's draft survives", async () => {
@@ -202,7 +202,7 @@ test("a failed attempt's drafts are discarded; only the answering attempt's draf
 test("an invalid draft is reported to the model and not collected", async () => {
   const { ctx } = setup();
   const drafts: Draft[] = [];
-  const foreign = toolCall("create_order", { customer_id: "c0000000-0000-4000-8000-000000000099", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
+  const foreign = toolCall("create_order", { customer_id: "c1000000-0000-4000-8000-000000000099", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] });
   const a = scripted("a", foreign, reply("找不到此客戶"));
   await runSubAgent("commercial", "建立訂單", ALL_TOOLS, ctx, [], { models: [a], drafts });
   assert.equal(drafts.length, 0, "another organization's customer cannot be drafted");

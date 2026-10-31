@@ -14,10 +14,10 @@ import { createFakeSupabase, type Tables } from "../evals/fake-supabase.js";
 
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const basic: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 
 test("when every model fails, the user gets a polite reply and the error stays in the trace", async () => {
-  const { client, writes } = createFakeSupabase(basic, USER_ID);
+  const { client, writes } = createFakeSupabase(fixtures, USER_ID);
   const broken = new MockLanguageModelV1({
     modelId: "broken",
     defaultObjectGenerationMode: "json",
@@ -33,12 +33,12 @@ test("when every model fails, the user gets a polite reply and the error stays i
 });
 
 test("a failure before the agent (an invalid organization) still fails the request", async () => {
-  const { client } = createFakeSupabase(basic, USER_ID);
+  const { client } = createFakeSupabase(fixtures, USER_ID);
   await assert.rejects(handleQuery(client, { message: "列出訂單", organizationId: "not-an-organization" }));
 });
 
 test("the trace records which prompts produced the reply", async () => {
-  const { client, writes } = createFakeSupabase(basic, USER_ID);
+  const { client, writes } = createFakeSupabase(fixtures, USER_ID);
   const script = [
     JSON.stringify({ agents: ["commercial"], tasks: { commercial: "列出訂單" } }),
     "目前有 3 張訂單。",

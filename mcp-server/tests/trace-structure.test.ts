@@ -30,7 +30,7 @@ const collector: SpanProcessor = {
 startTracing({ environment: "test", sampleRate: 1, mask: false, processor: collector });
 after(() => shutdownTracing());
 
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const roles: Record<string, FakeAccess> = JSON.parse(readFileSync(new URL("../evals/fixtures/roles.json", import.meta.url), "utf8"));
 
 const type = (s: ReadableSpan) => s.attributes["langfuse.observation.type"];

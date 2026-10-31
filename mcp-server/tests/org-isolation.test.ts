@@ -16,7 +16,7 @@ const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
 const FOREIGN = /0000000000099|他組織|ORD-OTHER|PO-OTHER|SH-OTHER/;
 
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 
 function setup() {
   const fake = createFakeSupabase(fixtures, USER_ID);
@@ -31,8 +31,8 @@ const READ_CALLS: [string, Record<string, unknown>][] = [
   ["list_customers", {}],
   ["list_customers", { search: "他組織" }],
   ["list_orders", {}],
-  ["list_products", { search: "藍0922" }],
-  ["get_inventory_summary", { search: "藍0922" }],
+  ["list_products", { search: "藍" }],
+  ["get_inventory_summary", { search: "藍" }],
   ["get_low_stock_alerts", {}],
   ["list_purchase_orders", {}],
   ["list_shippings", {}],
@@ -40,7 +40,7 @@ const READ_CALLS: [string, Record<string, unknown>][] = [
   ["list_shelves", { include_inactive: true }],
   ["list_receivings", {}],
   ["list_inventory_rolls", {}],
-  ["list_inventory_rolls", { search: "藍0922" }],
+  ["list_inventory_rolls", { search: "藍" }],
   ["list_inventory_rolls", { roll_number: "R" }],
 ];
 
@@ -62,11 +62,11 @@ for (const [name, args] of READ_CALLS) {
 
 test("get_* by id cannot read another organization's record", async () => {
   const foreign: [string, Record<string, string>][] = [
-    ["get_customer", { customer_id: "c0000000-0000-4000-8000-000000000099" }],
-    ["get_order", { order_id: "d0000000-0000-4000-8000-000000000099" }],
-    ["get_product", { product_id: "a0000000-0000-4000-8000-000000000099" }],
-    ["get_purchase_order", { purchase_order_id: "e0000000-0000-4000-8000-000000000099" }],
-    ["get_shipping", { shipping_id: "b0000000-0000-4000-8000-000000000099" }],
+    ["get_customer", { customer_id: "c1000000-0000-4000-8000-000000000099" }],
+    ["get_order", { order_id: "d1000000-0000-4000-8000-000000000099" }],
+    ["get_product", { product_id: "a1000000-0000-4000-8000-000000000099" }],
+    ["get_purchase_order", { purchase_order_id: "e1000000-0000-4000-8000-000000000099" }],
+    ["get_shipping", { shipping_id: "b1000000-0000-4000-8000-000000000099" }],
   ];
   for (const [name, args] of foreign) {
     const result = await tool(name).run(setup().ctx, args);
@@ -76,25 +76,25 @@ test("get_* by id cannot read another organization's record", async () => {
 
 test("writes cannot reference another organization's records", async () => {
   const { ctx, writes } = setup();
-  const order = await tool("create_order").run(ctx, { customer_id: "c0000000-0000-4000-8000-000000000099" });
+  const order = await tool("create_order").run(ctx, { customer_id: "c1000000-0000-4000-8000-000000000099" });
   assert.equal(order.ok, false);
   const po = await tool("create_purchase_order").run(ctx, {
-    factory_id: "f0000000-0000-4000-8000-000000000001",
-    items: [{ product_id: "a0000000-0000-4000-8000-000000000099", ordered_quantity: 10, unit_price: 5 }],
+    factory_id: "f1000000-0000-4000-8000-000000000002",
+    items: [{ product_id: "a1000000-0000-4000-8000-000000000099", ordered_quantity: 10, unit_price: 5 }],
   });
   assert.equal(po.ok, false);
-  const status = await tool("update_order_status").run(ctx, { order_id: "d0000000-0000-4000-8000-000000000099", status: "cancelled" });
+  const status = await tool("update_order_status").run(ctx, { order_id: "d1000000-0000-4000-8000-000000000099", status: "cancelled" });
   assert.equal(status.ok, false);
   // Item changes are merged with the current lines before the API call; a foreign parent is
   // refused there, before its lines are read.
   for (const [name, args] of [
-    ["update_order", { order_id: "d0000000-0000-4000-8000-000000000099", remove_product_ids: ["a0000000-0000-4000-8000-000000000001"] }],
-    ["update_purchase_order", { purchase_order_id: "e0000000-0000-4000-8000-000000000099", remove_product_ids: ["a0000000-0000-4000-8000-000000000001"] }],
-    ["update_shipping", { shipping_id: "b0000000-0000-4000-8000-000000000099", remove_roll_ids: ["a0000000-0000-4000-8000-000000000001"] }],
+    ["update_order", { order_id: "d1000000-0000-4000-8000-000000000099", remove_product_ids: ["a1000000-0000-4000-8000-000000000001"] }],
+    ["update_purchase_order", { purchase_order_id: "e1000000-0000-4000-8000-000000000099", remove_product_ids: ["a1000000-0000-4000-8000-000000000001"] }],
+    ["update_shipping", { shipping_id: "b1000000-0000-4000-8000-000000000099", remove_roll_ids: ["a1000000-0000-4000-8000-000000000001"] }],
   ] as const) {
     const r = await tool(name).draft!(ctx, args);
     assert.equal(r.ok, false, `${name} drafted a change to a foreign record`);
   }
   assert.equal(writes.filter((w) => w.op === "insert").length, 0, "no rows inserted");
-  assert.ok(!writes.some((w) => w.ids?.includes("d0000000-0000-4000-8000-000000000099")), "foreign order was not updated");
+  assert.ok(!writes.some((w) => w.ids?.includes("d1000000-0000-4000-8000-000000000099")), "foreign order was not updated");
 });
