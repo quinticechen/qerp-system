@@ -201,7 +201,8 @@ export function wilson(p: number, n: number): [number, number] {
   return [Math.max(0, center - half), Math.min(1, center + half)];
 }
 
-function costOf(r: RunResult): number | null {
+/** A run's model cost in US$ (all attempts), or null when no call reported a cost. */
+export function costOf(r: RunResult): number | null {
   const costs = r.attempts.flatMap((a) => a.calls).map((c) => c.costUsd).filter((c): c is number => c !== null);
   return costs.length ? costs.reduce((a, b) => a + b, 0) : null;
 }

@@ -12,6 +12,8 @@ import { join } from "node:path";
 import { CATEGORIES, loadSnapshot, parseItems, saveSnapshot, unscoredReason, type DatasetItem, type EvalCase } from "../evals/cases.js";
 import { judgePrompt, POLICIES } from "../evals/judge.js";
 import { evaluateRun, kindPassed, type RunOutput } from "../evals/checks.js";
+import { meanCost } from "../evals/experiment.js";
+import type { RunResult } from "../evals/report.js";
 import type { Draft } from "../src/tools/types.js";
 
 const KNOWN = { tools: ["create_order", "list_customers"], roles: ["owner", "editor", "viewer"] };
@@ -166,4 +168,11 @@ test("the judge sees the policy, the conversation without card rows, the reply a
   assert.match(user, /使用者：幫我開張單\nQuery：請問客戶？/);
   assert.doesNotMatch(user, /建立客戶/, "card rows are UI only");
   assert.match(user, /建立訂單（客戶：永泰布行）/);
+});
+
+test("cost_usd is the mean cost of one run, across all of its model attempts", () => {
+  const run = (...costs: (number | null)[]) => ({ attempts: [{ calls: costs.map((costUsd) => ({ costUsd })) }] }) as unknown as RunResult;
+  assert.equal(meanCost([run(0.001, 0.002), run(0.003)]), 0.003, "(0.003 + 0.003) / 2 runs");
+  assert.equal(meanCost([run(0.002), run(null)]), 0.002, "a run without a reported cost is left out");
+  assert.equal(meanCost([run(null)]), null);
 });

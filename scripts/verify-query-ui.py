@@ -69,6 +69,10 @@ def shot(page, name: str) -> str:
     page.screenshot(path=str(path))
     return str(path)
 
+def _center(box: dict) -> tuple[float, float]:
+    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+
+
 def check(label: str, ok: bool, page=None, snap: str = "") -> bool:
     results.append((PASS if ok else FAIL, label))
     print(f"  {'✅' if ok else '❌'}  {label}")
@@ -361,6 +365,18 @@ def run(base_url: str, email: str, password: str, token: str, headless: bool) ->
             page.locator("button[aria-label='歷史紀錄']").click()
             history_open = page.get_by_text("對話紀錄", exact=True).is_visible()
             check("History opens the conversation list", history_open, page, "09b_history")
+
+            # Scroll the list with the mouse wheel; the last conversation must end up inside the popover.
+            popover = page.locator("[data-radix-popper-content-wrapper]").last
+            last_row = popover.locator(".py-1 > *").last
+            if last_row.count() > 0:
+                page.mouse.move(*_center(popover.bounding_box()))
+                for _ in range(15):
+                    page.mouse.wheel(0, 400)
+                page.wait_for_timeout(300)
+                row_box, pop_box = last_row.bounding_box(), popover.bounding_box()
+                reachable = row_box["y"] + row_box["height"] <= pop_box["y"] + pop_box["height"] + 1
+                check("History list scrolls to the oldest conversation", reachable, page, "09c_history_scrolled")
             page.keyboard.press("Escape")
 
             page.locator("button[aria-label='新增對話']").click()

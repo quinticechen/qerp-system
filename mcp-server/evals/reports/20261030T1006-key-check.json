@@ -1,0 +1,300 @@
+{
+  "version": 3,
+  "id": "20261030T1006-key-check",
+  "label": "key-check",
+  "createdAt": "2026-10-30T10:06:35.617Z",
+  "filter": "q-list-customers",
+  "runs": 1,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:warehouse": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:catalog": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:facilities": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "summary": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "84e0c60c",
+      "prompt.commercial": "2a3a3be2",
+      "prompt.supply_chain": "d447db3a",
+      "prompt.warehouse": "266a35eb",
+      "prompt.catalog": "c507efb5",
+      "prompt.facilities": "f5d1927b",
+      "prompt.summary": "c87b8ca8",
+      "prompt.for_summary_note": "39f053c2",
+      "tools": "36f165dd",
+      "cases": "162f02f3",
+      "fixtures": "253c65b3"
+    },
+    "git": {
+      "commit": "bb1dd49",
+      "dirty": true
+    }
+  },
+  "dataset": {
+    "name": "query-agent",
+    "version": null,
+    "snapshot": "20261014T1611-502aa148.json"
+  },
+  "dbCheck": "skipped",
+  "cases": [
+    {
+      "id": "q-list-customers",
+      "itemId": "q-list-customers",
+      "name": "查詢所有客戶",
+      "category": "正常",
+      "domain": "customer",
+      "expectsDraft": false
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 1,
+    "taskCompletionCI": [
+      0.20654329147389294,
+      1
+    ],
+    "rules": 1,
+    "outcome": 1,
+    "writeCompletion": null,
+    "toolSelection": 1,
+    "routing": 1,
+    "toolConfusion": [],
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "正常": 1
+    },
+    "policyJudge": null,
+    "policyJudgeByCategory": {},
+    "byDomain": {
+      "customer": 1
+    },
+    "latencyMs": {
+      "avg": 2644,
+      "p50": 2644,
+      "p90": 2644,
+      "max": 2644
+    },
+    "phaseLatencyMs": {
+      "agent:commercial": {
+        "p50": 1540,
+        "p90": 1540
+      },
+      "router": {
+        "p50": 1100,
+        "p90": 1100
+      }
+    },
+    "totalCostUsd": 0.0006202,
+    "costPerCompletedTask": 0.0006202,
+    "avgInputTokens": 5982,
+    "avgOutputTokens": 55
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "unit": "ratio",
+      "value": 1,
+      "min": 0.85,
+      "pass": true
+    },
+    {
+      "id": "rules",
+      "label": "不可違反的規則",
+      "unit": "ratio",
+      "value": 1,
+      "min": 1,
+      "pass": true
+    },
+    {
+      "id": "latency",
+      "label": "平均延遲",
+      "unit": "ms",
+      "value": 2644,
+      "max": 10000,
+      "pass": true
+    }
+  ],
+  "results": [
+    {
+      "caseId": "q-list-customers",
+      "run": 1,
+      "reply": "- Chen\n- Chen1\n- Client name test0922\n- 永泰布行",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢所有客戶"
+        }
+      },
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "latencyMs": 2644,
+      "routeFromFallback": false,
+      "modelErrors": [],
+      "startedAt": 1793354795618,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793354795620,
+          "durationMs": 1100,
+          "calls": [
+            {
+              "startedAt": 1793354795622,
+              "durationMs": 1097,
+              "inputTokens": 867,
+              "outputTokens": 24,
+              "costUsd": 0.0000963,
+              "provider": "Google AI Studio"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793354796721,
+          "durationMs": 1540,
+          "calls": [
+            {
+              "startedAt": 1793354796722,
+              "durationMs": 800,
+              "inputTokens": 2363,
+              "outputTokens": 10,
+              "costUsd": 0.0002403,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1793354797527,
+              "durationMs": 733,
+              "inputTokens": 2752,
+              "outputTokens": 21,
+              "costUsd": 0.0002836,
+              "provider": "Google AI Studio"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1793354797527,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1793354798260,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "kind": "rule",
+          "check": "rule_no_error",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_write",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_id_leak",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_false_draft",
+          "pass": true,
+          "detail": "回覆提到確認卡片，但沒有草稿"
+        },
+        {
+          "kind": "rule",
+          "check": "rule_permission",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_latency",
+          "pass": true,
+          "detail": "2.6s"
+        },
+        {
+          "kind": "outcome",
+          "check": "no draft",
+          "pass": true,
+          "detail": "草稿：（無）"
+        },
+        {
+          "kind": "outcome",
+          "check": "answer includes「Client name test0922」",
+          "pass": true
+        },
+        {
+          "kind": "outcome",
+          "check": "answer includes「永泰布行」",
+          "pass": true
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "routes to commercial",
+          "pass": true,
+          "detail": "commercial"
+        }
+      ],
+      "pass": true
+    }
+  ]
+}

@@ -6,7 +6,6 @@ import { ActionCard } from './ActionCard';
 import { MessageFeedback } from './MessageFeedback';
 import { useQueryChat, QuerySession } from '@/hooks/useQueryChat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -326,7 +325,7 @@ function SessionHistoryPanel({
       {sessions.length === 0 ? (
         <p className="px-3 py-6 text-center text-xs text-gray-400">還沒有對話紀錄</p>
       ) : (
-        <ScrollArea className="max-h-80">
+        <div className="max-h-80 overflow-y-auto overscroll-contain">
           <div className="py-1">
             {sessions.map((session) => (
               <SessionRow
@@ -339,7 +338,7 @@ function SessionHistoryPanel({
               />
             ))}
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );
