@@ -87,11 +87,14 @@ function parseArgs() {
   if (primary) policy = { default: [primary, ...MODEL_PRIORITY.filter((id) => id !== primary)] };
 
   return {
-    runs: Number(get("--runs") ?? 3),
+    // One run per case: with a stable model gateway every run of a case agreed (2026-10-31). A case that
+    // regresses against the baseline runs --confirm-runs more times before it is reported.
+    runs: Number(get("--runs") ?? 1),
+    confirmRuns: Number(get("--confirm-runs") ?? 2),
     filter: get("--filter"),
     label: get("--label") ?? "run",
     concurrency: Number(get("--concurrency") ?? 4),
-    minPass: Number(get("--min-pass") ?? 0.66), // 2 of 3 runs
+    minPass: Number(get("--min-pass") ?? 0.66), // 1 of 1 run; 2 of 3 with confirmation runs
     arch,
     policy,
     compare: get("--compare"),
@@ -314,20 +317,45 @@ async function main() {
   } else {
     results = await runLocally(cases, opts);
   }
-  process.stdout.write("\n");
-  Object.assign(console, restore);
-
-  const metrics = computeMetrics(caseInfos, results);
-  const report: EvalReport = {
-    version: 3, id, label: opts.label, createdAt, ...(opts.filter ? { filter: opts.filter } : {}),
-    runs: opts.runs, minPass: opts.minPass, manifest, dataset, dbCheck: opts.dbCheck ? "passed" : "skipped",
-    cases: caseInfos, metrics, gates: evaluateGates(metrics), results,
-    ...(langfuseRuns ? { langfuse: { ...(experimentUrl ? { experimentUrl } : {}), runs: langfuseRuns } } : {}),
+  const buildReport = (all: RunResult[]): EvalReport => {
+    const metrics = computeMetrics(caseInfos, all);
+    return {
+      version: 3, id, label: opts.label, createdAt, ...(opts.filter ? { filter: opts.filter } : {}),
+      runs: opts.runs, minPass: opts.minPass, manifest, dataset, dbCheck: opts.dbCheck ? "passed" : "skipped",
+      cases: caseInfos, metrics, gates: evaluateGates(metrics), results: all,
+      ...(langfuseRuns ? { langfuse: { ...(experimentUrl ? { experimentUrl } : {}), runs: langfuseRuns } } : {}),
+    };
   };
-
   const baseline = opts.compare
     ? loadReport(join(REPORTS_DIR, opts.compare.endsWith(".json") ? opts.compare : `${opts.compare}.json`))
     : existsSync(REPORTS_DIR) ? findBaseline(REPORTS_DIR, { id, manifest }) : null;
+
+  // Confirmation runs: a case that went ✅ → ❌ runs again, locally, so one unlucky run is not reported
+  // as a regression. They decide the case's status only; the metrics stay on the first runs.
+  const suspects = baseline && opts.confirmRuns > 0 ? compareReports(baseline, buildReport(results)).regressed : [];
+  if (suspects.length) {
+    process.stdout.write(`\n確認退步（每案再跑 ${opts.confirmRuns} 次）：${suspects.join(", ")}\n`);
+    const byId = new Map(cases.map((c) => [c.id, c]));
+    let next = 0;
+    const extra: RunResult[] = [];
+    const workers = Array.from({ length: Math.min(opts.concurrency, suspects.length) }, async () => {
+      while (next < suspects.length) {
+        const c = byId.get(suspects[next++])!;
+        for (let i = 1; i <= opts.confirmRuns; i++) {
+          const r = await runOnce(c, opts.runs + i, opts.arch, opts.policy, opts.judge);
+          process.stdout.write(r.pass ? "." : "F");
+          extra.push({ ...r, confirm: true });
+        }
+      }
+    });
+    await Promise.all(workers);
+    results = [...results, ...extra];
+  }
+  process.stdout.write("\n");
+  Object.assign(console, restore);
+
+  const report = buildReport(results);
+  const metrics = report.metrics;
   if (opts.compare && !baseline) console.log(`--compare ${opts.compare} 不是 version 3 的報告，不比較`);
   const comparison = baseline ? compareReports(baseline, report) : null;
 

@@ -18,7 +18,7 @@ The Langfuse dataset `query-agent` has 102 cases (unchanged since 2026-10-14). T
 
 1. **Test what code decides with deterministic tests, not the LLM eval.** Which role gets which tool is decided by code (`auth-guard.ts` and `user_has_organization_permission()`). It is covered by `tests/auth-guard.test.ts` per role. The LLM eval only checks how the Agent *replies* without a permission: 2–3 cases per role.
 2. **Set minimum counts from a coverage table** (§3), instead of picking one total.
-3. **Use enough cases to measure.** Every slice that has a gate (write cases, 沒有權限) needs at least 20 cases. With 10 cases, one failure moves the rate by 10 points. Architecture and model comparisons run each case 3 times and compare per case.
+3. **Use enough cases to measure.** Every slice that has a gate (write cases, 沒有權限) needs at least 20 cases. With 10 cases, one failure moves the rate by 10 points. Architecture and model comparisons compare per case. ~~Each case runs 3 times.~~ Changed 2026-10-31 (user): one run per case, and a case that regresses against the baseline runs 2 more times before it is reported. Single runs agreed with 3 runs to within 2 points ([QUERY_AGENT_EVALS.md](../QUERY_AGENT_EVALS.md) §1).
 4. **Grow the set from production.** Replies that got a thumbs down, failed or fell back become `source: incident` cases after review.
 5. **Work split:**
    - The AI Session drafts cases (`source: generated`) and the rubric.
@@ -262,7 +262,7 @@ These show why the judge decides nothing until it agrees with the TPM's labels (
 | 3 | Draft the cases for the gaps in §3, in batches by sub-agent group, as Langfuse items with `source: generated`, without `reviewed_by` | AI Session | Batch 1, cross-flow: `gen-cross-01`–`15` added 2026-10-30 (§3.5) |
 | 4 | Review each batch in Langfuse; set `reviewed_by` | TPM | |
 | 5 | §3.4: add `answer_includes` and units to existing cases | AI Session drafts, TPM reviews | |
-| 6 | Put the rubric into the judge (`evals/judge.ts`); new baseline with 3 runs per case | AI Session | |
+| 6 | Put the rubric into the judge (`evals/judge.ts`); new baseline (one run per case, confirmation runs for regressions) | AI Session | |
 | 7 | Labeling queue `policy-calibration`: clear the 50 old-architecture items (confirm first), refill from the new baseline, label | AI Session / TPM | |
 | 8 | Calibrate the judge to ≥ 85% agreement; the TPM decides whether it joins the gates | AI Session / TPM | |
 | 9 | Per-node model comparison on the new set (EVAL_REDESIGN §8; candidates include `typesafe/jev-router`) | AI Session | |

@@ -55,6 +55,11 @@ export interface RunResult {
   steps: RunStep[];
   /** LLM judge on the reply policy (evals/judge.ts); recorded only. null = not judged or the judge failed. */
   judge?: JudgeVerdict | null;
+  /**
+   * A confirmation run: the case regressed against the baseline in its first run, so it ran again.
+   * Counts toward the case's status, never toward the metrics (only failing cases get them).
+   */
+  confirm?: boolean;
 }
 
 // ── Report ────────────────────────────────────────────────────────────────────
@@ -241,7 +246,7 @@ function judgeMetrics(runs: RunResult[], category: (r: RunResult) => string): Pi
 
 export function computeMetrics(cases: CaseInfo[], results: RunResult[]): Metrics {
   const byId = new Map(cases.map((c) => [c.id, c]));
-  const scored = results.filter((r) => byId.has(r.caseId) && !byId.get(r.caseId)!.unscored);
+  const scored = results.filter((r) => !r.confirm && byId.has(r.caseId) && !byId.get(r.caseId)!.unscored);
   const withDiag = (prefix: string) => scored.filter((r) => r.checks.some((c) => c.kind === "diagnostic" && c.check.startsWith(prefix)));
   const diagPass = (prefix: string) => (r: RunResult) => r.checks.filter((c) => c.kind === "diagnostic" && c.check.startsWith(prefix)).every((c) => c.pass);
 
@@ -395,6 +400,14 @@ export function gateRequirement(g: Pick<GateResult, "unit" | "min" | "max">): st
   return g.min !== undefined ? `≥ ${fmt(g.min)}` : `≤ ${fmt(g.max!)}`;
 }
 
+/** Which cases got confirmation runs (they regressed in their first run), for the report header. */
+function confirmedLine(report: EvalReport): string[] {
+  const ids = [...new Set(report.results.filter((r) => r.confirm).map((r) => r.caseId))];
+  if (!ids.length) return [];
+  const statuses = caseStatuses(report);
+  return [`- 退步確認：首次執行退步的案例再跑 ${report.results.filter((r) => r.confirm && r.caseId === ids[0]).length} 次（不計入指標）：${ids.map((id) => `\`${id}\` ${statuses.get(id)}`).join("、")}`];
+}
+
 export function buildMarkdown(report: EvalReport, comparison: Comparison | null): string {
   const { metrics: m, manifest } = report;
   const statuses = caseStatuses(report);
@@ -404,6 +417,7 @@ export function buildMarkdown(report: EvalReport, comparison: Comparison | null)
     "",
     `- 報告：\`${report.id}\`（${report.createdAt}）`,
     `- 案例：${report.cases.length}（每案 ${report.runs} 次）；案例通過門檻 ${Math.round(report.minPass * 100)}%${report.filter ? `；篩選 \`${report.filter}\`` : ""}`,
+    ...confirmedLine(report),
     `- Dataset：\`${report.dataset.name}\`${report.dataset.version ? ` 版本 ${report.dataset.version}` : "（最新）"}；快照 \`${report.dataset.snapshot}\``,
     `- 資料庫一致性檢查：${report.dbCheck === "passed" ? "通過" : "略過（不會被當成基準）"}`,
     `- Prompt：${manifest.prompts ? `Langfuse 標籤 \`${manifest.prompts.label}\`（${Object.entries(manifest.prompts.versions).map(([n, v]) => `${n} v${v}`).join("、")}）` : "程式內建"}`,

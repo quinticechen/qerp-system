@@ -15,9 +15,9 @@ on:
         required: true
         default: production
       runs:
-        description: 每個案例執行幾次
+        description: 每個案例執行幾次（退步的案例會自動再跑 2 次確認）
         required: true
-        default: "3"
+        default: "1"
       filter:
         description: 只跑 id 包含這段文字的案例（空白 = 全部）
         required: false
