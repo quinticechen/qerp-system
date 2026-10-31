@@ -1,6 +1,6 @@
 # AI Query Assistant (Query Agent)
 
-> Current-state document (2026-10-16), maintained by the **AI Session** ([SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §1). This document is a summary; for design and planning see [QUERY_AGENT_PHASE0.md](./requirements/QUERY_AGENT_PHASE0.md), [QUERY_AGENT_PHASE1.md](./requirements/QUERY_AGENT_PHASE1.md), [QUERY_AGENT_ARCHITECTURE_EVAL.md](./requirements/QUERY_AGENT_ARCHITECTURE_EVAL.md), [QUERY_AGENT_TPM_ALIGNMENT.md](./requirements/QUERY_AGENT_TPM_ALIGNMENT.md).
+> Current-state document (2026-10-31), maintained by the **AI Session** ([SESSION_COORDINATION.md](./SESSION_COORDINATION.md) §1). This document is a summary; for design and planning see [QUERY_AGENT_PHASE0.md](./requirements/QUERY_AGENT_PHASE0.md), [QUERY_AGENT_PHASE1.md](./requirements/QUERY_AGENT_PHASE1.md), [QUERY_AGENT_ARCHITECTURE_EVAL.md](./requirements/QUERY_AGENT_ARCHITECTURE_EVAL.md), [QUERY_AGENT_TPM_ALIGNMENT.md](./requirements/QUERY_AGENT_TPM_ALIGNMENT.md).
 
 ## 1. Architecture
 
@@ -17,9 +17,10 @@ mcp-server (Cloud Run)
    │    ├─ warehouse (📦 inventory and shipping)
    │    ├─ catalog (🧵 products)
    │    └─ facilities (🗄️ factories and shelves)
+   ├─ summary: when more than one sub-agent ran, merges their results into one reply (`summary.ts`); with one sub-agent, its reply is used as is
    ├─ tools: query Supabase with the user's JWT, always limited to the current organization
    ├─ write tools: only create pending actions (query_pending_actions), which run after the user confirms
-   ├─ gateway: falls back through models in order when one fails; when a model calls a tool it doesn't have, replies "沒有權限" (no permission) or "Query 現在還沒有這個功能" (Query can't do this yet) (TPM §3.4) instead of failing the request
+   ├─ gateway: falls back through models in order when one fails (an attempt is limited to 30 seconds, 8 for the router; 90 seconds for the whole request); when a model calls a tool it doesn't have, replies "沒有權限" (no permission) or "Query 現在還沒有這個功能" (Query can't do this yet) (TPM §3.4) instead of failing the request
    ├─ on failure: an Agent error never returns 500; it replies with a friendly Chinese message and records the error in the trace (TPM §3.4)
    ├─ trace: each reply's models, tool calls and latency are written to query_traces
    └─ Langfuse: a trace of the same request (PII removed, sampled; see below)
@@ -27,7 +28,7 @@ mcp-server (Cloud Run)
 
 Models are called through OpenRouter and fall back in order ([SERVICES.md](./SERVICES.md)). The router and sub-agent system prompts are read from the `production` label in Prompt Management through the Langfuse SDK (cached for 60 seconds), falling back to the in-code version when they can't be read; for the release process see [requirements/QUERY_AGENT_EVAL_REDESIGN.md](./requirements/QUERY_AGENT_EVAL_REDESIGN.md) §5.2.
 
-**Langfuse tracing** (`mcp-server/src/agent/langfuse.ts`, [QUERY_AGENT_LANGFUSE.md](./requirements/QUERY_AGENT_LANGFUSE.md)): each `/query` is one trace (user; the Query conversation as the session; nodes as tags), and the trace id is derived from `query_traces.id`; each model call is recorded as a generation by the AI SDK's telemetry and linked to the prompt version that produced it. Production content is de-identified first: phone numbers and emails become `[電話]` and `[Email]`, `contact_person` and `address` in tool results become `[聯絡人]` and `[地址]`, and the same values are also replaced wherever they appear in replies within the same request. Sampling: every failed or degraded request is sent, and 5% of the rest by trace id (adjustable with `LANGFUSE_SAMPLE_RATE`). Without Langfuse configured, it doesn't start and replies are unaffected.
+**Langfuse tracing** (`mcp-server/src/agent/langfuse.ts`, [QUERY_AGENT_LANGFUSE.md](./requirements/QUERY_AGENT_LANGFUSE.md)): each `/query` is one trace (user; the Query conversation as the session; nodes as tags), and the trace id is derived from `query_traces.id`. Each node is one observation (`router` and `summary` as chains, each sub-agent `agent:<group>` as an agent; `ai-gateway.ts`), so Langfuse draws router → sub-agents → summary; inside it, each model attempt is named after its model and each call is recorded as a generation by the AI SDK's telemetry, linked to the prompt version that produced it. Production content is de-identified first: phone numbers and emails become `[電話]` and `[Email]`, `contact_person` and `address` in tool results become `[聯絡人]` and `[地址]`, and the same values are also replaced wherever they appear in replies within the same request. Sampling: every failed or degraded request is sent, and 5% of the rest by trace id (adjustable with `LANGFUSE_SAMPLE_RATE`). Without Langfuse configured, it doesn't start and replies are unaffected.
 
 **Thumbs up / down**: icon buttons under each reply (`MessageFeedback`); `POST /query/messages/:id/feedback` stores it in `query_messages.metadata.feedback` and writes a `user-feedback` score to that reply's trace. If a thumbs-down reply was not sampled, the backend rebuilds its trace from `query_traces` and the conversation (also de-identified, masking the contact persons and addresses of every customer and factory in the organization; no model inputs or outputs).
 
@@ -49,15 +50,30 @@ Admin features (users, permissions, system settings) have no tools (Phase 0 D3).
 
 ### Known issues
 
-Latest eval (`20261016T0455-sdk-baseline`, 102 cases, Langfuse prompt `production` v1): overall task completion 85% (95% confidence interval 77%–91%), rules 99% (3 replies took over 30 seconds), write cases 80% — these two and the overall completion threshold did not pass; no-permission cases 100% and average latency 5.4 seconds passed.
+Released version (2026-10-31): router → sub-agents → summary, Langfuse prompts `query-router` / `query-agent-*` v2 and `query-summary` v1, code at the `staging` commit merged that day. It was evaluated as **this architecture only** (the single Agent was not rerun on the current cases): eval `20261031T0746-enriched-fixture-candidate`, 117 cases × 3 runs on the fake data checked against the database ([requirements/QUERY_AGENT_EVAL_COVERAGE.md](./requirements/QUERY_AGENT_EVAL_COVERAGE.md) §3.6–3.7):
 
-Compared with 91% on 2026-10-14 (`20261014T1630-phase1-agent-fixes`), the prompts and cases were the same and only the tool definitions and fake data differed: 11 regressed, 3 were fixed. Main causes:
+| Measure | Result | Threshold |
+|---------|--------|-----------|
+| Overall task completion | 95% (95% CI 89%–98%) | ≥ 85% ✅ |
+| Rules | 100% | 100% ✅ |
+| No-permission cases | 100% | 100% ✅ |
+| Write cases (draft expected) | 92% | 100% ❌ |
+| Average latency | 4.2 s (P50 3.5 s, P90 7.2 s) | ≤ 10 s ✅ |
 
-1. **Asking about optional fields**: after `create_product` and `add_product_color` gained the optional color code and safety stock, the model started asking "what safety stock?" and "what color code?" instead of creating the draft, violating "only ask about required fields" (E6)
-2. **Shelf names**: 「A區-01」 was split into name 「01」 and location 「A區」 (`create_shelf`); even when the receiving message said 「放 A區-01」 (put it on A區-01), the model still asked which shelf to use (`receive_inventory` requires `warehouse_id` on every roll)
-3. When one sentence is dispatched to several sub-agents, the other sub-agents reply "can't handle this" or produce extra content (cross-flow purchasing, receiving)
+The previous production version (no summary, prompts v1) scored 85% on the same 102 cases it shared with this set (`20261016T0455-sdk-baseline`); this version scored 93% on those cases (`20261020T1516-router-summary`). It was released before the failures below were fixed, on purpose: they are fixed next.
 
-Still failing: batch voiding creates cancel drafts directly; cross-flow order creation still creates a draft when the unit price is missing; 「永泰訂單改 100」 (change Yongtai's order to 100) doesn't list the orders to choose from.
+Failing cases (0 of 3 runs):
+
+1. `real-receiving-04` 「布卷 R-20261014-01 改放架子 B-02 品級變 B級」 ("move roll R-20261014-01 to shelf B-02, grade B"):
+   - the router also sends the message to facilities, which leaves an empty 修改貨架 (edit shelf) draft;
+   - the roll draft puts B-02 in the roll's position (`shelf`) instead of its shelf (`warehouse_id`), so the roll would stay on A區-01;
+   - write tools accept a draft that changes nothing.
+
+   The case only checks that a roll draft exists, so the wrong field passed.
+2. `real-purchase-05` 「改 P202609050001 預計到貨日改下週五」 ("move the expected arrival to next Friday"): asks for the date instead of working out next Friday.
+3. `real-order-07` (change an order's quantity), `real-cross-01` (an order plus a purchase order in one message), `q-no-id-leak` (lists factories when asked for their IDs).
+
+Cross-flow cases (15, not yet reviewed, so not scored) pass 24 of 45 runs: the reply misreads tool results, does not add up quantities across orders, or the summary guesses a number a sub-agent did not return (§3.5 of the coverage document).
 
 LLM scoring (recorded only) has not yet been calibrated against human labels ([QUERY_AGENT_EVALS.md](./QUERY_AGENT_EVALS.md) §3.2).
 

@@ -10,7 +10,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateText, generateObject, APICallError, NoSuchToolError, type ToolCallRepairFunction, type ToolSet } from "ai";
 import type { LanguageModelV1 } from "@ai-sdk/provider";
-import { propagateAttributes } from "@langfuse/tracing";
+import { propagateAttributes, startActiveObservation } from "@langfuse/tracing";
 import { normalizeToolName, type ModelCall, type QueryRun } from "./observer.js";
 import { TOOL_GROUPS } from "./permissions.js";
 import { tracingEnabled } from "./langfuse.js";
@@ -191,10 +191,40 @@ const repairToolCall: ToolCallRepairFunction<ToolSet> = async ({ toolCall, tools
 
 /**
  * AI SDK telemetry for one attempt: Langfuse records each provider call as a generation (model,
- * tokens, cost, input and output) under the request's trace (langfuse.ts).
+ * tokens, cost, input and output) under the request's trace (langfuse.ts). The attempt is named
+ * after its model — the phase is the observation around it (tracedPhase) — so a fallback reads
+ * as "agent:commercial → google/gemini-2.5-flash-lite, google/gemini-2.5-flash".
  */
 function telemetry(call: GatewayCall, modelId: string) {
-  return { isEnabled: tracingEnabled(), functionId: call.phase, metadata: { phase: call.phase, model: modelId } };
+  return { isEnabled: tracingEnabled(), functionId: modelId, metadata: { phase: call.phase, model: modelId } };
+}
+
+/**
+ * The phase as one Langfuse observation holding its model attempts and tool calls: a sub-agent
+ * ("agent:<group>") is an agent, the router and the summary are chains. Langfuse draws the
+ * request as router → sub-agents → summary from these.
+ */
+function tracedPhase<T>(call: GatewayCall, input: unknown, fn: () => Promise<T>, output: (result: T) => unknown): Promise<T> {
+  if (!tracingEnabled()) return fn();
+  const run = async (span: { update(attributes: Record<string, unknown>): unknown }): Promise<T> => {
+    span.update({ input, metadata: { phase: call.phase } });
+    try {
+      const result = await fn();
+      span.update({ output: output(result) });
+      return result;
+    } catch (err) {
+      span.update({ level: "ERROR", statusMessage: String(err instanceof Error ? err.message : err).slice(0, 500) });
+      throw err;
+    }
+  };
+  return call.phase.startsWith("agent:")
+    ? startActiveObservation(call.phase, run, { asType: "agent" })
+    : startActiveObservation(call.phase, run, { asType: "chain" });
+}
+
+/** What a phase was asked: the last message (the task or the user's message). */
+function phaseInput(options: { messages?: unknown; prompt?: unknown }): unknown {
+  return Array.isArray(options.messages) ? options.messages.at(-1) : options.prompt;
 }
 
 /** Runs fn with the phase as a trace tag and the prompt version linked to its generations. */
@@ -248,6 +278,10 @@ type GenerateTextResult = Awaited<ReturnType<typeof generateText>>;
  * meaningful on such a result.
  */
 export async function aiGenerateText(options: GenerateTextOptions, call: GatewayCall): Promise<GenerateTextResult> {
+  return tracedPhase(call, phaseInput(options as never), () => generateTextWithFallback(options, call), (r) => r.text);
+}
+
+function generateTextWithFallback(options: GenerateTextOptions, call: GatewayCall): Promise<GenerateTextResult> {
   return withFallback(call, async (model, abortSignal, modelId) => {
     let result: GenerateTextResult;
     try {
@@ -280,6 +314,10 @@ export async function aiGenerateText(options: GenerateTextOptions, call: Gateway
 
 /** generateObject（結構化輸出）with fallback. */
 export async function aiGenerateObject<T>(options: GenerateObjectOptions, call: GatewayCall): Promise<T> {
+  return tracedPhase(call, phaseInput(options as never), () => generateObjectWithFallback<T>(options, call), (r) => r);
+}
+
+function generateObjectWithFallback<T>(options: GenerateObjectOptions, call: GatewayCall): Promise<T> {
   return withFallback(call, async (model, abortSignal, modelId) => {
     const result = await generateObject({
       ...options,

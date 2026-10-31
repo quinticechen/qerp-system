@@ -18,7 +18,7 @@ const USAGE = { promptTokens: 1, completionTokens: 1 };
 const RAW = { rawPrompt: null, rawSettings: {} };
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const roles: Record<string, FakeAccess> = JSON.parse(readFileSync(new URL("../evals/fixtures/roles.json", import.meta.url), "utf8"));
 
 function recording(calls: LanguageModelV1CallOptions[], script: Generated[]): LanguageModelV1 {
@@ -34,14 +34,14 @@ async function setup(role = "owner") {
   return { ctx: { supabase: client, userId: access.userId, organizationId: access.organizationId }, allowed: access.allowedTools, writes };
 }
 
-const MESSAGE = "新增一張 Client name test0922 客戶的訂單給 Factory 092202 工廠";
+const MESSAGE = "新增一張 億豐紡織 客戶的訂單給 順大織廠 工廠";
 
 test("single agent: one model sees the original message and can use tools from both domains", async () => {
   const { ctx, allowed, writes } = await setup();
   const calls: LanguageModelV1CallOptions[] = [];
   const model = recording(calls, [
-    { toolCalls: [call("list_customers", { search: "test0922" }, "1"), call("list_factories", { search: "092202" }, "2")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
-    { toolCalls: [call("create_order", { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }, "3")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
+    { toolCalls: [call("list_customers", { search: "億豐" }, "1"), call("list_factories", { search: "順大" }, "2")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
+    { toolCalls: [call("create_order", { customer_id: "c1000000-0000-4000-8000-000000000003", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }, "3")], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
     { text: "已建立草稿，請在下方的確認卡片確認。", finishReason: "stop", usage: USAGE, rawCall: RAW },
   ]);
   const drafts: Draft[] = [];

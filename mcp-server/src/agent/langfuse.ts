@@ -198,6 +198,8 @@ export interface TracingOptions {
   sampleRate: number;
   /** De-identify span contents (real data). */
   mask: boolean;
+  /** Tests: receives the spans instead of Langfuse (no keys needed). */
+  processor?: SpanProcessor;
 }
 
 let sdk: NodeSDK | null = null;
@@ -206,9 +208,9 @@ let sampler: TailSamplingProcessor | null = null;
 /** Starts tracing once; false when Langfuse is not configured. */
 export function startTracing(options: TracingOptions): boolean {
   if (sdk) return true;
-  if (!langfuseConfigured()) return false;
+  if (!options.processor && !langfuseConfigured()) return false;
   sampler = new TailSamplingProcessor(
-    new LangfuseSpanProcessor({ environment: options.environment, release: process.env.K_REVISION }),
+    options.processor ?? new LangfuseSpanProcessor({ environment: options.environment, release: process.env.K_REVISION }),
     options.sampleRate,
     options.mask
   );

@@ -14,7 +14,7 @@ const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
 const OTHER_ORG_ID = "0e000000-0000-4000-8000-000000000099";
 
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const roles: Record<string, FakeAccess> = JSON.parse(readFileSync(new URL("../evals/fixtures/roles.json", import.meta.url), "utf8"));
 
 function clientFor(role: string, tables: Tables = fixtures) {
@@ -67,7 +67,7 @@ test("writes are scoped to the selected organization", async () => {
   const createOrder = getAllTools().find((t) => t.name === "create_order")!;
   const result = await createOrder.run(
     { supabase: client, userId: access.userId, organizationId: access.organizationId },
-    { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }
+    { customer_id: "c1000000-0000-4000-8000-000000000003", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }
   );
   assert.ok(result.ok);
   const call = writes.find((w) => w.op === "rpc" && w.table === "create_order");

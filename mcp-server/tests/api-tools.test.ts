@@ -14,7 +14,7 @@ import { FAKE_API_NAMES } from "../evals/fake-api.js";
 
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
-const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 const tool = (name: string) => getAllTools().find((t) => t.name === name)!;
 
 function setup() {
@@ -22,7 +22,7 @@ function setup() {
   return { ctx: { supabase: fake.client, userId: USER_ID, organizationId: ORG_ID } as ToolContext, writes: fake.writes };
 }
 
-const ORDER = { customer_id: "c0000000-0000-4000-8000-000000000003", items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 100, unit_price: 50 }], factory_ids: ["f0000000-0000-4000-8000-000000000001"] };
+const ORDER = { customer_id: "c1000000-0000-4000-8000-000000000003", items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 100, unit_price: 50 }], factory_ids: ["f1000000-0000-4000-8000-000000000002"] };
 
 test("every write tool is backed by an API dry run (draft) and the same API for real (confirm)", async () => {
   const { ctx, writes } = setup();
@@ -30,9 +30,9 @@ test("every write tool is backed by an API dry run (draft) and the same API for 
   assert.ok(drafted.ok);
   assert.equal(drafted.draft.summary.title, "建立訂單", "card title comes from the API");
   assert.deepEqual(drafted.draft.summary.fields, [
-    { label: "客戶", value: "Client name test0922" },
-    { label: "品項 1", value: "雲朵眠 test0922 - 藍0922（色號 BL-0922） × 100 公斤，單價 50" },
-    { label: "指定工廠", value: "Factory 092202" },
+    { label: "客戶", value: "億豐紡織" },
+    { label: "品項 1", value: "雲朵眠 - 藍 × 100 公斤，單價 50" },
+    { label: "指定工廠", value: "順大織廠" },
     { label: "訂單總額", value: "5000" },
   ], "same wording as the database's api_order_fields");
   assert.equal(writes.length, 0, "a draft writes nothing");

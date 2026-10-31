@@ -174,20 +174,47 @@ async function backfill(supabase: SupabaseClient, messageId: string, queryTraceI
     ...(row.status === "error" ? { level: "ERROR" as const } : {}),
   }, { asType: "agent", startTime: start, parentSpanContext: { traceId, spanId: randomBytes(8).toString("hex"), traceFlags: TraceFlags.SAMPLED } });
 
-  // Children with their recorded start times, so the timeline matches the request.
-  const parentSpanContext = root.otelSpan.spanContext();
+  // Same shape as a live trace (ai-gateway.ts tracedPhase): one observation per phase — an agent
+  // for "agent:<group>", a chain otherwise — holding its model attempts, named by model, and the
+  // agent's tool calls. Recorded start times keep the timeline.
+  const rootContext = root.otelSpan.spanContext();
   let at = start.getTime();
+  const phases: { phase: string; attempts: NonNullable<typeof row.attempts> }[] = [];
   for (const a of row.attempts ?? []) {
-    const attempt = startObservation(a.phase, {
-      model: a.model,
-      ...(a.error ? { level: "ERROR" as const, statusMessage: a.error } : {}),
-    }, { asType: "generation", startTime: new Date(at), parentSpanContext });
-    at += a.duration_ms;
-    attempt.end(new Date(at));
+    const last = phases.at(-1);
+    if (last?.phase === a.phase) last.attempts.push(a);
+    else phases.push({ phase: a.phase, attempts: [a] });
   }
-  for (const step of row.steps ?? []) {
+  for (const { phase, attempts } of phases) {
+    const phaseStart = new Date(at);
+    const failed = attempts.every((a) => a.error);
+    const attributes = { metadata: { phase }, ...(failed ? { level: "ERROR" as const } : {}) };
+    const placement = { startTime: phaseStart, parentSpanContext: rootContext };
+    const span = phase.startsWith("agent:")
+      ? startObservation(phase, attributes, { asType: "agent", ...placement })
+      : startObservation(phase, attributes, { asType: "chain", ...placement });
+    const parentSpanContext = span.otelSpan.spanContext();
+    for (const a of attempts) {
+      const attempt = startObservation(a.model, {
+        model: a.model,
+        ...(a.error ? { level: "ERROR" as const, statusMessage: a.error } : {}),
+      }, { asType: "generation", startTime: new Date(at), parentSpanContext });
+      at += a.duration_ms;
+      attempt.end(new Date(at));
+    }
+    const toolTime = new Date(at);
+    for (const step of (row.steps ?? []).filter((st) => `agent:${st.agent}` === phase)) {
+      for (const tool of step.tools) {
+        startObservation(tool.name, { input: mask(tool.args) }, { asType: "tool", startTime: toolTime, parentSpanContext }).end(toolTime);
+      }
+    }
+    span.end(new Date(at));
+  }
+  // Tool calls whose agent has no recorded attempt stay under the root.
+  const phaseNames = new Set(phases.map((ph) => ph.phase));
+  for (const step of (row.steps ?? []).filter((st) => !phaseNames.has(`agent:${st.agent}`))) {
     for (const tool of step.tools) {
-      startObservation(tool.name, { input: mask(tool.args), metadata: { agent: step.agent } }, { asType: "tool", startTime: end, parentSpanContext }).end(end);
+      startObservation(tool.name, { input: mask(tool.args), metadata: { agent: step.agent } }, { asType: "tool", startTime: end, parentSpanContext: rootContext }).end(end);
     }
   }
   root.end(end);

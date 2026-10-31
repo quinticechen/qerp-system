@@ -32,7 +32,7 @@ test("items become cases with defaults; archived items are skipped", () => {
   assert.deepEqual(cases.map((c) => c.id), ["a", "b"], "sorted by id");
   const a = cases[0];
   assert.equal(a.itemId, "lf-a");
-  assert.deepEqual(a.input, { role: "editor", fixtures: "basic", history: [], message: "幫永泰布行開單" });
+  assert.deepEqual(a.input, { role: "editor", fixtures: "real", history: [], message: "幫永泰布行開單" });
   assert.deepEqual(a.expected.draft, { tool: "create_order", fields: {} });
   assert.equal(a.name, "幫永泰布行開單", "the message names a case without a name");
 });
@@ -157,7 +157,7 @@ test("every situation category has a judge policy", () => {
 test("the judge sees the policy, the conversation without card rows, the reply and the drafts", () => {
   const c = evalCase({
     category: "資訊不足",
-    input: { role: "editor", fixtures: "basic", message: "永泰", history: [
+    input: { role: "editor", fixtures: "real", message: "永泰", history: [
       { role: "user", content: "幫我開張單" }, { role: "assistant", content: "請問客戶？" }, { role: "assistant", content: "建立客戶", kind: "action" },
     ] },
   });

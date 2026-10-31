@@ -1,5 +1,5 @@
 import { ToolName, AgentGroup, TOOL_GROUPS, GROUP_LABELS, ROUTABLE_GROUPS, filterByGroup } from "./permissions.js";
-import type { Draft, ToolContext } from "../tools/types.js";
+import type { ActionSummary, Draft, ToolContext } from "../tools/types.js";
 import { createAgentTools } from "./tool-registry.js";
 import { PROMPT_NAMES, systemPrompt, type PromptLink } from "./prompts.js";
 import { aiGenerateText, unavailableToolReply } from "./ai-gateway.js";
@@ -210,6 +210,32 @@ function permissionNote(scope: readonly ToolName[], available: readonly ToolName
 - 上方流程若需要這些工具，不要呼叫它們，直接告訴使用者目前帳號沒有這項操作的權限`;
 }
 
+/**
+ * Added to a sub-agent's prompt when it shares the message with others: its reply goes to the
+ * summary step (summary.ts), not the user (docs/requirements/QUERY_AGENT_EVAL_REDESIGN.md §8).
+ */
+export const FOR_SUMMARY_NOTE = `
+
+回報方式：
+- 這則訊息由多個助理分工處理。你的回覆不會直接給使用者，而是交給彙整步驟，由它寫成一則統一的回覆
+- 照常呼叫工具查詢、建立草稿；最後依下列格式簡短回報，沒有的項目寫「無」：
+查到的事實：（查到的資料，保留名稱、編號、數量與單位；列表照實列出）
+缺少的必填欄位：（要完成你負責的部分，使用者還需要提供的必填資訊）
+錯誤：（工具回傳的錯誤原文）`;
+
+/** What one sub-agent hands the summary step. */
+export interface SubAgentResult {
+  group: AgentGroup;
+  /** The part of the message this sub-agent handled. */
+  task: string;
+  /** The sub-agent's report: facts found and missing required fields (FOR_SUMMARY_NOTE). */
+  report: string;
+  /** Drafts it created, as their confirmation cards show them. */
+  drafts: ActionSummary[];
+  /** Error texts its tools returned (business-rule refusals included). */
+  toolErrors: string[];
+}
+
 interface AgentSpec {
   /** Observer / trace label: the group, or "all" for the single agent. */
   label: string;
@@ -230,12 +256,19 @@ export function replyForUnavailableTool(permitted: readonly ToolName[], toolName
   return exists && !permitted.includes(toolName as ToolName) ? NO_PERMISSION_REPLY : unavailableToolReply(toolName);
 }
 
+interface AgentOutcome {
+  text: string;
+  drafts: Draft[];
+  toolErrors: string[];
+}
+
 /** One agent: Vercel AI SDK generateText + maxSteps handles the tool loop. */
-async function runAgent(spec: AgentSpec, task: string, ctx: ToolContext, history: ConversationMessage[], run: QueryRun): Promise<string> {
+async function runAgent(spec: AgentSpec, task: string, ctx: ToolContext, history: ConversationMessage[], run: QueryRun): Promise<AgentOutcome> {
   const { observer } = run;
   // Writes become drafts. A failed attempt's drafts are discarded, so a fallback re-run doesn't
   // leave duplicate confirmation cards.
   let drafts: Draft[] = [];
+  let toolErrors: string[] = [];
   const tools = createAgentTools(ctx, spec.tools, { onDraft: (d) => drafts.push(d) });
   const messages: CoreMessage[] = [
     ...history.map((m) => ({ role: m.role, content: m.content } as CoreMessage)),
@@ -247,21 +280,22 @@ async function runAgent(spec: AgentSpec, task: string, ctx: ToolContext, history
     messages,
     tools,
     maxSteps: 10, // Vercel AI SDK 自動處理 tool call loop
-    onStepFinish: observer?.onStep
-      ? (step: any) =>
-          observer.onStep!(spec.label, {
-            toolCalls: (step.toolCalls ?? []).map((c: any) => ({ toolName: normalizeToolName(c.toolName), args: c.args })),
-            toolResults: (step.toolResults ?? []).map((r: any) => ({ toolName: normalizeToolName(r.toolName), result: r.result })),
-            promptTokens: step.usage?.promptTokens ?? 0,
-            completionTokens: step.usage?.completionTokens ?? 0,
-          })
-      : undefined,
+    onStepFinish: (step: any) => {
+      // The model sees a tool's data, or its error as plain text (tools/adapters.ts).
+      for (const r of step.toolResults ?? []) if (typeof r.result === "string") toolErrors.push(r.result);
+      observer?.onStep?.(spec.label, {
+        toolCalls: (step.toolCalls ?? []).map((c: any) => ({ toolName: normalizeToolName(c.toolName), args: c.args })),
+        toolResults: (step.toolResults ?? []).map((r: any) => ({ toolName: normalizeToolName(r.toolName), result: r.result })),
+        promptTokens: step.usage?.promptTokens ?? 0,
+        completionTokens: step.usage?.completionTokens ?? 0,
+      });
+    },
   } as any, {
     ...run,
     phase: `agent:${spec.label}`,
     prompt: spec.prompt,
     unavailableToolReply: (toolName: string) => replyForUnavailableTool(spec.permitted, toolName),
-    onAttemptFailed: () => { drafts = []; },
+    onAttemptFailed: () => { drafts = []; toolErrors = []; },
     // A reply that points to a confirmation card when none was drafted would mislead the user.
     validate: (text) => (drafts.length === 0 && CLAIMS_DRAFT.test(text) ? "回覆提到確認卡片，但沒有建立任何草稿" : null),
     // Some models stop silently after drafting; the card is what matters.
@@ -269,7 +303,7 @@ async function runAgent(spec: AgentSpec, task: string, ctx: ToolContext, history
   });
 
   run.drafts?.push(...drafts);
-  return result.text;
+  return { text: result.text, drafts, toolErrors };
 }
 
 /** 執行單一子 Agent（Router 架構） */
@@ -284,15 +318,36 @@ export async function runSubAgent(
   note = ""
 ): Promise<string> {
   const groupTools = filterByGroup(allowedTools, group);
-  if (groupTools.length === 0) {
-    return `你沒有${group === "admin" ? "系統管理" : GROUP_LABELS[group].replace(/^\S+ /, "")}相關功能的操作權限。`;
-  }
-  // The base prompt is read once per request (prompts.ts); fallback attempts reuse it.
+  if (groupTools.length === 0) return noGroupPermission(group);
   const base = await systemPrompt(PROMPT_NAMES.agent(group), AGENT_SYSTEM_PROMPTS[group], run);
-  return runAgent(
+  return (await runAgent(
     { label: group, system: base.text + permissionNote(TOOL_GROUPS[group], groupTools) + note, prompt: base.link, tools: groupTools, permitted: allowedTools },
     task, ctx, history, run
+  )).text;
+}
+
+function noGroupPermission(group: AgentGroup): string {
+  return `你沒有${group === "admin" ? "系統管理" : GROUP_LABELS[group].replace(/^\S+ /, "")}相關功能的操作權限。`;
+}
+
+/** A sub-agent sharing the message with others: it reports to the summary step (summary.ts). */
+export async function runSubAgentForSummary(
+  group: AgentGroup,
+  task: string,
+  allowedTools: ToolName[],
+  ctx: ToolContext,
+  history: ConversationMessage[] = [],
+  run: QueryRun = {},
+  note = ""
+): Promise<SubAgentResult> {
+  const groupTools = filterByGroup(allowedTools, group);
+  if (groupTools.length === 0) return { group, task, report: noGroupPermission(group), drafts: [], toolErrors: [] };
+  const base = await systemPrompt(PROMPT_NAMES.agent(group), AGENT_SYSTEM_PROMPTS[group], run);
+  const outcome = await runAgent(
+    { label: group, system: base.text + permissionNote(TOOL_GROUPS[group], groupTools) + note + FOR_SUMMARY_NOTE, prompt: base.link, tools: groupTools, permitted: allowedTools },
+    task, ctx, history, run
   );
+  return { group, task, report: outcome.text, drafts: outcome.drafts.map((d) => d.summary), toolErrors: outcome.toolErrors };
 }
 
 /** 單一 Agent：全部被授權的工具，處理使用者的原始訊息 */
@@ -306,8 +361,8 @@ export async function runSingleAgent(
   if (allowedTools.length === 0) return "很抱歉，你目前沒有任何操作權限。請聯繫系統管理員。";
   const scope = [...new Set(ROUTABLE_GROUPS.flatMap((g) => TOOL_GROUPS[g]))];
   const base = await systemPrompt(PROMPT_NAMES.single, SINGLE_AGENT_PROMPT, run);
-  return runAgent(
+  return (await runAgent(
     { label: "all", system: base.text + permissionNote(scope, allowedTools), prompt: base.link, tools: allowedTools, permitted: allowedTools },
     message, ctx, history, run
-  );
+  )).text;
 }

@@ -18,15 +18,15 @@ import { createFakeSupabase, type Tables } from "../evals/fake-supabase.js";
 const USER_ID = "0a000000-0000-4000-8000-000000000001";
 const ORG_ID = "0e000000-0000-4000-8000-000000000001";
 const SESSION_ID = "5e000000-0000-4000-8000-000000000001";
-const YONGTAI: Entity = { type: "customer", id: "c0000000-0000-4000-8000-000000000004", label: "永泰布行" };
+const YONGTAI: Entity = { type: "customer", id: "c1000000-0000-4000-8000-000000000001", label: "永泰布行" };
 
-const basic: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/basic.json", import.meta.url), "utf8"));
+const fixtures: Tables = JSON.parse(readFileSync(new URL("../evals/fixtures/real.json", import.meta.url), "utf8"));
 
 // ── Entity extraction ─────────────────────────────────────────────────────────
 
 test("a specific lookup (≤ 3 rows) yields entities; a browse does not", () => {
   assert.deepEqual(entitiesFromToolResult("list_customers", [{ id: YONGTAI.id, name: "永泰布行" }]), [YONGTAI]);
-  const many = basic.customers.slice(0, 4);
+  const many = fixtures.customers.slice(0, 4);
   assert.deepEqual(entitiesFromToolResult("list_customers", many), []);
 });
 
@@ -57,14 +57,14 @@ test("history entities: assistant messages only, later mentions win, at most 10"
 
 test("entity note is empty without entities, and lists ids otherwise", () => {
   assert.equal(entityNote([]), "");
-  assert.match(entityNote([YONGTAI]), /客戶：永泰布行（id: c0000000-0000-4000-8000-000000000004）/);
+  assert.match(entityNote([YONGTAI]), /客戶：永泰布行（id: c1000000-0000-4000-8000-000000000001）/);
 });
 
 // ── Server-side history ───────────────────────────────────────────────────────
 
 function withConversation(extraMessages: Record<string, unknown>[] = []): Tables {
   return {
-    ...basic,
+    ...fixtures,
     query_sessions: [{ id: SESSION_ID, user_id: USER_ID, organization_id: ORG_ID, title: "對話" }],
     query_messages: [
       { id: "m1", session_id: SESSION_ID, role: "user", content: "幫我找永泰布行", created_at: "2026-10-07T01:00:00Z", metadata: {} },
@@ -94,7 +94,7 @@ const RAW = { rawPrompt: null, rawSettings: {} };
 function rememberingModel(prompts: LanguageModelV1CallOptions["prompt"][]): LanguageModelV1 {
   const script: Generated[] = [
     { text: JSON.stringify({ agents: ["commercial"], tasks: { commercial: "幫永泰布行建立一張訂單" } }), finishReason: "stop", usage: USAGE, rawCall: RAW },
-    { toolCalls: [{ toolCallType: "function", toolCallId: "c1", toolName: "create_order", args: JSON.stringify({ customer_id: YONGTAI.id, items: [{ product_id: "a0000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }) }], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
+    { toolCalls: [{ toolCallType: "function", toolCallId: "c1", toolName: "create_order", args: JSON.stringify({ customer_id: YONGTAI.id, items: [{ product_id: "a1000000-0000-4000-8000-000000000001", quantity: 10, unit_price: 100 }] }) }], finishReason: "tool-calls", usage: USAGE, rawCall: RAW },
     { text: "已為永泰布行建立訂單草稿，請在下方確認。", finishReason: "stop", usage: USAGE, rawCall: RAW },
   ];
   let n = 0;
@@ -122,7 +122,7 @@ test("handleQuery reads history from the session, carries entities, and saves th
 
   assert.equal(response.reply, "已為永泰布行建立訂單草稿，請在下方確認。");
   const agentPrompt = JSON.stringify(prompts[1]);
-  assert.match(agentPrompt, /客戶：永泰布行（id: c0000000-0000-4000-8000-000000000004）/, "entity note in the system prompt");
+  assert.match(agentPrompt, /客戶：永泰布行（id: c1000000-0000-4000-8000-000000000001）/, "entity note in the system prompt");
   assert.match(agentPrompt, /找到客戶「永泰布行」/, "history comes from the session");
   assert.doesNotMatch(agentPrompt, /INJECTED/, "request.history is ignored when a session is given");
 
