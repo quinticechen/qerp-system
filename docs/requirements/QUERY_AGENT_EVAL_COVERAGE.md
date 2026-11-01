@@ -29,7 +29,7 @@ The Langfuse dataset `query-agent` has 102 cases (unchanged since 2026-10-14). T
 
 ### 3.1 Per tool (minimum: write tool 3 cases, read tool 2)
 
-The count is the number of cases that expect the tool, either as the draft or in `diagnostics.tools`. Write tools need three cases:
+The count is the number of cases that expect the tool: as the draft, in `expectedOutput.tools` (required, since 2026-10-31) or in `diagnostics.tools`. Write tools need three cases:
 
 - all required fields given;
 - a required field missing;

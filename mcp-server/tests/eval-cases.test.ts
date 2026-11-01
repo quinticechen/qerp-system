@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CATEGORIES, loadSnapshot, parseItems, saveSnapshot, unscoredReason, type DatasetItem, type EvalCase } from "../evals/cases.js";
 import { judgePrompt, POLICIES } from "../evals/judge.js";
-import { evaluateRun, kindPassed, type RunOutput } from "../evals/checks.js";
+import { evaluateRun, foreignNames, kindPassed, type RunOutput } from "../evals/checks.js";
 import { meanCost } from "../evals/experiment.js";
 import type { RunResult } from "../evals/report.js";
 import type { Draft } from "../src/tools/types.js";
@@ -46,10 +46,12 @@ test("every invalid item is reported at once, by its case id", () => {
     item("bad-role", { input: { role: "sales" } }),
     item("bad-tool", { expectedOutput: { draft: { tool: "delete_order" } } }),
     item("both", { expectedOutput: { draft: { tool: "create_order" }, no_draft: true } }),
+    item("bad-calls", { expectedOutput: { tools: ["list_customers", ["get_customer", "list_customers"]] } }),
     item("dup"), item("dup"),
   ], KNOWN);
   assert.deepEqual(cases.map((c) => c.id), ["dup"], "valid items still parse; the second dup does not");
-  assert.equal(errors.length, 5);
+  assert.equal(errors.length, 6);
+  assert.match(errors.find((e) => e.startsWith("bad-calls"))!, /expectedOutput\.tools：未知的工具「get_customer」/);
   assert.match(errors[0], /^w-create-order：metadata .*category/);
   assert.match(errors.find((e) => e.startsWith("bad-role"))!, /未知的角色「sales」/);
   assert.match(errors.find((e) => e.startsWith("bad-tool"))!, /未知的工具「delete_order」/);
@@ -91,9 +93,9 @@ const CTX = {
   toolPermissions: new Map([["list_customers", "canViewCustomers"], ["create_order", "canCreateOrders"], ["create_purchase_order", "canCreatePurchases"]]),
 };
 
-function evalCase(overrides: Partial<EvalCase> = {}): EvalCase {
+function evalCase(overrides: Omit<Partial<EvalCase>, "expected"> & { expected?: Partial<EvalCase["expected"]> } = {}): EvalCase {
   const [c] = parseItems([item("case")], KNOWN).cases;
-  return { ...c, ...overrides };
+  return { ...c, ...overrides, expected: { ...c.expected, ...overrides.expected } };
 }
 
 const orderDraft = (fields: Record<string, string>, tool = "create_order"): Draft =>
@@ -148,6 +150,51 @@ test("rules hold for every case, even when the policy is pending", () => {
   assert.deepEqual(failed(r), ["rule_no_error", "rule_no_write", "rule_no_id_leak", "rule_no_false_draft", "rule_permission", "rule_latency"]);
   assert.equal(kindPassed(r.checks, "outcome"), null, "a pending policy has no outcome checks");
   assert.equal(kindPassed(evaluateRun(pending, output(), CTX).checks, "rule"), true);
+});
+
+test("required tools count when any agent calls them, whatever the architecture; a list means any one", () => {
+  const c = evalCase({ expected: { tools: ["list_customers", ["get_customer", "list_orders"]] } });
+  const calls = [{ toolName: "list_customers", args: {} }, { toolName: "list_orders", args: {} }];
+  const ctx = { ...CTX, grants: [...CTX.grants, "canViewOrders"], toolPermissions: new Map([...CTX.toolPermissions, ["list_orders", "canViewOrders"]]) };
+  assert.ok(evaluateRun(c, output({ toolCalls: calls.map((t) => ({ ...t, agent: "all" })) }), { ...ctx, arch: "single" }).pass, "single agent");
+  const split = output({ toolCalls: [{ ...calls[0], agent: "commercial" }, { ...calls[1], agent: "supply_chain" }] });
+  assert.ok(evaluateRun(c, split, ctx).pass, "split across sub-agents");
+  const r = evaluateRun(c, output({ toolCalls: [{ ...calls[0], agent: "commercial" }] }), ctx);
+  assert.deepEqual(failed(r), ["calls get_customer|list_orders"]);
+  assert.equal(r.checks.find((ch) => !ch.pass)!.kind, "outcome");
+  assert.equal(r.checks.find((ch) => !ch.pass)!.detail, "called: list_customers（commercial）");
+});
+
+test("numbers match whole numbers only; kg counts as 公斤", () => {
+  const c = evalCase({ expected: { answer_includes: ["50 公斤", "40"] } });
+  assert.ok(evaluateRun(c, output({ reply: "還差 50kg；已出 40 公斤" }), CTX).pass);
+  assert.deepEqual(failed(evaluateRun(c, output({ reply: "庫存 450 公斤，訂單 400、40.5 公斤" }), CTX)), ["answer includes「50 公斤」", "answer includes「40」"]);
+});
+
+test("an expected title names the record the draft acts on", () => {
+  const c = evalCase({ expected: { draft: { tool: "create_order", title: "停用客戶「億豐紡織」", fields: {} } } });
+  const draft = (title: string): Draft => ({ tool: "create_order", payload: {}, summary: { title, fields: [] } }) as Draft;
+  assert.ok(evaluateRun(c, output({ drafts: [draft("停用客戶「億豐紡織」")] }), CTX).pass);
+  assert.deepEqual(failed(evaluateRun(c, output({ drafts: [draft("停用客戶「大東紡織」")] }), CTX)), ["draft title = 停用客戶「億豐紡織」"]);
+});
+
+test("answer order: a later group must be mentioned after every fact of the earlier group", () => {
+  const c = evalCase({ expected: { answer_order: [["永泰布行", "東興布業"], ["協成布行"]] } });
+  assert.ok(evaluateRun(c, output({ reply: "共 3 家，其中協成布行已停用。\n1. 東興布業\n2. 永泰布行\n3. 協成布行（已停用）" }), CTX).pass);
+  assert.deepEqual(failed(evaluateRun(c, output({ reply: "1. 協成布行（已停用）\n2. 永泰布行\n3. 東興布業" }), CTX)), ["answer lists「協成布行」after「永泰布行、東興布業」"]);
+});
+
+test("a reply naming another organization's record breaks rule_no_cross_org", () => {
+  const tables = {
+    customers: [{ organization_id: "own", name: "永泰布行" }, { organization_id: "other", name: "他組織客戶" }, { organization_id: "other", name: "永泰布行" }],
+    orders: [{ organization_id: "other", order_number: "B-OTHER-001" }],
+    user_organizations: [{ organization_id: "other", user_id: "u" }],
+  };
+  const names = foreignNames(tables, "own");
+  assert.deepEqual(names, ["B-OTHER-001", "他組織客戶"], "a name the own organization also uses is left out");
+  const r = evaluateRun(evalCase(), output({ reply: "客戶：永泰布行、他組織客戶" }), { ...CTX, foreignNames: names });
+  assert.deepEqual(failed(r), ["rule_no_cross_org"]);
+  assert.ok(evaluateRun(evalCase(), output({ reply: "客戶：永泰布行" }), { ...CTX, foreignNames: names }).pass);
 });
 
 // ── LLM judge ────────────────────────────────────────────────────────────────

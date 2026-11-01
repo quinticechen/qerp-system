@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { answerQuery, type AgentMode } from "../src/agent/answer.js";
 import { MODEL_POLICY, MODEL_PRIORITY, describeError, type ModelPolicy } from "../src/agent/ai-gateway.js";
 import { authGuard } from "../src/agent/auth-guard.js";
-import type { QueryObserver, ObservedToolCall, RouteDecision } from "../src/agent/observer.js";
+import type { QueryObserver, RouteDecision } from "../src/agent/observer.js";
 import { entitiesFromHistory, toModelHistory, type StoredMessage } from "../src/agent/memory.js";
 import { getAllTools } from "../src/tools/index.js";
 import type { Draft } from "../src/tools/types.js";
@@ -39,7 +39,7 @@ import {
   DATASET_NAME, fetchDatasetItems, langfuseConfigured, loadSnapshot, parseItems, saveSnapshot, unscoredReason,
   type EvalCase, type Snapshot,
 } from "./cases.js";
-import { evaluateRun } from "./checks.js";
+import { evaluateRun, foreignNames, type AgentToolCall } from "./checks.js";
 import { JUDGE_MODEL, judgeRun } from "./judge.js";
 import { checkDatabase } from "./db-check.js";
 import { fakeApiParams } from "./fake-api.js";
@@ -145,7 +145,7 @@ async function loadCases(opts: ReturnType<typeof parseArgs>): Promise<{ cases: E
 async function runOnce(c: EvalCase, run: number, arch: AgentMode, modelPolicy: ModelPolicy, judge: boolean): Promise<RunResult> {
   const role = ROLES[c.input.role];
   const { client, writes } = createFakeSupabase(loadFixtures(c.input.fixtures), EVAL_USER_ID, role);
-  const toolCalls: ObservedToolCall[] = [];
+  const toolCalls: AgentToolCall[] = [];
   const drafts: Draft[] = [];
   const modelErrors: string[] = [];
   const attempts: RunAttempt[] = [];
@@ -160,7 +160,7 @@ async function runOnce(c: EvalCase, run: number, arch: AgentMode, modelPolicy: M
       attempts.push({ phase, modelId, startedAt, durationMs, calls, ...(error ? { error: describeError(error).slice(0, 500) } : {}) });
     },
     onStep: (agent, step) => {
-      toolCalls.push(...step.toolCalls);
+      toolCalls.push(...step.toolCalls.map((t) => ({ ...t, agent })));
       steps.push({ agent, at: Date.now(), toolCalls: step.toolCalls });
     },
   };
@@ -186,7 +186,9 @@ async function runOnce(c: EvalCase, run: number, arch: AgentMode, modelPolicy: M
   }
 
   const output = { reply, error, route, toolCalls, writes, drafts, latencyMs: Date.now() - startedAt };
-  const { checks, pass } = evaluateRun(c, output, { arch, grants: role.grants, toolPermissions: TOOL_PERMISSIONS });
+  const { checks, pass } = evaluateRun(c, output, {
+    arch, grants: role.grants, toolPermissions: TOOL_PERMISSIONS, foreignNames: foreignNames(loadFixtures(c.input.fixtures), EVAL_ORG_ID),
+  });
   const verdict = judge ? await judgeRun(c, output) : undefined;
   return { caseId: c.id, run, ...output, routeFromFallback, modelErrors, startedAt, attempts, steps, checks, pass, ...(verdict !== undefined ? { judge: verdict } : {}) };
 }

@@ -22,13 +22,14 @@ export const customerTools = [
     domain: "customer",
     kind: "read",
     permission: "canViewCustomers",
-    description: "列出客戶列表，可用關鍵字搜尋名稱或聯絡人",
+    description: "列出客戶列表，可用關鍵字搜尋名稱或聯絡人；啟用的在前、停用的（is_active 為 false）排在最後，回覆時把停用的列在最下方並標示「已停用」",
     input: z.object({
       search: z.string().optional().describe("搜尋關鍵字"),
       limit: z.number().optional().describe("回傳筆數，預設 20"),
     }),
     execute: async ({ supabase, organizationId }, { search, limit }) => {
-      const q = supabase.from("customers").select("id, name, contact_person, phone, email, address").eq("organization_id", organizationId).order("name").limit(limit ?? 20);
+      const q = supabase.from("customers").select("id, name, contact_person, phone, email, address, is_active").eq("organization_id", organizationId)
+        .order("is_active", { ascending: false }).order("name").limit(limit ?? 20);
       const { data, error } = await applySearch(q, ["name", "contact_person"], search);
       if (error) return fail(`查詢失敗：${error.message}`);
       return ok(data ?? []);

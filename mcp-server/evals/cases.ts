@@ -50,11 +50,27 @@ const Input = z.object({
 
 const Expected = z.object({
   /** The one draft the agent should leave; card fields by label, as names (never IDs). */
-  draft: z.object({ tool: z.string(), fields: z.record(z.string()).default({}) }).optional(),
+  draft: z.object({
+    tool: z.string(),
+    /** The card title, which names the record an update, cancel or deactivate acts on (e.g. 停用客戶「億豐紡織」). */
+    title: z.string().optional(),
+    fields: z.record(z.string()).default({}),
+  }).optional(),
   /** Explicit "no draft" — also the default when `draft` is absent. */
   no_draft: z.boolean().optional(),
+  /**
+   * Tools that must be called during the request, by any agent (single agent or any sub-agent), in
+   * any order; other calls are allowed. An entry that is a list means any one of those tools. List
+   * only tools the answer cannot come without; a draft's tool is checked by `draft` instead.
+   */
+  tools: z.array(z.union([z.string().min(1), z.array(z.string().min(1)).min(1)])).default([]),
   /** Facts the reply must contain (names, numbers with units). */
   answer_includes: z.array(z.string()).default([]),
+  /**
+   * Groups of facts in the order the reply must give them: every fact of a group appears before a
+   * later mention of each fact of the next group (e.g. deactivated customers listed last).
+   */
+  answer_order: z.array(z.array(z.string().min(1)).min(1)).default([]),
   /** The §3.4 situation the LLM judge scores the reply against. */
   policy: z.string().optional(),
 }).refine((e) => !(e.draft && e.no_draft), { message: "draft 與 no_draft 不可同時出現" });
@@ -135,6 +151,8 @@ export function parseItems(items: DatasetItem[], known?: { tools: readonly strin
     if (known && tool && !known.tools.includes(tool) && !planned) {
       problems.push(`expectedOutput.draft.tool：未知的工具「${tool}」${(PLANNED_TOOLS as readonly string[]).includes(tool) ? "（尚未建立的工具只能用在 known_gap 案例）" : ""}`);
     }
+    const unknownCalls = known && expected.success ? expected.data.tools.flat().filter((t) => !known.tools.includes(t)) : [];
+    if (unknownCalls.length) problems.push(`expectedOutput.tools：未知的工具「${unknownCalls.join("、")}」`);
     if (meta.success && ids.has(meta.data.id)) problems.push(`metadata.id 重複：${meta.data.id}`);
     if (problems.length || !input.success || !expected.success || !meta.success) {
       errors.push(`${label}：${problems.join("；")}`);

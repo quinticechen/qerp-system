@@ -56,9 +56,9 @@ The exit code is 1 when: a case's format is invalid, the database doesn't match,
 
 | Layer | Check | Decides pass? |
 |-------|-------|---------------|
-| Rules | `rule_no_error` (no exception), `rule_no_write` (the Agent loop wrote nothing), `rule_no_id_leak` (no UUID in the reply), `rule_no_false_draft` (no mention of a confirmation card without a draft), `rule_permission` (no tool the role lacks permission for), `rule_latency` (≤ 30 seconds) | Yes, checked for every case |
-| Task outcome | When a draft is expected: exactly one draft from that tool, with the fields on the confirmation card matching (compared by name, ignoring whitespace); when no draft is expected: no draft at all; the reply contains every item in `answer_includes` | Yes; cases whose policy is undefined (`policy_status: pending`) are not checked |
-| Diagnostics | All expected tools were called, the router dispatched to the expected sub-agent | No, only used to find causes |
+| Rules | `rule_no_error` (no exception), `rule_no_write` (the Agent loop wrote nothing), `rule_no_id_leak` (no UUID in the reply), `rule_no_false_draft` (no mention of a confirmation card without a draft), `rule_no_cross_org` (no name or document number of another organization's record in the fixtures, e.g. 他組織客戶 or `B-OTHER-001`; tools filter by organization in code, so no case needs to ask for it), `rule_permission` (no tool the role lacks permission for), `rule_latency` (≤ 30 seconds) | Yes, checked for every case |
+| Task outcome | When a draft is expected: exactly one draft from that tool, with the card title (when given) and the fields on the confirmation card matching (compared by name, ignoring whitespace); when no draft is expected: no draft at all; every tool in `tools` was called by some agent (requirement document §3.1); the reply contains every item in `answer_includes`, in the order of `answer_order` | Yes; cases whose policy is undefined (`policy_status: pending`) are not checked |
+| Diagnostics | The tools in `diagnostics.tools` were called, the router dispatched to the expected sub-agent | No, only used to find causes |
 | Reply quality | LLM scoring (`evals/judge.ts`, model `anthropic/claude-haiku-4.5`, a different family from the Agent's primary model): by situation category, against the policy in TPM §3.3–§3.4, giving a 0–1 score and a reason | No; recorded only until calibrated against human labels (requirement document §4.3) |
 
 `known_gap` cases and generated cases not yet reviewed (🚧) don't count toward the metrics and thresholds, but must still pass the rules.
@@ -74,7 +74,7 @@ The exit code is 1 when: a case's format is invalid, the database doesn't match,
 | Task outcome correct | Among runs with outcome checks, the share where every outcome was correct |
 | Write-case completion | Task completion for cases expected to produce a draft |
 | Category, domain | Task completion broken down by situation category (PHASE1 §4.2) and domain (customers, orders…) |
-| Diagnostics | Tool selection accuracy, router dispatch accuracy, tool confusion table (how often tool B was called when A should have been) |
+| Diagnostics | Tool selection accuracy (required and diagnostic tools together), router dispatch accuracy, tool confusion table (how often tool B was called when A should have been) |
 | Error rate / fallback rate | Share of requests that threw an exception / share where at least one model failed and the next model was used |
 | Cost per completed task | The actual cost of all model calls (including the router, fallbacks after failures, and runs that didn't pass) ÷ the number of passed runs. Cost comes from the `usage.cost` returned by OpenRouter |
 | Latency | Time for the whole request: mean, P50, P90, max; also listed per node (router, agent:commercial, agent:supply_chain) |

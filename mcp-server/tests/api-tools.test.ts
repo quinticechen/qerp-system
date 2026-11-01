@@ -83,3 +83,13 @@ test("an unknown RPC is an error, as in PostgREST", async () => {
   const r = await fake.client.rpc("no_such_api", { p_organization_id: ORG_ID });
   assert.equal(r.error?.code, "PGRST202");
 });
+
+test("update_order's card lists line changes as 舊 → 新, as private.update_order does", async () => {
+  const { ctx } = setup();
+  const drafted = await tool("update_order").draft!(ctx, { order_id: "B202610010001", set_items: [{ product_id: "a1000000-0000-4000-8000-000000000004", quantity: 50 }] });
+  assert.ok(drafted.ok, JSON.stringify(drafted));
+  assert.equal(drafted.draft.summary.title, "修改訂單 B202610010001");
+  assert.deepEqual(drafted.draft.summary.fields, [
+    { label: "修改品項", value: "40S雙面布 - 藏青 × 200 公斤，單價 120 → 40S雙面布 - 藏青 × 50 公斤，單價 120" },
+  ]);
+});

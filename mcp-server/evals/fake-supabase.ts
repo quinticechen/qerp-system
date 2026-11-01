@@ -91,7 +91,8 @@ function project(row: Row, columns: string[] | null): Row {
 
 class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string } | null }> {
   private filters: Filter[] = [];
-  private sortBy: { column: string; ascending: boolean } | null = null;
+  /** Sort keys in the order given, as PostgREST applies repeated .order() calls. */
+  private sortBy: { column: string; ascending: boolean }[] = [];
   private max: number | null = null;
   private mode: "many" | "single" | "maybeSingle" = "many";
   private mutation: { op: "insert" | "update" | "delete"; values?: unknown } | null = null;
@@ -114,7 +115,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string
     this.filters.push((r) => r[column] !== null && r[column] !== undefined);
     return this;
   }
-  order(column: string, opts?: { ascending?: boolean }) { this.sortBy = { column, ascending: opts?.ascending ?? true }; return this; }
+  order(column: string, opts?: { ascending?: boolean }) { this.sortBy.push({ column, ascending: opts?.ascending ?? true }); return this; }
   limit(n: number) { this.max = n; return this; }
   single() { this.mode = "single"; return this; }
   maybeSingle() { this.mode = "maybeSingle"; return this; }
@@ -163,11 +164,13 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: { message: string
         this.writes.push({ op: "delete", table: this.table, values: null, ids: result.map((r) => r.id) });
         this.tables[this.table] = rows.filter((r) => !result.includes(r));
       }
-      if (this.sortBy) {
-        const { column, ascending } = this.sortBy;
+      if (this.sortBy.length) {
         result = [...result].sort((a, b) => {
-          const cmp = stringify(a[column]).localeCompare(stringify(b[column]));
-          return ascending ? cmp : -cmp;
+          for (const { column, ascending } of this.sortBy) {
+            const cmp = stringify(a[column]).localeCompare(stringify(b[column]));
+            if (cmp) return ascending ? cmp : -cmp;
+          }
+          return 0;
         });
       }
       if (this.max !== null) result = result.slice(0, this.max);

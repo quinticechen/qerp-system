@@ -218,12 +218,16 @@ function groupRate(runs: RunResult[], key: (r: RunResult) => string): Record<str
   return Object.fromEntries(Object.entries(groups).sort().map(([k, rs]) => [k, rate(rs, (r) => r.pass)!]));
 }
 
+/** Tool checks of either kind: required tools (outcome) and other expected tools (diagnostic). */
+const toolChecks = (r: RunResult) => r.checks.filter((c) => c.kind !== "rule" && c.check.startsWith("calls "));
+
 function toolConfusion(runs: RunResult[]): Metrics["toolConfusion"] {
   const counts = new Map<string, number>();
   for (const r of runs) {
-    const expected = r.checks.filter((c) => c.kind === "diagnostic" && c.check.startsWith("calls ")).map((c) => c.check.slice(6));
-    const missing = expected.filter((tool) => !r.toolCalls.some((t) => t.toolName === tool));
-    const extra = [...new Set(r.toolCalls.map((t) => t.toolName))].filter((tool) => !expected.includes(tool));
+    const checks = toolChecks(r);
+    const expected = new Set(checks.flatMap((c) => c.check.slice(6).split("|")));
+    const missing = checks.filter((c) => !c.pass).map((c) => c.check.slice(6));
+    const extra = [...new Set(r.toolCalls.map((t) => t.toolName))].filter((tool) => !expected.has(tool));
     for (const want of missing) for (const got of extra.length ? extra : ["（沒有呼叫）"]) {
       const k = `${want}\u0000${got}`;
       counts.set(k, (counts.get(k) ?? 0) + 1);
@@ -274,7 +278,7 @@ export function computeMetrics(cases: CaseInfo[], results: RunResult[]): Metrics
     rules: rate(results, (r) => kindPassed(r.checks, "rule") !== false),
     outcome: rate(scored.filter((r) => kindPassed(r.checks, "outcome") !== null), (r) => kindPassed(r.checks, "outcome") === true),
     writeCompletion: rate(scored.filter((r) => byId.get(r.caseId)!.expectsDraft), (r) => r.pass),
-    toolSelection: rate(withDiag("calls "), diagPass("calls ")),
+    toolSelection: rate(scored.filter((r) => toolChecks(r).length > 0), (r) => toolChecks(r).every((c) => c.pass)),
     routing: rate(withDiag("routes to "), diagPass("routes to ")),
     toolConfusion: toolConfusion(scored),
     errorRate: rate(scored, (r) => !!r.error),
