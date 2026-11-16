@@ -1,73 +1,89 @@
-# 紡織業 ERP 系統（weave-flow-erp-system）
+# Weave Flow ERP (紡織業 ERP)
 
-給紡織業的多組織 ERP：管理產品（產品與顏色）、客戶、工廠、貨架，並串起「訂單 → 採購 → 入庫 → 出貨」的流程與庫存；另有以中文對話查詢與建立資料的 AI 助理。
+An ERP for textile businesses that sell fabric by the kilogram and the roll. It follows each deal from the customer's order, to the purchase order placed with a factory, to the rolls arriving in the warehouse, to the shipment going out. It also includes **Query**, an AI assistant that looks up and enters data through a conversation in Chinese.
 
-## 架構
+The app's interface is in Traditional Chinese.
 
-```
-┌──────────────────────────┐        ┌──────────────────────────────┐
-│ 前端（React + Vite）      │        │ AI 伺服器 mcp-server          │
-│ Vercel                    │──────▶ │ Cloud Run（Express + AI SDK） │──▶ OpenRouter（模型）
-│ src/                      │ /query │ 路由器 + 子 Agent + tools      │
-└────────────┬─────────────┘        └──────────────┬───────────────┘
-             │ supabase-js（使用者 JWT）              │ supabase-js（同一位使用者的 JWT）
-             ▼                                        ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Supabase（PostgreSQL 17、Auth、PostgREST）                         │
-│ · 業務 API：PL/pgSQL 函式，檢查權限、寫入、計算進度與編號           │
-│ · RLS：依組織與權限鍵限制讀寫                                       │
-│ · 觸發器：出貨與入庫進度、單據編號、編輯紀錄                         │
-└──────────────────────────────────────────────────────────────────┘
-```
+## Who it's for
 
-- **所有業務寫入都經過資料庫的業務 API**（`supabase.rpc`），前端與 AI 共用同一套規則；讀取直接查資料表或 view，由 RLS 限制。
-- **權限在資料庫判斷**：`user_has_organization_permission()` 是唯一的判斷來源，RLS、業務 API、AI 都用它；前端只負責畫面一致。
-- **AI 不直接寫入**：寫入類 tool 只產生確認卡片，使用者確認後才執行。
+A small or mid-sized textile trader, where several people handle the same order at different stages:
 
-## 目錄
+| Person | What they do in Weave Flow |
+|--------|----------------------------|
+| Sales | Keep customer details, take orders, check whether stock can cover an order |
+| Purchasing | Place purchase orders with factories for what the orders need, and track what's still on its way |
+| Warehouse | Receive rolls (weight, grade, shelf), keep stock accurate, ship rolls against orders |
+| Owner and managers | See the whole picture on the dashboard, invite the team and decide who can do what |
 
-| 路徑 | 內容 |
-|------|------|
-| `src/` | 前端（頁面、元件、hooks、`lib/api` 業務 API 呼叫） |
-| `mcp-server/` | AI 伺服器、tools、eval |
-| `supabase/migrations/` | 資料庫結構與函式 |
-| `supabase/tests/` | 資料庫回滾測試 |
-| `scripts/` | 瀏覽器驗證腳本 |
-| `docs/` | 現況文件（下表） |
-| `docs/requirements/` | 開發需求、計畫與決策（[規則](./docs/requirements/README.md)） |
+## The problem it solves
 
-## 文件
+Without one shared system, each step of an order lives in a different spreadsheet, chat or notebook. It's hard to answer simple questions: Has this order been placed with a factory? How much of it has arrived? Can we ship it today? Weave Flow keeps every step in one place and links them. An order shows its purchasing and shipping progress, and stock updates itself as rolls arrive and leave.
 
-現況（系統現在是什麼樣子）：
+## What you can do
 
-| 文件 | 內容 |
-|------|------|
-| [FEATURES.md](./docs/FEATURES.md) | 功能 |
-| [TECH_STACK.md](./docs/TECH_STACK.md) | 技術棧與程式結構 |
-| [SERVICES.md](./docs/SERVICES.md) | 選用的外部服務與環境 |
-| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | 套件相依性 |
-| [API.md](./docs/API.md) | 業務 API、組織與成員 RPC、AI 伺服器端點 |
-| [DATABASE_TABLES.md](./docs/DATABASE_TABLES.md) | 資料表與業務邏輯 |
-| [PERMISSIONS.md](./docs/PERMISSIONS.md) | 角色與權限 |
-| [AGENT.md](./docs/AGENT.md) | AI 查詢助理的架構與 tools |
-| [EVALS.md](./docs/EVALS.md) | AI eval 服務 |
-| [SESSION_COORDINATION.md](./docs/SESSION_COORDINATION.md) | 兩個開發 Session 的分工與交接 |
+### Run an order from start to finish
 
-需求做完時，同一次修改要更新對應的現況文件（[docs/requirements/README.md](./docs/requirements/README.md)）。
+1. **Take the order**: customer, fabric and color, kilograms, unit price, number of rolls, and which factories will produce it.
+2. **Purchase from factories**: place purchase orders linked to the order. The order shows 「已向工廠下單」 (ordered from factory) on its own.
+3. **Receive the goods**: record each roll's weight, grade and shelf as it arrives. Receipt and roll numbers are created for you, and over-receiving shows a warning.
+4. **Ship**: pick the rolls to send. Stock goes down and the order's shipping progress updates. A cancelled shipment returns the rolls to stock.
 
-## 開發
+Along the way, **Inventory** shows the stock of each fabric and color, by grade, plus what's still awaiting receipt or shipment, with a warning when a color falls below its safety stock.
 
-```bash
-bun run dev          # 前端，http://localhost:8080
-bun run test         # 前端單元測試
-bun run lint
+### Keep your master data
 
-cd mcp-server
-bun run dev          # AI 伺服器，http://localhost:3100
-bun run test         # tools 與權限測試
-bun run eval -- --label <改了什麼>
-```
+Products (each fabric with its colors), customers, factories and warehouse shelves. A customer or factory you stop working with is deactivated, not deleted, so old orders still show who they were for.
 
-- 驗證 AI 查詢畫面：`python3 scripts/verify-query-ui.py --headless`（帳號在 `.env` 的 `VERIFY_EMAIL`／`VERIFY_PASSWORD`）。
-- 資料庫變更：`supabase/tests/build-run.sh <migration> -- <測試檔…>` 產生 `run.sql`，在 Supabase SQL Editor 執行通過（結果為 `ALL TESTS PASSED`，一定回滾）後，再套用 migration。
-- 開發規則見 [CLAUDE.md](./CLAUDE.md)。
+### Ask Query instead of clicking through screens
+
+The Query button at the bottom right of every page opens a chat. Type a request in Chinese, for example:
+
+- 「目前有哪些庫存低於門檻？」 (Which stock is below its threshold?)
+- 「禾境紡研的訂單，現在的庫存夠不夠出貨？」 (Is there enough stock to ship 禾境紡研's order?)
+- 「幫客戶王小姐建立新的訂單…」 (Create a new order for customer Ms. Wang…)
+
+Query can look up anything you can see, and can create, edit, deactivate or cancel records across every area above. **It never changes data on its own.** It first shows a confirmation card, and nothing is saved until you press "Confirm". Then the ERP opens the record it just saved, so you can check it.
+
+Query only sees the current organization, and only does what your role allows. On desktop it can be a floating window, a sidebar beside the ERP, or full screen. Conversations are kept in a history list. A thumbs up or down under each reply tells the team which answers to improve.
+
+### Work as a team
+
+- **Organizations**: each business is its own organization, and its data is never visible to others. One person can belong to several organizations and switch between them.
+- **Invitations**: the owner or an admin invites colleagues by email.
+- **Four fixed roles**:
+
+| Role | Can do |
+|------|--------|
+| Owner | Everything, plus transfer ownership or delete the organization |
+| Admin | All business features, plus managing members and organization settings |
+| Editor | View, create and edit business data |
+| Viewer | View business data only |
+
+## How it behaves
+
+- **Nothing is deleted.** Master data is deactivated and documents are cancelled, so history stays complete.
+- **Every change is on record.** Each document and record has an edit history of who changed what, and when.
+- **Rules are enforced, and explained.** For example, a purchase order that has already received goods can't be cancelled. The app says why in plain Chinese, such as 「已有入庫紀錄，不能取消」 (already received, can't cancel).
+- **Readable document numbers.** A letter plus the date and a sequence number: orders B, purchase orders P, receipts I, shipments O.
+- **No dead buttons.** Features that aren't finished yet are hidden in production.
+
+## Status
+
+The order-to-shipping flow, master data, organizations and roles are in use. Query is live and still improving. The current goals are to complete tasks at least 40% faster than clicking through the screens, with replies that are over 85% accurate and arrive in under 10 seconds. Organization settings other than transferring ownership and deleting the organization, and the month-on-month change on the dashboard, are not built yet.
+
+## Documentation
+
+| Document | What it covers |
+|----------|----------------|
+| [FEATURES.md](./docs/FEATURES.md) | Every feature and the page it lives on |
+| [PERMISSIONS.md](./docs/PERMISSIONS.md) | Roles and what each one can do |
+| [AGENT.md](./docs/AGENT.md) | How Query works, its tools and known issues |
+| [TECH_STACK.md](./docs/TECH_STACK.md) | Architecture, code layout and how to run the project |
+| [API.md](./docs/API.md) | Business APIs, organization and member RPCs, Query server endpoints |
+| [DATABASE_TABLES.md](./docs/DATABASE_TABLES.md) | Tables and business rules |
+| [SERVICES.md](./docs/SERVICES.md) | External services and environments |
+| [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Packages |
+| [EVALS.md](./docs/EVALS.md), [QUERY_AGENT_EVALS.md](./docs/QUERY_AGENT_EVALS.md) | How Query's answers are tested, and the results |
+| [requirements/](./docs/requirements/README.md) | Product requirements, plans and decisions |
+
+Developers should start with [TECH_STACK.md](./docs/TECH_STACK.md) and [CLAUDE.md](./CLAUDE.md).
