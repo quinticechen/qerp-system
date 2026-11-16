@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { safeNextPath } from '@/lib/safeNextPath';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { Eye, EyeOff, LogIn, User, Mail, UserPlus, AlertCircle } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ForgotPasswordDialog from '@/components/auth/ForgotPasswordDialog';
+import { SEO } from '@/components/SEO';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -25,17 +27,20 @@ const Login = () => {
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to continue after signing in, e.g. checkout from the pricing page.
+  const nextPath = safeNextPath(searchParams.get('next')) ?? '/dashboard';
 
   useEffect(() => {
     // 檢查是否已登入
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate('/dashboard');
+        navigate(nextPath);
       }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +93,7 @@ const Login = () => {
         description: "歡迎使用紡織業 ERP 系統",
       });
 
-      navigate('/dashboard');
+      navigate(nextPath);
     } catch (error: any) {
       toast({
         title: "登入失敗",
@@ -136,7 +141,7 @@ const Login = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}${nextPath}`,
           data: {
             full_name: fullName,
           }
@@ -187,7 +192,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${window.location.origin}${nextPath}`
         }
       });
 
@@ -204,6 +209,7 @@ const Login = () => {
 
     return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
+      <SEO title="登入" description="登入 QERP 紡織業 ERP，管理訂單、採購、入庫、庫存與出貨。" />
       {/* 背景裝飾 - 保持不變 */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-indigo-600/5 to-purple-600/5"></div>
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>

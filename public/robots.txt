@@ -1,23 +1,25 @@
+# Only the public pages are for search engines; everything else needs a sign-in.
 User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /admin/
-Disallow: /private/
+Allow: /$
+Allow: /login
+Allow: /pricing
+Disallow: /dashboard
+Disallow: /product
+Disallow: /customer
+Disallow: /factory
+Disallow: /shelf
+Disallow: /order
+Disallow: /purchase
+Disallow: /inventory
+Disallow: /shipping
+Disallow: /user
+Disallow: /permission
+Disallow: /organization-roles
+Disallow: /system
+Disallow: /create-organization
+Disallow: /accept-invitation
+Disallow: /reset-password
+Disallow: /checkout
+Disallow: /billing
 
-# Specific crawlers
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 1
-
-User-agent: Bingbot
-Allow: /
-Crawl-delay: 1
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-# Sitemap location
 Sitemap: https://qerp.qwizai.com/sitemap.xml

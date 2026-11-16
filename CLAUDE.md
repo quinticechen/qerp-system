@@ -117,6 +117,7 @@ If your change is to:
 - **Tools stay inside the selected organization:** RLS lets a user read every organization they belong to, so every tool query filters `organization_id = ctx.organizationId` (by-id lookups too), and writes check referenced records with `allInOrganization()`. `tests/org-isolation.test.ts` must cover each new tool.
 - **Database objects stay inside the organization too:** views are created `WITH (security_invoker = true)` and expose `organization_id` so the UI can filter by the current organization (a view without it runs as its owner and bypasses RLS). A `SECURITY DEFINER` function that takes a user or organization id must answer only about the caller or the caller's organizations — call `can_inspect_organization()` (see `supabase/migrations/20261007130000_org_boundary_hardening.sql`). Run the Supabase security advisor after any such migration.
 - **Owner-run functions live in the `private` schema:** business APIs, member RPCs and the permission functions are implemented as `SECURITY DEFINER` in `private`, which PostgREST does not expose; `public` holds a same-named `SECURITY INVOKER` wrapper that clients call. Change the implementation with `CREATE OR REPLACE FUNCTION private.<name>` — never `CREATE OR REPLACE` the `public` wrapper. A new owner-run function goes in `private`, plus a wrapper only if clients call it (pattern: `supabase/migrations/20261009140512_private_definer_functions.sql`). The security advisor should show no definer function in `public` callable by clients.
+- **Service role only for billing:** the server runs everything with the caller's JWT. The one exception is the Stripe webhook, which has no user and writes `organization_subscriptions` through `mcp-server/src/billing/admin-store.ts`; never use that client for anything else. Stripe prices are looked up by `qerp_<plan>_<period>`; keep `src/lib/billingPlans.ts`, `private.plan_limits()` and Stripe in step (`docs/requirements/PRICING_AND_BILLING.md` §2).
 - **The AI never writes directly:** in the agent loop, `write` tools only create drafts (`query_pending_actions`); the write runs when the user confirms the card (`POST /query/actions/:id/confirm`, `mcp-server/src/agent/actions.ts`), which re-checks membership and permission and claims the action atomically. A new write tool needs `summarize()` (card text with names, never IDs); the registry refuses one without it. The eval fails any case where the agent loop writes.
 
 ## Record Dialogs
@@ -145,7 +146,7 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 
 ## Documentation
 
-- `README.md`: overall architecture and the docs index.
+- `README.md`: the product from the user's side — who it is for, what they can do, how it behaves — and the docs index. No technical detail; architecture, code layout and dev commands live in `docs/TECH_STACK.md`.
 - `docs/`: the current state — features, tech stack, services, dependencies, API, tables, permissions, AI agent, evals. Describe what exists now, not plans.
 - `docs/requirements/`: requirements, plans and decisions. Write the requirement there before building it.
 - **When a requirement (or one of its phases) is done, update the matching `docs/` file in the same change** — the mapping is in `docs/requirements/README.md`. A change is not complete while the current-state docs still describe the old behaviour.
@@ -156,7 +157,7 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 |------|-------|
 | Frontend port | 8080 |
 | MCP server port | 3100 |
-| Query backend (production) | Google Cloud Run — service `query-ai-agent`, `asia-south1`, project `erp-system-463209`, `https://query-ai-agent-189729990634.asia-south1.run.app`. Built by continuous deployment from `mcp-server/Dockerfile` (build context `mcp-server/`); env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` set on the service (optional `LANGFUSE_SAMPLE_RATE`, default 0.05) |
+| Query backend (production) | Google Cloud Run — service `query-ai-agent`, `asia-south1`, project `erp-system-463209`, `https://query-ai-agent-189729990634.asia-south1.run.app`. Built by continuous deployment from `mcp-server/Dockerfile` (build context `mcp-server/`); env vars `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` set on the service (optional `LANGFUSE_SAMPLE_RATE`, default 0.05); billing adds `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` |
 | Frontend → Query backend | `VITE_QUERY_API_URL` (set in Vercel to the Cloud Run URL; unset locally → `http://localhost:3100`; override locally in `.env.local`) |
 | Supabase project ref | gyiyedvutcbwzpbcsmjc |
 | Test account | quinticechen@gmail.com |

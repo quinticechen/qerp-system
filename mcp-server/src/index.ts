@@ -9,6 +9,11 @@ import { authGuard, AccessError } from "./agent/auth-guard.js";
 import { getTools } from "./tools/index.js";
 import { registerMcpTools } from "./tools/adapters.js";
 import { flushTracing, PRODUCTION_SAMPLE_RATE, shutdownTracing, startTracing } from "./agent/langfuse.js";
+import { StripeClient } from "./billing/stripe-client.js";
+import { verifyStripeSignature } from "./billing/signature.js";
+import { handleStripeEvent, type StripeEvent } from "./billing/webhook.js";
+import { supabaseSubscriptionStore } from "./billing/admin-store.js";
+import { createCheckout, createPortal } from "./billing/checkout.js";
 
 const PORT = parseInt(process.env.PORT || "3100", 10);
 
@@ -47,11 +52,23 @@ function extractJwt(authHeader: string | undefined): string | null {
   return authHeader.slice(7);
 }
 
-async function readBody(req: http.IncomingMessage): Promise<any> {
+async function readRawBody(req: http.IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString();
+  return Buffer.concat(chunks).toString();
+}
+
+async function readBody(req: http.IncomingMessage): Promise<any> {
+  const raw = await readRawBody(req);
   return raw ? JSON.parse(raw) : {};
+}
+
+const PRODUCTION_APP_ORIGIN = "https://qerp.qwizai.com";
+
+function stripeClient(): StripeClient {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+  return new StripeClient(key);
 }
 
 function sendError(res: http.ServerResponse, err: unknown) {
@@ -78,11 +95,38 @@ const httpServer = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── POST /billing/webhook — Stripe events; authenticated by signature, not a user JWT ──
+  if (req.method === "POST" && req.url === "/billing/webhook") {
+    const raw = await readRawBody(req);
+    const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+    const signature = req.headers["stripe-signature"];
+    if (!verifyStripeSignature(raw, Array.isArray(signature) ? signature[0] : signature, secret)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid signature" }));
+      return;
+    }
+    try {
+      const event = JSON.parse(raw) as StripeEvent;
+      const outcome = await handleStripeEvent(event, supabaseSubscriptionStore, stripeClient());
+      console.log(`[billing] ${event.type} ${event.id}: ${outcome}`);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ received: true, outcome }));
+    } catch (err: unknown) {
+      // 500 makes Stripe retry the event later.
+      console.error("[billing] webhook failed:", err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Webhook handling failed" }));
+    }
+    return;
+  }
+
   const actionRoute = req.url?.match(/^\/query\/actions\/([0-9a-f-]{36})\/(confirm|cancel)$/i);
   const feedbackRoute = req.url?.match(/^\/query\/messages\/([0-9a-f-]{36})\/feedback$/i);
 
   // ── Auth：所有 /mcp、/query、確認操作與回饋都需要 JWT ───────────────────────
-  if (req.url === "/mcp" || req.url === "/query" || actionRoute || feedbackRoute) {
+  const billingRoute = req.url === "/billing/checkout" || req.url === "/billing/portal";
+
+  if (req.url === "/mcp" || req.url === "/query" || actionRoute || feedbackRoute || billingRoute) {
     const jwt = extractJwt(req.headers.authorization);
     if (!jwt) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -110,6 +154,21 @@ const httpServer = http.createServer(async (req, res) => {
       try {
         const body = await readBody(req);
         const result = await setFeedback(supabase, feedbackRoute[1], parseFeedbackValue(body.value ?? null));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (err: unknown) {
+        sendError(res, err);
+      }
+      return;
+    }
+
+    // ── POST /billing/checkout | /billing/portal — Stripe Checkout or the billing portal ──
+    if (billingRoute && req.method === "POST") {
+      try {
+        const body = await readBody(req);
+        const origin = req.headers.origin ?? "";
+        const context = { supabase, stripe: stripeClient(), appOrigin: ALLOWED_ORIGINS.has(origin) ? origin : PRODUCTION_APP_ORIGIN };
+        const result = req.url === "/billing/checkout" ? await createCheckout(context, body) : await createPortal(context, body);
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify(result));
       } catch (err: unknown) {

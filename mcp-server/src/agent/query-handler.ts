@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { authGuard } from "./auth-guard.js";
 import { answerQuery } from "./answer.js";
 import { isRateLimited, RATE_LIMIT_REPLY } from "./input-guard.js";
+import { quotaReply } from "../billing/quota.js";
 import { TraceRecorder } from "./trace.js";
 import { traceQuery, type QueryTraceHandle } from "./langfuse.js";
 import { EntityCollector, combineObservers, entitiesFromHistory, loadHistory, toModelHistory, type StoredMessage } from "./memory.js";
@@ -115,6 +116,16 @@ async function answerAndSave(
     lf.end({ output: RATE_LIMIT_REPLY, degraded: false, metadata: { rate_limited: true } });
     const messageId = sessionId ? await saveReply(supabase, sessionId, RATE_LIMIT_REPLY, { trace_id: trace.id }) : null;
     return { reply: RATE_LIMIT_REPLY, allowedToolCount: access.allowedTools.length, traceId: trace.id, messageId, actions: [] };
+  }
+
+  // Plan allowance (PRICING_AND_BILLING.md §3): a pending organization, or one past its monthly
+  // Query messages, gets a fixed reply without the agent.
+  const planReply = await quotaReply(supabase, access.organizationId);
+  if (planReply) {
+    await trace.save(supabase, meta);
+    lf.end({ output: planReply, degraded: false, metadata: { plan_limited: true } });
+    const messageId = sessionId ? await saveReply(supabase, sessionId, planReply, { trace_id: trace.id }) : null;
+    return { reply: planReply, allowedToolCount: access.allowedTools.length, traceId: trace.id, messageId, actions: [] };
   }
 
   try {

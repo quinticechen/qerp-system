@@ -1,21 +1,51 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>紡織業 ERP 系統</title>
-    <meta name="description" content="專業的紡織業企業資源管理系統，提供完整的訂單、庫存、採購、出貨管理解決方案" />
-    <meta name="author" content="Textile ERP Team" />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="icon" href="/favicon.ico" />
 
-    <meta property="og:title" content="紡織業 ERP 系統" />
-    <meta property="og:description" content="專業的紡織業企業資源管理系統" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <!--
+      Home page tags for crawlers and link previews that don't run JavaScript.
+      src/main.tsx removes every [data-default-seo] element at startup; after that the SEO component
+      (react-helmet-async) is the only source, so keep these in step with src/lib/siteMeta.ts.
+    -->
+    <title>QERP｜紡織業 ERP 與 AI 助理</title>
+    <meta data-default-seo name="description" content="QERP 是給紡織業的雲端 ERP：訂單、向工廠採購、布卷入庫、庫存與出貨串成一條流程，並有 AI 助理 Query 用中文對話查詢與建立資料。免費試用。" />
+    <meta data-default-seo name="robots" content="index, follow" />
+    <link data-default-seo rel="canonical" href="https://qerp.qwizai.com/" />
+    <link data-default-seo rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/" />
+    <link data-default-seo rel="alternate" hreflang="x-default" href="https://qerp.qwizai.com/" />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@textile_erp" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta data-default-seo property="og:title" content="QERP｜紡織業 ERP 與 AI 助理" />
+    <meta data-default-seo property="og:description" content="訂單、採購、入庫、庫存與出貨串成一條流程，再用中文對話讓 AI 助理幫你查、幫你建。免費試用 QERP。" />
+    <meta data-default-seo property="og:type" content="website" />
+    <meta data-default-seo property="og:url" content="https://qerp.qwizai.com/" />
+    <meta data-default-seo property="og:image" content="https://qerp.qwizai.com/og-image.png" />
+    <meta data-default-seo property="og:image:width" content="1200" />
+    <meta data-default-seo property="og:image:height" content="630" />
+    <meta data-default-seo property="og:site_name" content="QERP" />
+    <meta data-default-seo property="og:locale" content="zh_TW" />
+
+    <meta data-default-seo name="twitter:card" content="summary_large_image" />
+    <meta data-default-seo name="twitter:title" content="QERP｜紡織業 ERP 與 AI 助理" />
+    <meta data-default-seo name="twitter:description" content="訂單、採購、入庫、庫存與出貨串成一條流程，再用中文對話讓 AI 助理幫你查、幫你建。免費試用 QERP。" />
+    <meta data-default-seo name="twitter:image" content="https://qerp.qwizai.com/og-image.png" />
+
+    <script data-default-seo type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "QERP",
+        "url": "https://qerp.qwizai.com/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "inLanguage": "zh-TW",
+        "description": "給紡織業的雲端 ERP：訂單、採購、入庫、庫存、出貨，以及中文 AI 助理 Query。",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "TWD", "description": "免費試用" }
+      }
+    </script>
   </head>
 
   <body>

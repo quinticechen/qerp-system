@@ -45,6 +45,11 @@ begin
   values (v_user, 'authenticated', 'authenticated', 'sql-test-' || v_user || '@example.test');
 
   insert into public.organizations (name, owner_id) values ('SQL 測試組織', v_user) returning id into v_org;
+  -- New organizations start 'pending' with one seat (20261116171234_billing_subscriptions.sql);
+  -- fixtures run on an active Pro plan so tests can add members.
+  if to_regclass('public.organization_subscriptions') is not null then
+    execute 'update public.organization_subscriptions set plan = ''pro'', status = ''active'', billing_period = ''month'' where organization_id = $1' using v_org;
+  end if;
   insert into public.customers (name, organization_id) values ('測試客戶', v_org) returning id into v_customer;
   insert into public.products_new (name, user_id, organization_id) values ('測試棉布-' || v_user, v_user, v_org) returning id into v_product;
   insert into public.products_new (name, user_id, organization_id) values ('測試麻布-' || v_user, v_user, v_org) returning id into v_product2;

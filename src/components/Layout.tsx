@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import Header from '@/components/Header';
 import { RoutePermissionGuard } from '@/components/RoutePermissionGuard';
+import { OrganizationActivationGate } from '@/components/billing/OrganizationActivationGate';
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   return (
@@ -15,7 +16,9 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
         <SidebarInset className="bg-background">
           <Header />
           <main className="flex-1 p-6 bg-background">
-            <RoutePermissionGuard>{children || <Outlet />}</RoutePermissionGuard>
+            <RoutePermissionGuard>
+              <OrganizationActivationGate>{children || <Outlet />}</OrganizationActivationGate>
+            </RoutePermissionGuard>
           </main>
         </SidebarInset>
       </div>
