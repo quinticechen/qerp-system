@@ -441,6 +441,59 @@ export type Database = {
           },
         ]
       }
+      organization_subscriptions: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          billing_period: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          organization_id: string
+          plan: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          billing_period?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          organization_id: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          billing_period?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          organization_id?: string
+          plan?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -1692,6 +1745,10 @@ export type Database = {
           organization_name: string
           role_display_name: string
         }[]
+      }
+      get_organization_entitlement: {
+        Args: { _organization_id: string }
+        Returns: Json
       }
       get_organization_member_status: {
         Args: { _organization_id: string }

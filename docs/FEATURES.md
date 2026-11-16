@@ -6,9 +6,21 @@
 
 Signed-out visitors see the QERP Home page: what the product does, the order-to-shipping flow, features, a sample Query conversation, the four roles and an FAQ. Signed-in members still go straight to `/dashboard` (or `/create-organization`).
 
-- 「免費試用」 (free trial, in the header, the hero and the closing section) opens a form: name, phone and company name are required; email, company size and note are optional. After 「建立」 (create), the form is replaced by 「我們會盡快致電給您，並為您開通 QERP 帳號。感謝您的耐心等候！」 (we'll call you and open your account as soon as possible; thanks for waiting). The request is saved to `trial_requests` for the team to follow up; it doesn't create an account. Repeat requests from the same phone within 10 minutes show 「申請太頻繁，請稍後再試」 (too many requests, try again later).
+- 「免費試用」 (free trial, in the header, the hero and the closing section) goes to the pricing page (below). Its free plan opens a form: name, phone and company name are required; email, company size and note are optional. After 「建立」 (create), the form is replaced by 「我們會盡快致電給您，並為您開通 QERP 帳號。感謝您的耐心等候！」 (we'll call you and open your account as soon as possible; thanks for waiting). The request is saved to `trial_requests` for the team to follow up; it doesn't create an account. Repeat requests from the same phone within 10 minutes show 「申請太頻繁，請稍後再試」 (too many requests, try again later).
 - 「登入」 (sign in) opens `/login`, where self sign-up still works.
 - Search and sharing: title 「QERP｜紡織業 ERP 與 AI 助理」, description, canonical URL on `https://qerp.qwizai.com`, Open Graph and Twitter cards with `public/og-image.png`, and JSON-LD (`SoftwareApplication`, `Organization`, `WebSite`, `FAQPage`). `sitemap.xml` lists `/` and `/login`; `robots.txt` keeps crawlers out of the signed-in pages ([requirements/HOME_PAGE.md](./requirements/HOME_PAGE.md)).
+
+## 0.1 Pricing and subscriptions (`/pricing`)
+
+Three plans with a 月繳／年繳／兩年繳 (monthly / yearly / two-year) switch: Free (3 members, Query 100 messages a month), Standard (10, 1,000; NT$1,490 / 14,900 / 26,800) and Pro (30, 5,000; NT$3,990 / 39,900 / 71,800). Every plan has the whole ERP.
+
+- Free: 「申請免費試用」 opens the free-trial form; the team calls and activates the organization.
+- Paid: 「選擇…方案」 → sign in or sign up → create an organization if needed → `/checkout` (organization, plan, price; owner or admin only) → Stripe payment → `/billing/success`, activated within seconds.
+- An organization created without paying is **not activated**: ERP pages (except Organization Settings) show 「尚未開通」 with links to pricing and the free-trial form; only the owner can be a member; Query replies that it isn't activated.
+- Members per organization and Query messages per month are limited by plan; past the limit, inviting fails with 「已達目前方案的成員上限」 and Query replies that this month's messages are used up.
+- Organization Settings → 「方案與帳單」 (plan and billing): plan, status, period, renewal date, members and Query usage; 「管理方案與付款」 opens Stripe's billing portal (change plan or card, invoices, cancel at period end), 「升級方案」 on the free plan. A cancelled or ended subscription drops to the free plan with all data kept.
+
+Details: [requirements/PRICING_AND_BILLING.md](./requirements/PRICING_AND_BILLING.md).
 
 ## 1. Accounts and organizations
 

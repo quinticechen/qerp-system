@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { safeNextPath } from '@/lib/safeNextPath';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,17 +27,20 @@ const Login = () => {
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to continue after signing in, e.g. checkout from the pricing page.
+  const nextPath = safeNextPath(searchParams.get('next')) ?? '/dashboard';
 
   useEffect(() => {
     // 檢查是否已登入
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate('/dashboard');
+        navigate(nextPath);
       }
     };
     checkAuth();
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +93,7 @@ const Login = () => {
         description: "歡迎使用紡織業 ERP 系統",
       });
 
-      navigate('/dashboard');
+      navigate(nextPath);
     } catch (error: any) {
       toast({
         title: "登入失敗",
@@ -137,7 +141,7 @@ const Login = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}${nextPath}`,
           data: {
             full_name: fullName,
           }
@@ -188,7 +192,7 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`
+          redirectTo: `${window.location.origin}${nextPath}`
         }
       });
 

@@ -86,6 +86,6 @@ The order-to-shipping flow, master data, organizations and roles are in use, and
 | [EVALS.md](./docs/EVALS.md), [QUERY_AGENT_EVALS.md](./docs/QUERY_AGENT_EVALS.md) | How Query's answers are tested, and the results |
 | [requirements/](./docs/requirements/README.md) | Product requirements, plans and decisions |
 
-To try QERP, press 「免費試用」 (free trial) on [qerp.qwizai.com](https://qerp.qwizai.com) and leave your details; the team calls back and opens your account.
+To try QERP, press 「免費試用」 (free trial) on [qerp.qwizai.com](https://qerp.qwizai.com) and pick a plan. The free plan (3 members) is opened by the team after a call; Standard (10 members) and Pro (30 members) are paid monthly, yearly or every two years by card and open as soon as payment succeeds. Plans and limits: [docs/requirements/PRICING_AND_BILLING.md](docs/requirements/PRICING_AND_BILLING.md).
 
 Developers should start with [TECH_STACK.md](./docs/TECH_STACK.md) and [CLAUDE.md](./CLAUDE.md).

@@ -22,6 +22,9 @@ import SystemPage from '@/pages/SystemPage';
 import CreateOrganization from '@/pages/CreateOrganization';
 import AcceptInvitation from '@/pages/AcceptInvitation';
 import NotFound from '@/pages/NotFound';
+import PricingPage from '@/pages/PricingPage';
+import CheckoutPage from '@/pages/CheckoutPage';
+import BillingSuccessPage from '@/pages/BillingSuccessPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import { OrganizationGuard } from '@/components/organization/OrganizationGuard';
@@ -49,8 +52,11 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<Index />} />
+              <Route path="/pricing" element={<PricingPage />} />
               
               {/* 受保護路由 - 需要登入但不需要組織 */}
+              <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+              <Route path="/billing/success" element={<ProtectedRoute><BillingSuccessPage /></ProtectedRoute>} />
               <Route
                 path="/create-organization"
                 element={

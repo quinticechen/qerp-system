@@ -12,6 +12,7 @@ import { useOrganizationPermissions } from '@/hooks/useOrganizationPermissions';
 import { DeleteOrganizationDialog } from '@/components/organization/DeleteOrganizationDialog';
 import { RecordAuditHistoryButton } from '@/components/common/RecordAuditHistoryButton';
 import { UnfinishedFeature } from '@/components/common/UnfinishedFeature';
+import { BillingCard } from '@/components/billing/BillingCard';
 
 const SystemSettings = () => {
   const { organization, hasOrganization } = useCurrentOrganization();
@@ -42,6 +43,8 @@ const SystemSettings = () => {
         </div>
         <RecordAuditHistoryButton recordId={organization?.id} />
       </div>
+
+      {organization && <BillingCard organizationId={organization.id} canEdit={canEdit} />}
 
       {/* 沒有編輯權限時只能查看；以下設定都還沒有接上功能（UnfinishedFeature：正式環境不顯示） */}
       <fieldset disabled={!canEdit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">

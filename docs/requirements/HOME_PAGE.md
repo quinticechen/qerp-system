@@ -11,7 +11,7 @@
 | Question | Decision |
 |----------|----------|
 | Product name | **QERP** (matches the domain). The UI subtitle stays 紡織業 ERP |
-| Main call to action | 「免費試用」 (free trial) opens a request form. After 「建立」 (create), the form is replaced by a thank-you message: the team will call and open the account as soon as possible |
+| Main call to action | 「免費試用」 (free trial) opens a request form. After 「建立」 (create), the form is replaced by a thank-you message: the team will call and open the account as soon as possible. **Changed the same day**: 「免費試用」 now goes to `/pricing`, and the form opens from the free plan there ([PRICING_AND_BILLING.md](./PRICING_AND_BILLING.md)) |
 | Form fields | Name, phone and company name are required; email, company size and note are optional |
 | Where requests go | A new Supabase table `trial_requests`; the team reads it in the Supabase dashboard. No email notification for now |
 | Self sign-up | Kept: the login page's sign-up tab works as before, and the Home page links to 登入 (sign in) |
@@ -35,8 +35,8 @@ Header (logo, section links, 登入, 免費試用) → hero → the order-to-shi
 - The Home page adds JSON-LD `SoftwareApplication`, `Organization`, `WebSite` and `FAQPage` (from the same FAQ the page shows).
 - Canonical URLs always use `https://qerp.qwizai.com` plus the path, so Vercel preview URLs don't compete with production.
 - Share image: `public/og-image.png` (1200×630).
-- `sitemap.xml` lists only the public pages (`/`, `/login`); `robots.txt` keeps crawlers out of the signed-in app pages.
+- `sitemap.xml` lists only the public pages (`/`, `/pricing`, `/login`); `robots.txt` keeps crawlers out of the signed-in app pages.
 
 ## 6. Out of scope
 
-Pricing, an English version, email or LINE notifications for new requests, and an admin screen for requests in the ERP.
+An English version, email or LINE notifications for new requests, and an admin screen for requests in the ERP.

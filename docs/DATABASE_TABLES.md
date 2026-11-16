@@ -93,6 +93,8 @@ Shippings shippings (O) ── shipped rolls shipping_items ─┘
 |-------|------|---------|
 | `trial_requests` free-trial requests | 0 | Name, phone, company name (required), email, company size (`1-10`, `11-50`, `51-200`, `201+`), note; `status` `new` → `contacted` → `activated`, or `declined`. Written by the Home page's 「免費試用」 form. **No `organization_id`**: the visitor isn't a member yet. Clients may only insert the form's columns (no read, update or delete); the team works through it in the Supabase dashboard. The `private.trial_requests_throttle()` trigger allows the same phone once per 10 minutes and 30 requests per hour overall (`PT429`, 「申請太頻繁，請稍後再試」) ([requirements/HOME_PAGE.md](./requirements/HOME_PAGE.md)) |
 
+| `organization_subscriptions` plans and subscriptions | — | One row per organization (created by a trigger on `organizations`): `plan` (`free` / `standard` / `pro`), `status` (`pending` not activated / `active` / `past_due`), `billing_period` (`month` / `year` / `two_years`), Stripe customer and subscription ids, `current_period_end`, `cancel_at_period_end`, `activated_by` (`manual` / `stripe`). Members can read their organization's row; only the Stripe webhook (service role) and the team write it. Limits come from `private.plan_limits()`; the `enforce_member_limit` trigger on `user_organizations` caps active members; `get_organization_entitlement(org)` returns plan, limits and this month's usage ([requirements/PRICING_AND_BILLING.md](./requirements/PRICING_AND_BILLING.md)) |
+
 ## 4. Deprecated and unused
 
 ### 4.1 Columns
