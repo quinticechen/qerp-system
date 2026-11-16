@@ -53,7 +53,15 @@ export interface StripeSubscription {
 }
 
 export class StripeClient {
-  constructor(private readonly secretKey: string, private readonly fetchFn: FetchLike = fetch as unknown as FetchLike) {}
+  /**
+   * @param portalConfiguration Billing portal configuration to use (STRIPE_PORTAL_CONFIGURATION); without it Stripe
+   *   uses the account's default, which other apps on the same Stripe account may change.
+   */
+  constructor(
+    private readonly secretKey: string,
+    private readonly fetchFn: FetchLike = fetch as unknown as FetchLike,
+    private readonly portalConfiguration?: string,
+  ) {}
 
   private async request<T>(method: "GET" | "POST", path: string, params: Params = {}): Promise<T> {
     const body = encodeParams(params).join("&");
@@ -81,7 +89,7 @@ export class StripeClient {
   }
 
   createPortalSession(customer: string, returnUrl: string): Promise<{ url: string }> {
-    return this.request("POST", "/billing_portal/sessions", { customer, return_url: returnUrl });
+    return this.request("POST", "/billing_portal/sessions", { customer, return_url: returnUrl, configuration: this.portalConfiguration || undefined });
   }
 
   retrieveSubscription(id: string): Promise<StripeSubscription> {

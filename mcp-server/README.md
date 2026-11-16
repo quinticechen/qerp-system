@@ -38,6 +38,7 @@ bun run test           # tool, permission and adapter tests; run after every cha
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` | No | Tracing, prompt versions and evals; without them Query still works |
 | `LANGFUSE_SAMPLE_RATE` | No | Share of successful requests traced (default 0.05) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | For billing | Stripe API and webhook signing secret |
+| `STRIPE_PORTAL_CONFIGURATION` | No | Stripe billing portal configuration id (`bpc_…`); default is the account's default configuration |
 | `SUPABASE_SERVICE_ROLE_KEY` | For billing | Used only by the Stripe webhook to write `organization_subscriptions` |
 | `PORT` | No | Default 3100 |
 

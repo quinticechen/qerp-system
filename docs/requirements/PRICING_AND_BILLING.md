@@ -64,8 +64,24 @@ update public.trial_requests set status = 'activated' where phone = '<電話>';
 
 1. Apply `supabase/migrations/20261116171234_billing_subscriptions.sql` after its rolled-back test passes (`supabase/tests/billing_subscriptions.test.sql`).
 2. Stripe (test mode first): products QERP 標準 and QERP 專業 with the six prices and lookup keys in §2; Billing portal settings saved (allow cancel at period end, switching between the six prices); a webhook endpoint `https://query-ai-agent-189729990634.asia-south1.run.app/billing/webhook` with the events `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
-3. Cloud Run env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (used only to write `organization_subscriptions` from the webhook, `mcp-server/src/billing/admin-store.ts`).
+3. Cloud Run env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (used only to write `organization_subscriptions` from the webhook, `mcp-server/src/billing/admin-store.ts`), and optionally `STRIPE_PORTAL_CONFIGURATION` (the billing portal configuration to use; without it Stripe uses the account default).
 4. Supabase Auth redirect URLs must allow `https://qerp.qwizai.com/**` (sign-up confirmation returns to `/checkout?...`).
+
+### Live mode (done 2026-11-16)
+
+The Stripe account (QWIZ AI LLC, US, charges in TWD and pays out in USD) is shared with other products, so everything QERP uses is named or tagged `qerp`:
+
+| Object | Id |
+|--------|----|
+| Product QERP 標準 | `prod_VdeMFrbEEUa1lQ` |
+| Product QERP 專業 | `prod_VdeMC5HMCAqtRs` |
+| Prices | the six lookup keys in §2, tax inclusive |
+| Webhook endpoint (Cloud Run `/billing/webhook`, the three events in step 2) | `we_1UcN91GYVYFmwG4FzVPYjyTR`, metadata `app=qerp` |
+| Billing portal configuration (cancel at period end, switch between the six prices, invoices, card) | `bpc_1UcN9KGYVYFmwG4FW39J5IMq` → set as `STRIPE_PORTAL_CONFIGURATION` |
+
+The account also has another app's webhook (a Supabase function) subscribed to `checkout.session.completed` and `customer.subscription.*`, so it receives QERP's events too, and QERP's webhook receives that app's. QERP ignores events without one of its organizations; whether the other app ignores QERP's is up to that app.
+
+Local testing uses test mode: `mcp-server/.env` holds the `sk_test_` key and the `whsec_` printed by `stripe listen --events checkout.session.completed,customer.subscription.updated,customer.subscription.deleted --forward-to localhost:3100/billing/webhook`.
 
 ## 6. Not covered yet
 

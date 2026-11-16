@@ -68,7 +68,7 @@ const PRODUCTION_APP_ORIGIN = "https://qerp.qwizai.com";
 function stripeClient(): StripeClient {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
-  return new StripeClient(key);
+  return new StripeClient(key, undefined, process.env.STRIPE_PORTAL_CONFIGURATION);
 }
 
 function sendError(res: http.ServerResponse, err: unknown) {
