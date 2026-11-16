@@ -143,7 +143,7 @@ The environment comes from `src/lib/appEnvironment.ts` (`APP_ENV`, `SHOW_UNFINIS
 
 ## Documentation
 
-- `README.md`: overall architecture and the docs index.
+- `README.md`: the product from the user's side — who it is for, what they can do, how it behaves — and the docs index. No technical detail; architecture, code layout and dev commands live in `docs/TECH_STACK.md`.
 - `docs/`: the current state — features, tech stack, services, dependencies, API, tables, permissions, AI agent, evals. Describe what exists now, not plans.
 - `docs/requirements/`: requirements, plans and decisions. Write the requirement there before building it.
 - **When a requirement (or one of its phases) is done, update the matching `docs/` file in the same change** — the mapping is in `docs/requirements/README.md`. A change is not complete while the current-state docs still describe the old behaviour.
