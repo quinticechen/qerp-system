@@ -87,6 +87,12 @@ Shippings shippings (O) ── shipped rolls shipping_items ─┘
 | `query_pending_actions` | 3 | Write actions proposed by the AI, awaiting the user's confirmation |
 | `query_traces` | 16 | Each AI reply's models, tool calls and latency (for debugging, visible only to their own user) |
 
+### 3.6 Public site
+
+| Table | Rows | Purpose |
+|-------|------|---------|
+| `trial_requests` free-trial requests | 0 | Name, phone, company name (required), email, company size (`1-10`, `11-50`, `51-200`, `201+`), note; `status` `new` → `contacted` → `activated`, or `declined`. Written by the Home page's 「免費試用」 form. **No `organization_id`**: the visitor isn't a member yet. Clients may only insert the form's columns (no read, update or delete); the team works through it in the Supabase dashboard. The `private.trial_requests_throttle()` trigger allows the same phone once per 10 minutes and 30 requests per hour overall (`PT429`, 「申請太頻繁，請稍後再試」) ([requirements/HOME_PAGE.md](./requirements/HOME_PAGE.md)) |
+
 ## 4. Deprecated and unused
 
 ### 4.1 Columns
