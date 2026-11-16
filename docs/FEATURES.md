@@ -2,6 +2,14 @@
 
 > Current-state document (2026-10-09). Each feature is available by role, see [PERMISSIONS.md](./PERMISSIONS.md); all data writes go through the business APIs in [API.md](./API.md).
 
+## 0. Public Home page (`/`)
+
+Signed-out visitors see the QERP Home page: what the product does, the order-to-shipping flow, features, a sample Query conversation, the four roles and an FAQ. Signed-in members still go straight to `/dashboard` (or `/create-organization`).
+
+- 「免費試用」 (free trial, in the header, the hero and the closing section) opens a form: name, phone and company name are required; email, company size and note are optional. After 「建立」 (create), the form is replaced by 「我們會盡快致電給您，並為您開通 QERP 帳號。感謝您的耐心等候！」 (we'll call you and open your account as soon as possible; thanks for waiting). The request is saved to `trial_requests` for the team to follow up; it doesn't create an account. Repeat requests from the same phone within 10 minutes show 「申請太頻繁，請稍後再試」 (too many requests, try again later).
+- 「登入」 (sign in) opens `/login`, where self sign-up still works.
+- Search and sharing: title 「QERP｜紡織業 ERP 與 AI 助理」, description, canonical URL on `https://qerp.qwizai.com`, Open Graph and Twitter cards with `public/og-image.png`, and JSON-LD (`SoftwareApplication`, `Organization`, `WebSite`, `FAQPage`). `sitemap.xml` lists `/` and `/login`; `robots.txt` keeps crawlers out of the signed-in pages ([requirements/HOME_PAGE.md](./requirements/HOME_PAGE.md)).
+
 ## 1. Accounts and organizations
 
 | Feature | Page | Description |

@@ -1184,6 +1184,42 @@ export type Database = {
           },
         ]
       }
+      trial_requests: {
+        Row: {
+          company_name: string
+          company_size: string | null
+          contact_name: string
+          created_at: string
+          email: string | null
+          id: string
+          note: string | null
+          phone: string
+          status: string
+        }
+        Insert: {
+          company_name: string
+          company_size?: string | null
+          contact_name: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          note?: string | null
+          phone: string
+          status?: string
+        }
+        Update: {
+          company_name?: string
+          company_size?: string | null
+          contact_name?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          note?: string | null
+          phone?: string
+          status?: string
+        }
+        Relationships: []
+      }
       user_operation_logs: {
         Row: {
           id: string

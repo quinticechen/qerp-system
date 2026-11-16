@@ -11,6 +11,7 @@ import { Eye, EyeOff, LogIn, User, Mail, UserPlus, AlertCircle } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ForgotPasswordDialog from '@/components/auth/ForgotPasswordDialog';
+import { SEO } from '@/components/SEO';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -204,6 +205,7 @@ const Login = () => {
 
     return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 relative overflow-hidden">
+      <SEO title="登入" description="登入 QERP 紡織業 ERP，管理訂單、採購、入庫、庫存與出貨。" />
       {/* 背景裝飾 - 保持不變 */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-indigo-600/5 to-purple-600/5"></div>
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
