@@ -6,7 +6,7 @@ import { HomeHeader } from '@/components/home/HomeHeader';
 import { HomeFooter } from '@/components/home/HomeFooter';
 import { TrialRequestDialog } from '@/components/home/TrialRequestDialog';
 import { PricingPlanCard } from '@/components/pricing/PricingPlanCard';
-import { BILLING_PERIODS, BILLING_PERIOD_LABELS, BILLING_PERIOD_SAVINGS, PLANS, type BillingPeriod } from '@/lib/billingPlans';
+import { BILLING_PERIODS, BILLING_PERIOD_LABELS, PLANS, periodSavingsPercent, type BillingPeriod } from '@/lib/billingPlans';
 import { SITE_NAME, SITE_URL } from '@/lib/siteMeta';
 
 const PRICING_JSON_LD: Record<string, unknown>[] = [
@@ -80,7 +80,11 @@ const PricingPage = () => {
                 className="whitespace-nowrap rounded-full px-4 data-[state=on]:bg-indigo-600 data-[state=on]:text-white sm:px-5"
               >
                 {BILLING_PERIOD_LABELS[value]}
-                {BILLING_PERIOD_SAVINGS[value] && <span className="ml-1.5 hidden text-xs opacity-80 sm:inline">{BILLING_PERIOD_SAVINGS[value]}</span>}
+                {periodSavingsPercent(value) > 0 && (
+                  <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                    省 {periodSavingsPercent(value)}%
+                  </span>
+                )}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

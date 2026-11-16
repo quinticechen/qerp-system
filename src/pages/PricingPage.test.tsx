@@ -41,7 +41,17 @@ describe('PricingPage', () => {
     expect(within(card('標準')).getByText('NT$1,490')).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: /兩年繳/ }));
     expect(within(card('專業')).getByText('NT$71,800')).toBeTruthy();
-    expect(within(card('專業')).getByText(/約 NT\$2,992 \/ 月/)).toBeTruthy();
+    expect(within(card('專業')).getByText(/約 NT\$2,992 \/ 月，比月繳省 NT\$23,960/)).toBeTruthy();
+    expect(within(card('專業')).getByText('省 25%')).toBeTruthy();
+  });
+
+  it('shows how much each longer period saves', () => {
+    renderPricing();
+    expect(screen.getByRole('radio', { name: /年繳.*省 17%/ })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /兩年繳.*省 25%/ })).toBeTruthy();
+    expect(within(card('標準')).getByText('省 17%')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /月繳/ }));
+    expect(within(card('標準')).queryByText(/省 \d+%/)).toBeNull();
   });
 
   it('the free plan opens the contact form', () => {

@@ -17,7 +17,7 @@
 
 ## 2. Plans
 
-Plans differ only in seats and Query messages; every plan has the whole ERP.
+Plans differ only in seats and Query messages; every plan has the whole ERP. The pricing page shows each longer period's saving against paying monthly for the same months, computed from these prices (`savingsPercent()` in `src/lib/billingPlans.ts`): yearly 省 17%, every two years 省 25%, plus the amount saved in TWD.
 
 | | Free | Standard | Pro |
 |---|---|---|---|

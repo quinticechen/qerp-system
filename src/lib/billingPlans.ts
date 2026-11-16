@@ -23,12 +23,6 @@ export const BILLING_PERIOD_UNITS: Record<BillingPeriod, string> = {
   two_years: '/ 2 年',
 };
 
-export const BILLING_PERIOD_SAVINGS: Record<BillingPeriod, string | null> = {
-  month: null,
-  year: '付 10 個月',
-  two_years: '付 18 個月',
-};
-
 export const BILLING_PERIOD_MONTHS: Record<BillingPeriod, number> = { month: 1, year: 12, two_years: 24 };
 
 export interface PlanDefinition {
@@ -79,6 +73,22 @@ export const isBillingPeriod = (value: string | null): value is BillingPeriod =>
 export const findPlan = (code: PlanCode): PlanDefinition => PLANS.find((plan) => plan.code === code)!;
 
 export const formatTwd = (amount: number): string => `NT$${amount.toLocaleString('en-US')}`;
+
+/** What a period would cost at the monthly price (e.g. 12 × monthly for a year). */
+export const monthlyListPrice = (prices: Record<BillingPeriod, number>, period: BillingPeriod): number =>
+  prices.month * BILLING_PERIOD_MONTHS[period];
+
+/** TWD saved against paying monthly for the same length of time; 0 for monthly. */
+export const savingsAmount = (prices: Record<BillingPeriod, number>, period: BillingPeriod): number =>
+  monthlyListPrice(prices, period) - prices[period];
+
+/** Percent saved against paying monthly, rounded to a whole percent (yearly 17%, two-year 25%). */
+export const savingsPercent = (prices: Record<BillingPeriod, number>, period: BillingPeriod): number =>
+  Math.round((savingsAmount(prices, period) / monthlyListPrice(prices, period)) * 100);
+
+/** The saving every paid plan reaches for a period, for the period switch (the smallest, so it is never overstated). */
+export const periodSavingsPercent = (period: BillingPeriod): number =>
+  Math.min(...PLANS.flatMap((plan) => (plan.prices ? [savingsPercent(plan.prices, period)] : [])));
 
 /** Average monthly cost of a period's price, rounded to the dollar. */
 export const monthlyEquivalent = (amount: number, period: BillingPeriod): number => Math.round(amount / BILLING_PERIOD_MONTHS[period]);
