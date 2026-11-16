@@ -69,7 +69,7 @@ Query only sees the current organization, and only does what your role allows. O
 
 ## Status
 
-The order-to-shipping flow, master data, organizations and roles are in use. Query is live and still improving. The current goals are to complete tasks at least 40% faster than clicking through the screens, with replies that are over 85% accurate and arrive in under 10 seconds. Organization settings other than transferring ownership and deleting the organization, and the month-on-month change on the dashboard, are not built yet.
+The order-to-shipping flow, master data, organizations and roles are in use, and the public Home page takes free-trial requests. Query is live and still improving. The current goals are to complete tasks at least 40% faster than clicking through the screens, with replies that are over 85% accurate and arrive in under 10 seconds. Organization settings other than transferring ownership and deleting the organization, and the month-on-month change on the dashboard, are not built yet.
 
 ## Documentation
 
@@ -85,5 +85,7 @@ The order-to-shipping flow, master data, organizations and roles are in use. Que
 | [DEPENDENCIES.md](./docs/DEPENDENCIES.md) | Packages |
 | [EVALS.md](./docs/EVALS.md), [QUERY_AGENT_EVALS.md](./docs/QUERY_AGENT_EVALS.md) | How Query's answers are tested, and the results |
 | [requirements/](./docs/requirements/README.md) | Product requirements, plans and decisions |
+
+To try QERP, press 「免費試用」 (free trial) on [qerp.qwizai.com](https://qerp.qwizai.com) and leave your details; the team calls back and opens your account.
 
 Developers should start with [TECH_STACK.md](./docs/TECH_STACK.md) and [CLAUDE.md](./CLAUDE.md).

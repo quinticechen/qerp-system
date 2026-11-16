@@ -1,78 +1,63 @@
-# Weave Flow ERP — MCP Server
+# QERP Query Server (`mcp-server`)
 
-讓 Claude 或任何支援 MCP 的 AI 用自然語言操作 WeaveFlow ERP 的後端資料。
+The backend for **Query**, QERP's AI assistant. It answers questions and drafts records in Chinese for the ERP's chat panel, and exposes the same business tools to any Model Context Protocol (MCP) client. Every request runs as the signed-in user, inside one organization and within that user's permissions.
 
-## 工具清單
+Architecture, the tool list and known issues: [docs/AGENT.md](../docs/AGENT.md). Endpoint details: [docs/API.md](../docs/API.md). Evals: [docs/QUERY_AGENT_EVALS.md](../docs/QUERY_AGENT_EVALS.md).
 
-| 分類 | 工具 | 說明 |
-|------|------|------|
-| 客戶 | `list_customers` | 列出客戶，支援搜尋 |
-| 客戶 | `get_customer` | 取得單一客戶完整資料 |
-| 客戶 | `create_customer` | 建立新客戶 |
-| 訂單 | `list_orders` | 列出銷售訂單，支援狀態篩選 |
-| 訂單 | `get_order` | 取得訂單詳情含品項 |
-| 訂單 | `create_order` | 建立新銷售訂單 |
-| 訂單 | `update_order_status` | 更新訂單/付款/出貨狀態 |
-| 產品 | `list_products` | 列出產品目錄 |
-| 產品 | `get_product` | 取得產品完整規格 |
-| 庫存 | `get_inventory_summary` | 查詢各品項庫存（A/B/C/D 級） |
-| 庫存 | `get_low_stock_alerts` | 列出庫存不足警示 |
-| 採購單 | `list_purchase_orders` | 列出採購單 |
-| 採購單 | `get_purchase_order` | 取得採購單詳情含品項 |
-| 出貨 | `list_shippings` | 列出出貨記錄 |
-| 出貨 | `get_shipping` | 取得出貨單詳情含卷號 |
-| 工廠 | `list_factories` | 列出工廠資料 |
+## Endpoints
 
-## 安裝與設定
+All endpoints except `/health` need `Authorization: Bearer <Supabase access token>`.
 
-### 1. 安裝依賴並編譯
+| Method and path | Purpose |
+|-----------------|---------|
+| `POST /query` | One chat turn from the ERP's Query panel (`organization_id` in the body) |
+| `POST /query/actions/:id/confirm` · `/cancel` | Confirm or cancel a drafted write. Writes run only here, never inside the agent loop |
+| `POST /query/messages/:id/feedback` | Thumbs up / down on a reply |
+| `POST /mcp` | MCP over Streamable HTTP; the organization comes from the `X-Organization-Id` header |
+| `GET /health` | Health check |
+
+The server only serves organizations the user actively belongs to, and offers only the tools the user's role allows (`user_has_organization_permission()`, the same check the database uses).
+
+## Run locally
 
 ```bash
 cd mcp-server
-npm install
-npm run build
+# create .env with the variables below
+bun run dev            # http://localhost:3100, reloads on change
+bun run test           # tool, permission and adapter tests; run after every change
 ```
 
-### 2. 設定環境變數
+`bun run build` then `bun run start` runs the compiled server. Production runs on Google Cloud Run, deployed from `Dockerfile` ([docs/SERVICES.md](../docs/SERVICES.md)).
 
-複製 `.env.example` 為 `.env` 並填入：
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Yes | Supabase project; every query runs with the caller's JWT, so RLS applies (no service-role key) |
+| `OPENROUTER_API_KEY` | For `/query` | Model calls |
+| `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` | No | Tracing, prompt versions and evals; without them Query still works |
+| `LANGFUSE_SAMPLE_RATE` | No | Share of successful requests traced (default 0.05) |
+| `PORT` | No | Default 3100 |
 
-```bash
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-ORGANIZATION_ID=your-organization-uuid
-```
+## Connect an MCP client
 
-> **注意：** 使用 Service Role Key，此 key 可繞過 RLS，請妥善保管，僅用於伺服器端。
-
-### 3. 加入 Claude Code（.mcp.json）
-
-在專案根目錄或 `~/.claude/` 建立或更新 `.mcp.json`：
+Point any client that speaks Streamable HTTP at `/mcp` with the user's token and organization. For Claude Code, in `.mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "weave-flow-erp": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-server/dist/index.js"],
-      "env": {
-        "SUPABASE_URL": "https://your-project.supabase.co",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key",
-        "ORGANIZATION_ID": "your-organization-uuid"
+    "qerp": {
+      "type": "http",
+      "url": "http://localhost:3100/mcp",
+      "headers": {
+        "Authorization": "Bearer <Supabase access token>",
+        "X-Organization-Id": "<organization uuid>"
       }
     }
   }
 }
 ```
 
-重啟 Claude Code 後即可使用。
+Then ask in plain language, for example 「現在哪些產品庫存不足？」 (which products are low on stock?) or 「列出永泰布行的訂單」 (list 永泰布行's orders).
 
-## 使用範例
+## Evals
 
-```
-列出所有未付款的訂單
-幫我查詢客戶「台灣布業」的所有訂單
-現在哪些產品庫存不足？
-建立一張給客戶 XXX 的新訂單
-```
+`bun run eval` replays the eval cases against real models and costs money, so run it only when it's needed ([docs/QUERY_AGENT_EVALS.md](../docs/QUERY_AGENT_EVALS.md)).
