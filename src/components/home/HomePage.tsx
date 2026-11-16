@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { SEO } from '@/components/SEO';
 import { DEFAULT_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/siteMeta';
 import { HomeHeader } from './HomeHeader';
@@ -10,14 +9,10 @@ import { HomeRolesSection } from './HomeRolesSection';
 import { HomeFaqSection } from './HomeFaqSection';
 import { HomeCallToAction } from './HomeCallToAction';
 import { HomeFooter } from './HomeFooter';
-import { TrialRequestDialog } from './TrialRequestDialog';
 import { HOME_JSON_LD } from './homeContent';
 
 /** Public Home page for signed-out visitors (docs/requirements/HOME_PAGE.md). */
 export function HomePage() {
-  const [trialOpen, setTrialOpen] = useState(false);
-  const startTrial = () => setTrialOpen(true);
-
   return (
     <div className="min-h-screen bg-white text-left text-slate-900">
       <SEO
@@ -28,18 +23,17 @@ export function HomePage() {
         canonicalPath="/"
         jsonLd={HOME_JSON_LD}
       />
-      <HomeHeader onStartTrial={startTrial} />
+      <HomeHeader />
       <main>
-        <HomeHero onStartTrial={startTrial} />
+        <HomeHero />
         <HomeFlowSection />
         <HomeFeatureSection />
         <HomeQuerySection />
         <HomeRolesSection />
         <HomeFaqSection />
-        <HomeCallToAction onStartTrial={startTrial} />
+        <HomeCallToAction />
       </main>
       <HomeFooter />
-      <TrialRequestDialog open={trialOpen} onOpenChange={setTrialOpen} />
     </div>
   );
 }

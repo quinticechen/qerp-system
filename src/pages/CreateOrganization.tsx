@@ -9,7 +9,8 @@ import { Building2, Users, Settings, Shield } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganizationContext } from '@/contexts/OrganizationContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { safeNextPath } from '@/lib/safeNextPath';
 import { useAuth } from '@/hooks/useAuth';
 import { PendingInvitationsCard } from '@/components/organization/PendingInvitationsCard';
 
@@ -24,6 +25,8 @@ const CreateOrganization = () => {
   const { createOrganization } = useOrganizationContext();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get('next'));
   const [isCreating, setIsCreating] = useState(false);
 
   // 如果還在載入認證狀態，顯示載入畫面
@@ -80,7 +83,7 @@ const CreateOrganization = () => {
       
       // 延遲導航，讓使用者看到成功訊息，然後直接回到首頁讓路由系統處理
       setTimeout(() => {
-        navigate('/', { replace: true });
+        navigate(nextPath ?? '/', { replace: true });
       }, 1500);
     } catch (error: any) {
       console.error('Error creating organization:', error);

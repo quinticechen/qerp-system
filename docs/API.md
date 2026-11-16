@@ -378,6 +378,12 @@ Creating an organization writes `organizations` directly (a trigger adds the cre
 
 Other functions prefixed `api_` are for internal use by the business APIs only and can't be called.
 
+### 4.2 Plans
+
+| Function | Who can use it | Description |
+|----------|----------------|-------------|
+| `get_organization_entitlement(_organization_id)` | Organization members | `{ plan, status, billing_period, current_period_end, cancel_at_period_end, max_members, members, query_messages_per_month, query_messages_used }`; non-members get `42501` / `not_member` |
+
 ## 5. Read-only data
 
 | Name | Description |
@@ -389,7 +395,7 @@ Other functions prefixed `api_` are for internal use by the business APIs only a
 
 ## 6. AI server (`mcp-server/`)
 
-Deployed on Google Cloud Run ([SERVICES.md](./SERVICES.md)). Every endpoint requires `Authorization: Bearer <Supabase JWT>` and serves only organizations the user actively belongs to.
+Deployed on Google Cloud Run ([SERVICES.md](./SERVICES.md)). Every endpoint except `/health` and `/billing/webhook` requires `Authorization: Bearer <Supabase JWT>` and serves only organizations the user actively belongs to.
 
 | Endpoint | Description |
 |----------|-------------|
@@ -398,5 +404,10 @@ Deployed on Google Cloud Run ([SERVICES.md](./SERVICES.md)). Every endpoint requ
 | `POST /query/actions/:id/confirm` | The user confirms a write the AI proposed; membership and permission are re-checked at confirmation before it runs |
 | `POST /query/messages/:id/feedback` | Thumbs up or down on one of your own AI replies: body `{ "value": "up" \| "down" \| null }` (null undoes); returns `{ feedback }`. Stored in `query_messages.metadata.feedback` (`set_query_message_feedback()`) and sent to Langfuse ([AGENT.md](./AGENT.md)). 404 for replies that aren't yours |
 | `/mcp` | Model Context Protocol endpoint, with `X-Organization-Id` in the header |
+| `POST /billing/checkout` | Body `{ organization_id, plan: "standard" \| "pro", period: "month" \| "year" \| "two_years" }`; owner or admin (`canEditSystemSettings`) only. Returns `{ url }` of a Stripe Checkout page. 409 when the organization already has a paid subscription |
+| `POST /billing/portal` | Body `{ organization_id }`; owner or admin only. Returns `{ url }` of Stripe's billing portal. 404 when the organization has never paid |
+| `POST /billing/webhook` | Stripe events, **no JWT**: authenticated by the `Stripe-Signature` header. Activates, renews, changes or ends the organization's subscription ([requirements/PRICING_AND_BILLING.md](./requirements/PRICING_AND_BILLING.md) §4) |
+
+`/query` also checks the plan first: a not-yet-activated organization, or one past its monthly Query messages, gets a fixed reply without the agent.
 
 AI tools and architecture: [AGENT.md](./AGENT.md) (maintained by the AI Session).

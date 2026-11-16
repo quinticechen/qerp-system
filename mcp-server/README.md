@@ -6,7 +6,7 @@ Architecture, the tool list and known issues: [docs/AGENT.md](../docs/AGENT.md).
 
 ## Endpoints
 
-All endpoints except `/health` need `Authorization: Bearer <Supabase access token>`.
+All endpoints except `/health` and `/billing/webhook` need `Authorization: Bearer <Supabase access token>`.
 
 | Method and path | Purpose |
 |-----------------|---------|
@@ -14,6 +14,8 @@ All endpoints except `/health` need `Authorization: Bearer <Supabase access toke
 | `POST /query/actions/:id/confirm` · `/cancel` | Confirm or cancel a drafted write. Writes run only here, never inside the agent loop |
 | `POST /query/messages/:id/feedback` | Thumbs up / down on a reply |
 | `POST /mcp` | MCP over Streamable HTTP; the organization comes from the `X-Organization-Id` header |
+| `POST /billing/checkout` · `/billing/portal` | Stripe Checkout for a paid plan, or Stripe's billing portal (owner or admin) |
+| `POST /billing/webhook` | Stripe events; authenticated by the `Stripe-Signature` header instead of a JWT |
 | `GET /health` | Health check |
 
 The server only serves organizations the user actively belongs to, and offers only the tools the user's role allows (`user_has_organization_permission()`, the same check the database uses).
@@ -31,10 +33,12 @@ bun run test           # tool, permission and adapter tests; run after every cha
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Yes | Supabase project; every query runs with the caller's JWT, so RLS applies (no service-role key) |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Yes | Supabase project; every query runs with the caller's JWT, so RLS applies |
 | `OPENROUTER_API_KEY` | For `/query` | Model calls |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL` | No | Tracing, prompt versions and evals; without them Query still works |
 | `LANGFUSE_SAMPLE_RATE` | No | Share of successful requests traced (default 0.05) |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | For billing | Stripe API and webhook signing secret |
+| `SUPABASE_SERVICE_ROLE_KEY` | For billing | Used only by the Stripe webhook to write `organization_subscriptions` |
 | `PORT` | No | Default 3100 |
 
 ## Connect an MCP client

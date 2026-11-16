@@ -9,8 +9,9 @@ export function HomeFooter() {
         <HomeLogo />
         <nav aria-label="頁尾" className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
           {HOME_SECTIONS.map((section) => (
-            <a key={section.id} href={`#${section.id}`} className="hover:text-indigo-600">{section.label}</a>
+            <a key={section.id} href={`/#${section.id}`} className="hover:text-indigo-600">{section.label}</a>
           ))}
+          <Link to="/pricing" className="hover:text-indigo-600">方案與價格</Link>
           <Link to="/login" className="hover:text-indigo-600">登入</Link>
         </nav>
         <p className="text-sm text-slate-400">© {new Date().getFullYear()} QERP</p>

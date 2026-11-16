@@ -9,6 +9,13 @@
     <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/" />
   </url>
   <url>
+    <loc>https://qerp.qwizai.com/pricing</loc>
+    <lastmod>2026-11-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="zh-TW" href="https://qerp.qwizai.com/pricing" />
+  </url>
+  <url>
     <loc>https://qerp.qwizai.com/login</loc>
     <lastmod>2026-11-16</lastmod>
     <changefreq>yearly</changefreq>

@@ -3,10 +3,6 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-interface HomeHeroProps {
-  onStartTrial: () => void;
-}
-
 const HIGHLIGHTS = ['訂單到出貨一條龍', '布卷、等級、貨架逐卷追蹤', '中文 AI 助理'];
 
 // A sample order, to show what "progress computed for you" looks like.
@@ -16,7 +12,7 @@ const SAMPLE_PROGRESS = [
   { label: '已出貨', value: 40, bar: 'w-2/5 bg-emerald-500' },
 ];
 
-export function HomeHero({ onStartTrial }: HomeHeroProps) {
+export function HomeHero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <div className="absolute -top-24 right-0 h-96 w-96 rounded-full bg-indigo-400/20 blur-3xl" aria-hidden="true" />
@@ -43,9 +39,11 @@ export function HomeHero({ onStartTrial }: HomeHeroProps) {
             ))}
           </ul>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button size="lg" onClick={onStartTrial} className="h-12 bg-gradient-to-r from-blue-600 to-indigo-600 px-8 text-base text-white shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700">
-              免費試用
-              <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+            <Button asChild size="lg" className="h-12 bg-gradient-to-r from-blue-600 to-indigo-600 px-8 text-base text-white shadow-lg shadow-blue-500/25 hover:from-blue-700 hover:to-indigo-700">
+              <Link to="/pricing">
+                免費試用
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="h-12 bg-white/70 px-8 text-base">
               <Link to="/login">已有帳號，登入</Link>
