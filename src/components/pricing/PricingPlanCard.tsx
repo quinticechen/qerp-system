@@ -2,11 +2,12 @@ import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  BILLING_PERIOD_SAVINGS,
   BILLING_PERIOD_UNITS,
   PLAN_INCLUDES,
   formatTwd,
   monthlyEquivalent,
+  savingsAmount,
+  savingsPercent,
   type BillingPeriod,
   type PlanDefinition,
 } from '@/lib/billingPlans';
@@ -40,12 +41,21 @@ export function PricingPlanCard({ plan, period, onSelect }: PricingPlanCardProps
           </>
         ) : (
           <>
-            <p className="text-4xl font-bold text-slate-900">
-              {formatTwd(price)}
-              <span className="ml-1 text-base font-normal text-slate-500">{BILLING_PERIOD_UNITS[period]}</span>
+            <p className="flex flex-wrap items-baseline gap-x-2 text-4xl font-bold text-slate-900">
+              <span>
+                {formatTwd(price)}
+                <span className="ml-1 text-base font-normal text-slate-500">{BILLING_PERIOD_UNITS[period]}</span>
+              </span>
+              {period !== 'month' && plan.prices && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-sm font-semibold text-emerald-700">
+                  省 {savingsPercent(plan.prices, period)}%
+                </span>
+              )}
             </p>
             <p className="mt-2 text-sm text-slate-500">
-              {period === 'month' ? '每月自動續訂，可隨時取消' : `約 ${formatTwd(monthlyEquivalent(price, period))} / 月・${BILLING_PERIOD_SAVINGS[period]}`}
+              {period === 'month' || !plan.prices
+                ? '每月自動續訂，可隨時取消'
+                : `約 ${formatTwd(monthlyEquivalent(price, period))} / 月，比月繳省 ${formatTwd(savingsAmount(plan.prices, period))}`}
             </p>
           </>
         )}

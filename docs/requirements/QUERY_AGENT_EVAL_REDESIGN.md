@@ -22,7 +22,7 @@ Other limits: reply quality could only be checked with regular expressions; 3 ru
 
 | # | Question | Decision |
 |---|----------|----------|
-| E1 | What decides whether a case passes | **The outcome**: the draft (type and content expressed with names), the facts in the answer, and rules that must never be broken. Tool call order and router dispatch are diagnostic metrics only (2026-10-14) |
+| E1 | What decides whether a case passes | **The outcome**: the draft (type and content expressed with names), the facts in the answer, and rules that must never be broken. Tool call order and router dispatch are diagnostic metrics only (2026-10-14). **Revised 2026-10-31 (user):** a case may also name tools the answer cannot come without (`expectedOutput.tools`); they count toward passing. A tool counts when any agent calls it, in any order, so the same case holds for the single agent and the router (§3.1). Router dispatch stays diagnostic |
 | E2 | Where cases live | **The Langfuse Dataset is authoritative**: add and edit cases on the Langfuse website; the eval reads from Langfuse when it runs; each run exports the cases it used to the repo (`mcp-server/evals/snapshots/`) for git tracking and offline reruns (2026-10-14) |
 | E3 | Where prompts live | **Langfuse Prompt Management**: production reads only the `production` label; a new version must pass the eval before it can be labeled `production`; a fallback prompt is kept in code for when Langfuse can't be reached (2026-10-14) |
 | E4 | Case format | The §3 format: situation category, source, reviewer, policy status; expectations describe only outcomes and rules (2026-10-14) |
@@ -50,6 +50,7 @@ Each case is one item in the Langfuse Dataset `query-agent`: `input` is what's s
     "message": "雲朵眠藍色 20 公斤，一公斤 80"
   },
   "expectedOutput": {
+    "tools": [],
     "draft": {
       "tool": "create_order",
       "fields": { "客戶": "永泰布行", "品項 1": "雲朵眠 test0922 - 藍0922 × 20 公斤，單價 80" }
@@ -73,17 +74,41 @@ Each case is one item in the Langfuse Dataset `query-agent`: `input` is what's s
 |-------|-------------|
 | `input.role` | `owner`, `admin`, `editor`, `viewer` (`evals/fixtures/roles.json`) |
 | `input.fixtures` | Name of the fake data set (`evals/fixtures/<name>.json`) |
-| `expectedOutput.draft` | The draft that should be produced: `tool` and the confirmation card's fields (`summary.fields`, expressed with names, not IDs); list only the fields to check |
+| `expectedOutput.draft` | The draft that should be produced: `tool`, optionally `title` (the card title, which is where an update, cancel or deactivate names its record, e.g. 停用客戶「億豐紡織」 "deactivate customer 億豐紡織"), and the confirmation card's fields (`summary.fields`, expressed with names, not IDs). List every field the user's request decides, plus the total (訂單總額 / 採購總額) as a check on quantity × price; leave out fields that depend on the run date (下單日期, 到貨日期) |
 | `expectedOutput.no_draft` | `true`: no draft may be produced |
-| `expectedOutput.answer_includes` | Facts that must appear in the answer (names, number + unit) |
+| `expectedOutput.tools` | Tools that must be called (§3.1). An entry that is a list means any one of them, e.g. `[["list_customers", "get_customer"]]`. Names are checked against the tool registry before any model runs |
+| `expectedOutput.answer_includes` | Facts that must appear in the answer (names, number + unit); compared ignoring whitespace, case, dash style (`－` = `-`) and `kg` vs 公斤. A fact that starts or ends with a digit matches whole numbers only, so `50 公斤` doesn't match 「450 公斤」. Write quantities with their unit |
+| `expectedOutput.answer_order` | Groups of facts in the order the answer must give them: each fact of a later group is mentioned after every fact of the group before it has appeared, e.g. `[[active customers…], ["協成布行"]]` for a deactivated customer listed last. A mention in an opening summary does not fail it |
 | `expectedOutput.policy` | The §3.4 situation; the LLM scoring picks its rubric by this |
 | `metadata.category` | The PHASE1 §4.2 situation category (including the TPM's additions: security and defense, large result, cross-flow) |
 | `metadata.domain` | `customer`, `factory`, `product`, `shelf`, `order`, `purchase`, `receiving`, `inventory`, `shipping`, `general` |
 | `metadata.source` | `real` (real utterance), `incident` (incident), `matrix` (filled in per §4.2), `generated` (LLM paraphrase) |
 | `metadata.reviewed_by` | Reviewer; `generated` cases without a reviewer don't count toward the thresholds |
 | `metadata.policy_status` | `defined`; `pending` means the policy isn't defined, so only the rules that must never be broken are checked |
-| `metadata.diagnostics` | Expected tools and dispatch; only feed the diagnostic report and don't affect passing |
+| `metadata.diagnostics` | Tools that are likely but not required, and the expected dispatch; only feed the diagnostic report and don't affect passing |
 | `metadata.known_gap` | A known gap not yet fixed; doesn't count toward the thresholds. For these cases `draft.tool` may be a business API not yet wrapped as a tool (`PLANNED_TOOLS` in `evals/cases.ts`), recording the expected behavior once the tool exists |
+
+### 3.1 Required tools (`expectedOutput.tools`)
+
+A tool passes when it was called at least once during the request by any agent: the single agent, or any sub-agent the router dispatched to. Order and extra calls don't matter. The eval collects every agent's tool calls into one list (`onStep` in `src/agent/observer.ts`), so the check is the same whatever the orchestration, and a case need not change when the orchestration does.
+
+| Situation | Result |
+|-----------|--------|
+| The single agent calls the tool | Pass |
+| The router dispatches to a sub-agent that calls it | Pass |
+| A cross-flow request: two sub-agents each call part of the tools | Pass when together they called every required tool |
+| The router dispatches to a sub-agent that lacks the tool, so it is never called | Fail (outcome); the `routes to` diagnostic shows the misroute |
+| The agent answers without calling it | Fail |
+
+The check's detail names the agent that made each call, e.g. `called: list_customers（commercial）`.
+
+What to list:
+
+- Only tools the answer cannot come without: single-turn lookups (lists, a record, stock, documents). When the earlier turns already hold the data, or several tools could do, list the alternatives or leave it out.
+- Not the draft's tool: `draft.tool` already checks it.
+- Not lookups a write tool can do itself: write tools accept names (`refInput`), so `list_customers` before `create_order` stays in `diagnostics.tools`.
+
+A renamed or merged tool makes every case that names it fail the format check before any model runs, so the case set is updated in the same change.
 
 ## 4. Scoring
 
@@ -91,8 +116,8 @@ Each case is one item in the Langfuse Dataset `query-agent`: `input` is what's s
 
 | Layer | Langfuse score | Judged by | Counts toward thresholds |
 |-------|----------------|-----------|--------------------------|
-| Rules that must never be broken | `rule_*` (e.g. `rule_no_write`, `rule_no_id_leak`, `rule_no_false_draft`, `rule_permission`) | Code; checked on every run | Always 100% |
-| Task outcome | `outcome` (0 / 1) | Code compares against `expectedOutput.draft`, `no_draft`, `answer_includes` | Yes |
+| Rules that must never be broken | `rule_*` (e.g. `rule_no_write`, `rule_no_id_leak`, `rule_no_false_draft`, `rule_no_cross_org`, `rule_permission`) | Code; checked on every run | Always 100% |
+| Task outcome | `outcome` (0 / 1) | Code compares against `expectedOutput.draft`, `no_draft`, `tools`, `answer_includes`, `answer_order` | Yes |
 | Reply quality | `policy_judge` (0–1, with a reason) | Langfuse LLM-as-a-Judge (observation level; trace-level evaluators only run on Langfuse Cloud until 2026-11-16), using the §3.4 rubric matching `expectedOutput.policy` | Recorded only until calibrated (§4.3) |
 
 `latency_ms` is also recorded: a single run over 30 seconds counts as a failure of that run; the overall average must be within 10 seconds (TPM §3.1).

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { verifyStripeSignature } from "../src/billing/signature.js";
-import { encodeParams, type StripeSubscription } from "../src/billing/stripe-client.js";
+import { encodeParams, StripeClient, type FetchLike, type StripeSubscription } from "../src/billing/stripe-client.js";
 import { parseLookupKey, priceLookupKey } from "../src/billing/plans.js";
 import { handleStripeEvent, subscriptionPatch, type SubscriptionRow, type SubscriptionStore } from "../src/billing/webhook.js";
 import { createCheckout, createPortal } from "../src/billing/checkout.js";
@@ -40,6 +40,18 @@ test("prices are found by lookup key, and Stripe params are form-encoded with ne
     encodeParams({ mode: "subscription", line_items: [{ price: "price_1", quantity: 1 }], metadata: { organization_id: ORG }, lookup_keys: ["k"], skip: undefined }),
     ["mode=subscription", "line_items%5B0%5D%5Bprice%5D=price_1", "line_items%5B0%5D%5Bquantity%5D=1", `metadata%5Borganization_id%5D=${ORG}`, "lookup_keys%5B0%5D=k"],
   );
+});
+
+test("the billing portal uses QERP's own configuration when one is set", async () => {
+  const bodies: string[] = [];
+  const fetchFn: FetchLike = async (_url, init) => {
+    bodies.push(init.body ?? "");
+    return { ok: true, status: 200, json: async () => ({ url: "https://billing.stripe.com/x" }) };
+  };
+  await new StripeClient("sk", fetchFn, "bpc_qerp").createPortalSession("cus_1", "https://qerp.qwizai.com/system");
+  await new StripeClient("sk", fetchFn).createPortalSession("cus_1", "https://qerp.qwizai.com/system");
+  assert.match(bodies[0], /configuration=bpc_qerp/);
+  assert.doesNotMatch(bodies[1], /configuration=/, "falls back to the account default");
 });
 
 const subscription = (overrides: Partial<StripeSubscription> = {}): StripeSubscription => ({

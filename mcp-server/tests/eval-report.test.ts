@@ -201,3 +201,18 @@ test("experiment log row: primary model per phase, gates, regressions and an emp
   const row = logRow(r, { baselineId: "b", regressed: ["q-b"], fixed: [], changed: [] });
   assert.equal(row, "| `20261014T0100-x` | router；router: gemini-2.5-flash-lite；commercial、supply_chain: gemini-2.5-flash | 100% | — | 1.0s | ✅ | `q-b` |  |");
 });
+
+test("confirmation runs decide a regressed case's status but stay out of the metrics", () => {
+  const before = report("before", [run("q-a", 1, true), run("w-a", 1, true)]);
+  const first = [run("q-a", 1, false), run("w-a", 1, false)];
+  assert.deepEqual(compareReports(before, report("first", first, { runs: 1 })).regressed, ["q-a", "w-a"], "both regress on one run");
+
+  // q-a was an unlucky run (passes 2 more times); w-a really regressed (fails once more).
+  const confirmed = [...first,
+    run("q-a", 2, true, { confirm: true }), run("q-a", 3, true, { confirm: true }),
+    run("w-a", 2, true, { confirm: true }), run("w-a", 3, false, { confirm: true })];
+  const after = report("after", confirmed, { runs: 1 });
+  assert.deepEqual(compareReports(before, after).regressed, ["w-a"], "2 of 3 passing is not a regression");
+  assert.equal(after.metrics.taskCompletion, 0, "metrics count the first runs only");
+  assert.equal(computeMetrics(CASES, first).taskCompletion, after.metrics.taskCompletion);
+});

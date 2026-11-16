@@ -12,7 +12,7 @@ Signed-out visitors see the QERP Home page: what the product does, the order-to-
 
 ## 0.1 Pricing and subscriptions (`/pricing`)
 
-Three plans with a 月繳／年繳／兩年繳 (monthly / yearly / two-year) switch: Free (3 members, Query 100 messages a month), Standard (10, 1,000; NT$1,490 / 14,900 / 26,800) and Pro (30, 5,000; NT$3,990 / 39,900 / 71,800). Every plan has the whole ERP.
+Three plans with a 月繳／年繳／兩年繳 (monthly / yearly / two-year) switch that shows each period's saving (年繳 省 17%, 兩年繳 省 25%; each card also shows the TWD saved against monthly): Free (3 members, Query 100 messages a month), Standard (10, 1,000; NT$1,490 / 14,900 / 26,800) and Pro (30, 5,000; NT$3,990 / 39,900 / 71,800). Every plan has the whole ERP.
 
 - Free: 「申請免費試用」 opens the free-trial form; the team calls and activates the organization.
 - Paid: 「選擇…方案」 → sign in or sign up → create an organization if needed → `/checkout` (organization, plan, price; owner or admin only) → Stripe payment → `/billing/success`, activated within seconds.

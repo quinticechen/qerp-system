@@ -1,0 +1,931 @@
+{
+  "version": 3,
+  "id": "20261016T0438-sdk-smoke",
+  "label": "sdk-smoke",
+  "createdAt": "2026-10-16T04:38:57.194Z",
+  "filter": "pp-c",
+  "runs": 1,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:warehouse": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:catalog": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:facilities": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "fa2b6145",
+      "prompt.commercial": "1673bda2",
+      "prompt.supply_chain": "c7669442",
+      "prompt.warehouse": "7cf4d15f",
+      "prompt.catalog": "ddf772c1",
+      "prompt.facilities": "f0072790",
+      "tools": "36f165dd",
+      "cases": "57c6a3f0",
+      "fixtures": "253c65b3"
+    },
+    "git": {
+      "commit": "8954a0c",
+      "dirty": true
+    },
+    "prompts": {
+      "label": "production",
+      "versions": {
+        "query-router": 1,
+        "query-agent-commercial": 1,
+        "query-agent-supply_chain": 1,
+        "query-agent-warehouse": 1,
+        "query-agent-catalog": 1,
+        "query-agent-facilities": 1,
+        "query-agent-single": 1
+      }
+    }
+  },
+  "dataset": {
+    "name": "query-agent",
+    "version": null,
+    "snapshot": "20261014T1611-502aa148.json"
+  },
+  "dbCheck": "passed",
+  "cases": [
+    {
+      "id": "pp-create-order",
+      "itemId": "pp-create-order",
+      "name": "改寫：開一張新訂單",
+      "category": "改寫",
+      "domain": "order",
+      "expectsDraft": true
+    },
+    {
+      "id": "pp-create-po",
+      "itemId": "pp-create-po",
+      "name": "改寫：跟工廠訂布",
+      "category": "改寫",
+      "domain": "purchase",
+      "expectsDraft": true
+    },
+    {
+      "id": "pp-customers",
+      "itemId": "pp-customers",
+      "name": "改寫：客戶名單",
+      "category": "改寫",
+      "domain": "customer",
+      "expectsDraft": false
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 1,
+    "taskCompletionCI": [
+      0.43849391955098227,
+      1
+    ],
+    "rules": 1,
+    "outcome": 1,
+    "writeCompletion": 1,
+    "toolSelection": 1,
+    "routing": 0.3333333333333333,
+    "toolConfusion": [],
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "改寫": 1
+    },
+    "policyJudge": 0.09999999999999999,
+    "policyJudgeByCategory": {
+      "改寫": 0.09999999999999999
+    },
+    "byDomain": {
+      "customer": 1,
+      "order": 1,
+      "purchase": 1
+    },
+    "latencyMs": {
+      "avg": 7202,
+      "p50": 7091,
+      "p90": 10037,
+      "max": 10037
+    },
+    "phaseLatencyMs": {
+      "agent:catalog": {
+        "p50": 3007,
+        "p90": 3007
+      },
+      "agent:commercial": {
+        "p50": 3678,
+        "p90": 5870
+      },
+      "agent:supply_chain": {
+        "p50": 7415,
+        "p90": 7415
+      },
+      "router": {
+        "p50": 1210,
+        "p90": 2605
+      }
+    },
+    "totalCostUsd": 0.00180005,
+    "costPerCompletedTask": 0.0006000166666666667,
+    "avgInputTokens": 4893,
+    "avgOutputTokens": 459
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "unit": "ratio",
+      "value": 1,
+      "min": 0.85,
+      "pass": true
+    },
+    {
+      "id": "rules",
+      "label": "不可違反的規則",
+      "unit": "ratio",
+      "value": 1,
+      "min": 1,
+      "pass": true
+    },
+    {
+      "id": "write",
+      "label": "寫入類案例（應產生草稿）",
+      "unit": "ratio",
+      "value": 1,
+      "min": 1,
+      "pass": true
+    },
+    {
+      "id": "latency",
+      "label": "平均延遲",
+      "unit": "ms",
+      "value": 7202,
+      "max": 10000,
+      "pass": true
+    }
+  ],
+  "results": [
+    {
+      "caseId": "pp-create-order",
+      "run": 1,
+      "reply": "**📋 客戶與訂單**\n已建立草稿，請在下方的確認卡片確認內容。\n\n---\n\n**🧵 產品**\n我無法處理訂單事宜，請與負責訂單的助理聯繫。",
+      "route": {
+        "agents": [
+          "commercial",
+          "catalog"
+        ],
+        "tasks": {
+          "commercial": "為客戶「永泰布行」建立訂單，產品：棉麻平織 米白，數量：30 公斤，單價：120",
+          "catalog": "查詢產品規格，產品名稱：棉麻平織，顏色：米白"
+        }
+      },
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰布行"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "棉麻平織 米白"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "items": [
+              {
+                "unit_price": 120,
+                "product_id": "a0000000-0000-4000-8000-000000000003",
+                "quantity": 30
+              }
+            ],
+            "customer_id": "c0000000-0000-4000-8000-000000000004"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c0000000-0000-4000-8000-000000000004",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000003",
+                "quantity": 30,
+                "unit_price": 120
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "棉麻平織 - 米白（色號 OW-01） × 30 公斤，單價 120"
+              },
+              {
+                "label": "訂單總額",
+                "value": "3600"
+              }
+            ]
+          }
+        }
+      ],
+      "latencyMs": 7091,
+      "routeFromFallback": false,
+      "modelErrors": [],
+      "startedAt": 1792125540903,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125540913,
+          "durationMs": 1210,
+          "calls": [
+            {
+              "startedAt": 1792125540922,
+              "durationMs": 1199,
+              "inputTokens": 657,
+              "outputTokens": 57,
+              "costUsd": 0.0000885,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:catalog",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125542124,
+          "durationMs": 3007,
+          "calls": [
+            {
+              "startedAt": 1792125542126,
+              "durationMs": 3003,
+              "inputTokens": 915,
+              "outputTokens": 238,
+              "costUsd": 0.0001867,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125542124,
+          "durationMs": 5870,
+          "calls": [
+            {
+              "startedAt": 1792125542125,
+              "durationMs": 2775,
+              "inputTokens": 1008,
+              "outputTokens": 263,
+              "costUsd": 0.000206,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125544905,
+              "durationMs": 2313,
+              "inputTokens": 1203,
+              "outputTokens": 88,
+              "costUsd": 0.0001555,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125547222,
+              "durationMs": 771,
+              "inputTokens": 0,
+              "outputTokens": 0,
+              "costUsd": null,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1792125544904,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰布行"
+              }
+            },
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "棉麻平織 米白"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "catalog",
+          "at": 1792125545131,
+          "toolCalls": []
+        },
+        {
+          "agent": "commercial",
+          "at": 1792125547221,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "items": [
+                  {
+                    "unit_price": 120,
+                    "product_id": "a0000000-0000-4000-8000-000000000003",
+                    "quantity": 30
+                  }
+                ],
+                "customer_id": "c0000000-0000-4000-8000-000000000004"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1792125547994,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "kind": "rule",
+          "check": "rule_no_error",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_write",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_id_leak",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_false_draft",
+          "pass": true,
+          "detail": "回覆提到確認卡片，但沒有草稿"
+        },
+        {
+          "kind": "rule",
+          "check": "rule_permission",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_latency",
+          "pass": true,
+          "detail": "7.1s"
+        },
+        {
+          "kind": "outcome",
+          "check": "one create_order draft",
+          "pass": true,
+          "detail": "草稿：create_order"
+        },
+        {
+          "kind": "outcome",
+          "check": "draft「客戶」= 永泰布行",
+          "pass": true,
+          "detail": "永泰布行"
+        },
+        {
+          "kind": "outcome",
+          "check": "draft「品項 1」= 棉麻平織 - 米白（色號 OW-01） × 30 公斤，單價 120",
+          "pass": true,
+          "detail": "棉麻平織 - 米白（色號 OW-01） × 30 公斤，單價 120"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers, list_products, create_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_products",
+          "pass": true,
+          "detail": "called: list_customers, list_products, create_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls create_order",
+          "pass": true,
+          "detail": "called: list_customers, list_products, create_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "routes to commercial",
+          "pass": false,
+          "detail": "catalog+commercial"
+        }
+      ],
+      "pass": true,
+      "judge": {
+        "score": 0,
+        "reason": "回覆自相矛盾。Query 既說「我無法處理訂單事宜」，卻又成功建立了訂單草稿，包含完整的客戶、產品、數量、單價和總額資訊。這違反了政策中「只根據工具查到的資料回答」的原則——若真的無法處理，就不應該建立草稿；若能建立草稿，就應該明確告知已完成，而非推諉。"
+      }
+    },
+    {
+      "caseId": "pp-create-po",
+      "run": 1,
+      "reply": "**📋 客戶與訂單**\n找不到客戶「永興織造」，是否要新增此客戶？若否，請提供正確的客戶名稱。\n\n---\n\n**🏭 採購與入庫**\n好的，已為您建立採購單草稿。請在下方的確認卡片中核對內容，確認無誤後點選「確認」。",
+      "route": {
+        "agents": [
+          "commercial",
+          "supply_chain"
+        ],
+        "tasks": {
+          "commercial": "建立訂單，客戶名稱為永興織造，產品為棉麻平織米白，數量 50 公尺，單價 80",
+          "supply_chain": "建立採購單，供應商為永興織造，產品為棉麻平織米白，數量 50 公尺，單價 80"
+        }
+      },
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永興織造"
+          }
+        },
+        {
+          "toolName": "list_factories",
+          "args": {
+            "search": "永興織造"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "棉麻平織 米白"
+          }
+        },
+        {
+          "toolName": "create_purchase_order",
+          "args": {
+            "factory_id": "f0000000-0000-4000-8000-000000000002",
+            "items": [
+              {
+                "unit_price": 80,
+                "ordered_quantity": 50,
+                "specifications": "米白",
+                "product_id": "a0000000-0000-4000-8000-000000000003"
+              }
+            ]
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_purchase_order",
+          "payload": {
+            "factory_id": "f0000000-0000-4000-8000-000000000002",
+            "items": [
+              {
+                "product_id": "a0000000-0000-4000-8000-000000000003",
+                "ordered_quantity": 50,
+                "unit_price": 80,
+                "specifications": "米白"
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立採購單",
+            "fields": [
+              {
+                "label": "工廠",
+                "value": "永興織造"
+              },
+              {
+                "label": "品項 1",
+                "value": "棉麻平織 - 米白（色號 OW-01） × 50 公斤，單價 80"
+              },
+              {
+                "label": "下單日期",
+                "value": "2026-10-16"
+              },
+              {
+                "label": "採購總額",
+                "value": "4000"
+              }
+            ]
+          }
+        }
+      ],
+      "latencyMs": 10037,
+      "routeFromFallback": false,
+      "modelErrors": [],
+      "startedAt": 1792125540904,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125540918,
+          "durationMs": 2605,
+          "calls": [
+            {
+              "startedAt": 1792125540923,
+              "durationMs": 2599,
+              "inputTokens": 653,
+              "outputTokens": 78,
+              "costUsd": 0.0000965,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125543524,
+          "durationMs": 3678,
+          "calls": [
+            {
+              "startedAt": 1792125543532,
+              "durationMs": 1475,
+              "inputTokens": 1003,
+              "outputTokens": 17,
+              "costUsd": 0.0001071,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125545010,
+              "durationMs": 2191,
+              "inputTokens": 1015,
+              "outputTokens": 24,
+              "costUsd": 0.0001111,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:supply_chain",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125543525,
+          "durationMs": 7415,
+          "calls": [
+            {
+              "startedAt": 1792125543533,
+              "durationMs": 3158,
+              "inputTokens": 1240,
+              "outputTokens": 388,
+              "costUsd": 0.0002792,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125546695,
+              "durationMs": 2308,
+              "inputTokens": 1321,
+              "outputTokens": 10,
+              "costUsd": 0.00002855,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125549007,
+              "durationMs": 925,
+              "inputTokens": 1436,
+              "outputTokens": 96,
+              "costUsd": 0.0000704,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125549934,
+              "durationMs": 1000,
+              "inputTokens": 1632,
+              "outputTokens": 33,
+              "costUsd": 0.0001764,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1792125545009,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永興織造"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1792125546694,
+          "toolCalls": [
+            {
+              "toolName": "list_factories",
+              "args": {
+                "search": "永興織造"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1792125547202,
+          "toolCalls": []
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1792125549006,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "棉麻平織 米白"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1792125549934,
+          "toolCalls": [
+            {
+              "toolName": "create_purchase_order",
+              "args": {
+                "factory_id": "f0000000-0000-4000-8000-000000000002",
+                "items": [
+                  {
+                    "unit_price": 80,
+                    "ordered_quantity": 50,
+                    "specifications": "米白",
+                    "product_id": "a0000000-0000-4000-8000-000000000003"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "agent": "supply_chain",
+          "at": 1792125550940,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "kind": "rule",
+          "check": "rule_no_error",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_write",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_id_leak",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_false_draft",
+          "pass": true,
+          "detail": "回覆提到確認卡片，但沒有草稿"
+        },
+        {
+          "kind": "rule",
+          "check": "rule_permission",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_latency",
+          "pass": true,
+          "detail": "10.0s"
+        },
+        {
+          "kind": "outcome",
+          "check": "one create_purchase_order draft",
+          "pass": true,
+          "detail": "草稿：create_purchase_order"
+        },
+        {
+          "kind": "outcome",
+          "check": "draft「工廠」= 永興織造",
+          "pass": true,
+          "detail": "永興織造"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_factories",
+          "pass": true,
+          "detail": "called: list_customers, list_factories, list_products, create_purchase_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_products",
+          "pass": true,
+          "detail": "called: list_customers, list_factories, list_products, create_purchase_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls create_purchase_order",
+          "pass": true,
+          "detail": "called: list_customers, list_factories, list_products, create_purchase_order"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "routes to supply_chain",
+          "pass": false,
+          "detail": "commercial+supply_chain"
+        }
+      ],
+      "pass": true,
+      "judge": {
+        "score": 0.3,
+        "reason": "回覆有多項違反政策的問題：(1) 使用者說「50 公尺」，Query 卻改為「50 公斤」，單位錯誤且未經確認；(2) 使用者未提及色號，Query 自行捏造「OW-01」；(3) 使用者說「訂」（採購），Query 卻建立採購單並要求確認，邏輯混亂；(4) 客戶查詢失敗後仍逕自建立草稿，應先確認客戶。"
+      }
+    },
+    {
+      "caseId": "pp-customers",
+      "run": 1,
+      "reply": "\n- Chen\n- Chen1\n- Client name test0922\n- 永泰布行",
+      "route": {
+        "agents": [
+          "commercial"
+        ],
+        "tasks": {
+          "commercial": "查詢客戶名單"
+        }
+      },
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {}
+        }
+      ],
+      "writes": [],
+      "drafts": [],
+      "latencyMs": 4478,
+      "routeFromFallback": false,
+      "modelErrors": [],
+      "startedAt": 1792125540905,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125540918,
+          "durationMs": 1176,
+          "calls": [
+            {
+              "startedAt": 1792125540923,
+              "durationMs": 1167,
+              "inputTokens": 573,
+              "outputTokens": 9,
+              "costUsd": 0.0000609,
+              "provider": "Google"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1792125542095,
+          "durationMs": 3287,
+          "calls": [
+            {
+              "startedAt": 1792125542097,
+              "durationMs": 2403,
+              "inputTokens": 872,
+              "outputTokens": 54,
+              "costUsd": 0.0001088,
+              "provider": "Google"
+            },
+            {
+              "startedAt": 1792125544506,
+              "durationMs": 875,
+              "inputTokens": 1152,
+              "outputTokens": 23,
+              "costUsd": 0.0001244,
+              "provider": "Google"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1792125544505,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {}
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1792125545382,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "kind": "rule",
+          "check": "rule_no_error",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_write",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_id_leak",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_false_draft",
+          "pass": true,
+          "detail": "回覆提到確認卡片，但沒有草稿"
+        },
+        {
+          "kind": "rule",
+          "check": "rule_permission",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_latency",
+          "pass": true,
+          "detail": "4.5s"
+        },
+        {
+          "kind": "outcome",
+          "check": "no draft",
+          "pass": true,
+          "detail": "草稿：（無）"
+        },
+        {
+          "kind": "outcome",
+          "check": "answer includes「永泰布行」",
+          "pass": true
+        },
+        {
+          "kind": "diagnostic",
+          "check": "calls list_customers",
+          "pass": true,
+          "detail": "called: list_customers"
+        },
+        {
+          "kind": "diagnostic",
+          "check": "routes to commercial",
+          "pass": true,
+          "detail": "commercial"
+        }
+      ],
+      "pass": true,
+      "judge": {
+        "score": 0,
+        "reason": "違反政策要求。Query 直接列出客戶名單，但根據政策「只根據工具查到的資料回答，不捏造客戶、產品、單據或數字」，此回覆無法確認是否真的從工具查詢到這些資料，或是直接捏造的客戶名單。此外，缺少必要的上下文說明（如時間範圍、篩選條件等），也沒有建立草稿卡片供使用者確認，無法完整完成「改寫」情境下的要求。"
+      }
+    }
+  ]
+}

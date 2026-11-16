@@ -11,7 +11,7 @@ import { startActiveObservation } from "@langfuse/tracing";
 import { kindPassed } from "./checks.js";
 import type { EvalCase } from "./cases.js";
 import { POLICIES } from "./judge.js";
-import type { CaseInfo, CaseStatus, GateResult, LangfuseRunRef, RunResult } from "./report.js";
+import { costOf, type CaseInfo, type CaseStatus, type GateResult, type LangfuseRunRef, type RunResult } from "./report.js";
 
 /** Score configs, named after what they measure (Langfuse: one config per score name). */
 export const SCORE_CONFIGS: CreateScoreConfigRequest[] = [
@@ -20,6 +20,7 @@ export const SCORE_CONFIGS: CreateScoreConfigRequest[] = [
   { name: "outcome", dataType: "NUMERIC", minValue: 0, maxValue: 1, description: "結果（草稿與回覆中的事實）符合預期的執行比例；政策待定的案例沒有這個分數" },
   { name: "passed", dataType: "BOOLEAN", description: "案例通過：通過的執行比例達到門檻（預設 3 次中 2 次）" },
   { name: "latency_ms", dataType: "NUMERIC", minValue: 0, description: "這個案例每次執行的平均延遲（毫秒）" },
+  { name: "cost_usd", dataType: "NUMERIC", minValue: 0, description: "這個案例每次執行的平均模型花費（美元，不含 LLM 評審）" },
   { name: "policy_judge", dataType: "NUMERIC", minValue: 0, maxValue: 1, description: "程式內 LLM 評審的平均分數（校準前只記錄，不計入門檻）" },
   { name: "task_completion", dataType: "NUMERIC", minValue: 0, maxValue: 1, description: "整次執行：計分案例的任務完成率" },
   { name: "gates_passed", dataType: "BOOLEAN", description: "整次執行：所有門檻都通過" },
@@ -101,6 +102,16 @@ const share = (runs: RunResult[], pass: (r: RunResult) => boolean | null): numbe
   return scored.length ? scored.filter((r) => pass(r)).length / scored.length : null;
 };
 
+/**
+ * Mean model cost of one run, or null when no run reported a cost. The trace's own cost and
+ * latency add up all of a case's runs, so these per-run means are what compares across evals
+ * that ran each case a different number of times.
+ */
+export function meanCost(runs: RunResult[]): number | null {
+  const costs = runs.map(costOf).filter((c): c is number => c !== null);
+  return costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : null;
+}
+
 /** Runs every case through the SDK experiment runner; returns the results and the experiment link. */
 export async function runExperiment(p: ExperimentParams): Promise<{ results: RunResult[]; url?: string; runs: Record<string, LangfuseRunRef> }> {
   const byCase = new Map<string, RunResult[]>();
@@ -162,6 +173,7 @@ export async function runExperiment(p: ExperimentParams): Promise<{ results: Run
           ...score("rules", share(runs, (r) => kindPassed(r.checks, "rule"))),
           ...score("outcome", share(runs, (r) => kindPassed(r.checks, "outcome"))),
           ...score("latency_ms", Math.round(runs.reduce((s, r) => s + r.latencyMs, 0) / runs.length)),
+          ...score("cost_usd", meanCost(runs)),
           ...(judged.length
             ? score("policy_judge", judged.reduce((s, r) => s + r.judge!.score, 0) / judged.length, judged.map((r) => `run ${r.run}：${r.judge!.reason}`).join("\n"))
             : []),

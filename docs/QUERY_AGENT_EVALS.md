@@ -32,9 +32,12 @@ Order of execution:
 | `--no-langfuse` | Run locally only, without creating a Langfuse experiment (the report can be uploaded later with `bun run eval:upload`) |
 | `--no-judge` | Don't run the LLM scoring (§2.1) |
 | `--prompt-label <label>` | Use the Langfuse prompt with that label (for example `candidate`); by default the in-code prompt is used. Fails if it can't be read; the report records each prompt's version. Release process in the requirement document §5.2 |
-| `--runs`, `--min-pass` | Runs per case (default 3), case pass threshold (default 66%, i.e. 2 of 3) |
+| `--runs`, `--min-pass` | Runs per case (default 1), case pass threshold (default 66%: 1 of 1, or 2 of 3 with confirmation runs) |
+| `--confirm-runs` | Extra runs for each case that went ✅ → ❌ against the baseline (default 2; 0 turns it off). They run locally after the experiment, decide only that case's status, and are left out of the metrics; the report lists them under 退步確認 (regression check) |
 
-This calls real models and costs money: flash-lite is about US$0.0005 per run, so 100 cases × 3 runs is about US$0.15.
+This calls real models and costs money: about US$0.0005 per run, so a full eval of 117 cases is about US$0.06 and takes about 7 minutes.
+
+**Why one run per case** (2026-10-31): in four evals that ran every case 3 times, the completion rate of any single run was within 2 points of the 2-of-3 result. In `20261031T0746`, every one of the 101 scored cases gave the same result in all 3 runs. The runs that disagreed came from rate limits and empty model responses (fallback rates of 60–70% on 2026-10-20), not from the Agent. Three runs tripled the cost and time for almost no information, so a run is repeated only when it would be reported as a regression.
 
 **Output**
 
@@ -53,9 +56,9 @@ The exit code is 1 when: a case's format is invalid, the database doesn't match,
 
 | Layer | Check | Decides pass? |
 |-------|-------|---------------|
-| Rules | `rule_no_error` (no exception), `rule_no_write` (the Agent loop wrote nothing), `rule_no_id_leak` (no UUID in the reply), `rule_no_false_draft` (no mention of a confirmation card without a draft), `rule_permission` (no tool the role lacks permission for), `rule_latency` (≤ 30 seconds) | Yes, checked for every case |
-| Task outcome | When a draft is expected: exactly one draft from that tool, with the fields on the confirmation card matching (compared by name, ignoring whitespace); when no draft is expected: no draft at all; the reply contains every item in `answer_includes` | Yes; cases whose policy is undefined (`policy_status: pending`) are not checked |
-| Diagnostics | All expected tools were called, the router dispatched to the expected sub-agent | No, only used to find causes |
+| Rules | `rule_no_error` (no exception), `rule_no_write` (the Agent loop wrote nothing), `rule_no_id_leak` (no UUID in the reply), `rule_no_false_draft` (no mention of a confirmation card without a draft), `rule_no_cross_org` (no name or document number of another organization's record in the fixtures, e.g. 他組織客戶 or `B-OTHER-001`; tools filter by organization in code, so no case needs to ask for it), `rule_permission` (no tool the role lacks permission for), `rule_latency` (≤ 30 seconds) | Yes, checked for every case |
+| Task outcome | When a draft is expected: exactly one draft from that tool, with the card title (when given) and the fields on the confirmation card matching (compared by name, ignoring whitespace); when no draft is expected: no draft at all; every tool in `tools` was called by some agent (requirement document §3.1); the reply contains every item in `answer_includes`, in the order of `answer_order` | Yes; cases whose policy is undefined (`policy_status: pending`) are not checked |
+| Diagnostics | The tools in `diagnostics.tools` were called, the router dispatched to the expected sub-agent | No, only used to find causes |
 | Reply quality | LLM scoring (`evals/judge.ts`, model `anthropic/claude-haiku-4.5`, a different family from the Agent's primary model): by situation category, against the policy in TPM §3.3–§3.4, giving a 0–1 score and a reason | No; recorded only until calibrated against human labels (requirement document §4.3) |
 
 `known_gap` cases and generated cases not yet reviewed (🚧) don't count toward the metrics and thresholds, but must still pass the rules.
@@ -71,7 +74,7 @@ The exit code is 1 when: a case's format is invalid, the database doesn't match,
 | Task outcome correct | Among runs with outcome checks, the share where every outcome was correct |
 | Write-case completion | Task completion for cases expected to produce a draft |
 | Category, domain | Task completion broken down by situation category (PHASE1 §4.2) and domain (customers, orders…) |
-| Diagnostics | Tool selection accuracy, router dispatch accuracy, tool confusion table (how often tool B was called when A should have been) |
+| Diagnostics | Tool selection accuracy (required and diagnostic tools together), router dispatch accuracy, tool confusion table (how often tool B was called when A should have been) |
 | Error rate / fallback rate | Share of requests that threw an exception / share where at least one model failed and the next model was used |
 | Cost per completed task | The actual cost of all model calls (including the router, fallbacks after failures, and runs that didn't pass) ÷ the number of passed runs. Cost comes from the `usage.cost` returned by OpenRouter |
 | Latency | Time for the whole request: mean, P50, P90, max; also listed per node (router, agent:commercial, agent:supply_chain) |
@@ -99,7 +102,8 @@ Project: Langfuse Cloud (EU) → **Datasets → `query-agent`**.
 | Dataset `query-agent` | **The source of the cases**: add, edit and archive cases here (format in the requirement document §3). Every change creates a new version |
 | One run of the experiment `query-agent` | One eval run; the run name is the report ID and the description is `--label`; the metadata holds the architecture, models per node, hashes, git commit, prompt versions, Dataset version and snapshot |
 | Each row in a run | One case's trace (linked to its Dataset item): beneath it, `run 1`, `run 2`… are the individual runs (input: situation, policy and conversation; output: reply and draft), and beneath those one observation per node: `router` and `summary` (and `judge`) as chains, each sub-agent `agent:<group>` (`agent:all` for the single agent) as an agent, so Langfuse draws router → sub-agents → summary. Inside a node are its model attempts, named after the model (`<model>:ai.generateText`; a fallback shows as a second model under the same node), each provider call as a generation (model, tokens, input and output), and the node's tool calls. Traces from before 2026-10-30 lack the node observations: their attempts are named `<node>:ai.generateText` directly under the run. When run with `--prompt-label`, generations link to the prompt version that produced them (the Prompts page shows each version's usage and scores) |
-| Scores (per case) | `pass_rate` (share of runs passed; the comment lists the failed rules and outcome checks), `rules`, `outcome` (absent for cases with an undefined policy), `latency_ms` (mean latency), `policy_judge` (mean of the in-code LLM scoring; the comment holds each run's reason), `passed` (whether the case met the case pass threshold; absent for 🚧 cases) |
+| Scores (per case) | `pass_rate` (share of runs passed; the comment lists the failed rules and outcome checks), `rules`, `outcome` (absent for cases with an undefined policy), `latency_ms` (mean latency of one run), `cost_usd` (mean model cost of one run in US$, LLM judge excluded), `policy_judge` (mean of the in-code LLM scoring; the comment holds each run's reason), `passed` (whether the case met the case pass threshold; absent for 🚧 cases) |
+| Comparing latency and cost | A case's trace holds all of its runs, so the latency and cost Langfuse shows for a trace or an experiment add up every run: an eval with 3 runs per case looks about 3 times slower and costlier than one with 1 run. Compare evals by the `latency_ms` and `cost_usd` scores instead. Every experiment since 2026-10-07 has them: they were backfilled on 2026-10-31 from the local reports. The 10-07 experiments recorded no cost, and the invalid runs `20261030T1001` and `20261031T0637` made no model calls |
 | Scores (whole run) | `task_completion` (task completion), `gates_passed` (whether every §2.3 threshold passed; the comment lists the failed ones) |
 | Score config | Every score carries a config (`SCORE_CONFIGS` in `evals/experiment.ts`; missing ones are created automatically when the eval runs): the items above, plus `policy-compliance` for human labels and the LLM judge (符合 / 部分符合 / 不符合 — compliant / partly compliant / non-compliant) and user feedback `user-feedback` |
 
@@ -175,3 +179,4 @@ The models per node are set by `ModelPolicy`: `router`, `agent:commercial`, `age
 | `20261030T1454-trace-nodes-renamed-customers` | router；router、commercial、supply_chain、warehouse、catalog、facilities、summary: gemini-2.5-flash-lite | 91% | US$0.00105 | 6.0s | ❌ 不可違反的規則、寫入類案例（應產生草稿） | `real-other-03`、`real-shelf-01`、`w-cross-domain-order` |  |
 | `20261030T1530-roll-number-lookup` | router；router、commercial、supply_chain、warehouse、catalog、facilities、summary: gemini-2.5-flash-lite | 95% | US$0.00090 | 6.3s | ❌ 寫入類案例（應產生草稿） | `real-receiving-04` |  |
 | `20261031T0746-enriched-fixture-candidate` | router；router、commercial、supply_chain、warehouse、catalog、facilities、summary: gemini-2.5-flash-lite | 95% | US$0.00057 | 7.2s | ❌ 寫入類案例（應產生草稿） | 無 |  |
+| `20261031T0851-one-run-default` | router；router、commercial、supply_chain、warehouse、catalog、facilities、summary: gemini-2.5-flash-lite | 95% | US$0.00080 | 7.2s | ❌ 寫入類案例（應產生草稿） | 無 |  |

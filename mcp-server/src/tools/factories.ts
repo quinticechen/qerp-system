@@ -11,13 +11,14 @@ export const factoryTools = [
     domain: "factory",
     kind: "read",
     permission: "canViewFactories",
-    description: "列出工廠資料，可搜尋名稱或聯絡人",
+    description: "列出工廠資料，可搜尋名稱或聯絡人；啟用的在前、停用的（is_active 為 false）排在最後，回覆時把停用的列在最下方並標示「已停用」",
     input: z.object({
       search: z.string().optional(),
       limit: z.number().optional(),
     }),
     execute: async ({ supabase, organizationId }, { search, limit }) => {
-      const q = supabase.from("factories").select("id, name, contact_person, phone, email").eq("organization_id", organizationId).order("name").limit(limit ?? 20);
+      const q = supabase.from("factories").select("id, name, contact_person, phone, email, is_active").eq("organization_id", organizationId)
+        .order("is_active", { ascending: false }).order("name").limit(limit ?? 20);
       const { data, error } = await applySearch(q, ["name", "contact_person"], search);
       if (error) return fail(`查詢失敗：${error.message}`);
       return ok(data ?? []);

@@ -253,12 +253,46 @@ const SPECS: Record<string, ApiSpec> = {
       const order = inOrg(t, "orders", p.p_order_id, p.p_organization_id);
       if (!order) return notFound("order_not_found", "找不到此訂單");
       if (order.status === "cancelled") return err("55000", "order_cancelled", `訂單 ${order.order_number} 已取消，不能修改`);
-      const changes = (p.p_changes ?? {}) as Row;
-      const allowed = ["items", "factory_ids", "note", "status", "payment_status", "shipping_status"];
-      const unknown = Object.keys(changes).filter((k) => !allowed.includes(k));
-      if (unknown.length) return invalid("unknown_field", `不支援修改的欄位：${unknown.join("、")}`);
+      const changes = changesOf(p, ["items", "factory_ids", "note", "status", "payment_status", "shipping_status"]);
+      if (isError(changes)) return changes;
       if (changes.status === "cancelled") return invalid("use_cancel_order", "請使用取消訂單");
-      return Object.entries(changes).map(([k, v]) => ({ label: k, value: `${String(order[k] ?? "（空白）")} → ${String(v)}` }));
+      // Same card as private.update_order: status, factories and note as 舊 → 新, then line changes.
+      const factoryNames = (ids: unknown[]) =>
+        (t.factories ?? []).filter((f) => ids.includes(f.id)).map((f) => String(f.name)).sort().join("、") || null;
+      const oldFactoryIds = (t.order_factories ?? []).filter((r) => r.order_id === order.id).map((r) => r.factory_id);
+      const status = (key: string) => [ORDER_STATUS[String(order[key])], ORDER_STATUS[String(key in changes ? changes[key] : order[key])]] as const;
+      const lineLabel = (productId: unknown, quantity: unknown, price: unknown) => {
+        const product = (t.products_new ?? []).find((r) => r.id === productId);
+        return `${product ? productLabel(product) : ""} × ${Number(quantity)} 公斤，單價 ${Number(price)}`;
+      };
+      const oldLines = (t.order_products ?? []).filter((r) => r.order_id === order.id);
+      const newLines = "items" in changes ? (changes.items as Row[]) : null;
+      if (newLines) {
+        for (const line of newLines) {
+          if (!inOrg(t, "products_new", line.product_id, p.p_organization_id)) return notFound("product_not_found", "找不到此產品");
+          if (!(Number(line.quantity) > 0)) return invalid("invalid_quantity", "數量必須大於 0");
+        }
+      }
+      const lineChanges: Field[] = newLines ? [
+        ...oldLines.filter((o) => !newLines.some((n) => n.product_id === o.product_id))
+          .map((o) => ({ label: "移除品項", value: lineLabel(o.product_id, o.quantity, o.unit_price) })),
+        ...oldLines.flatMap((o) => {
+          const n = newLines.find((l) => l.product_id === o.product_id);
+          const price = n?.unit_price ?? o.unit_price;
+          return n && (Number(n.quantity) !== Number(o.quantity) || Number(price) !== Number(o.unit_price))
+            ? [{ label: "修改品項", value: `${lineLabel(o.product_id, o.quantity, o.unit_price)} → ${lineLabel(o.product_id, n.quantity, price)}` }] : [];
+        }),
+        ...newLines.filter((n) => !oldLines.some((o) => o.product_id === n.product_id))
+          .map((n) => ({ label: "新增品項", value: lineLabel(n.product_id, n.quantity, n.unit_price) })),
+      ] : [];
+      return [
+        ...changed(
+          ["訂單狀態", ...status("status")], ["付款狀態", ...status("payment_status")], ["出貨狀態", ...status("shipping_status")],
+          ["指定工廠", factoryNames(oldFactoryIds), "factory_ids" in changes ? factoryNames(changes.factory_ids as unknown[]) : factoryNames(oldFactoryIds)],
+          ["備註", order.note, "note" in changes ? changes.note : order.note],
+        ),
+        ...lineChanges,
+      ];
     },
   },
 

@@ -1,0 +1,494 @@
+{
+  "version": 3,
+  "id": "20261030T1449-trace-structure-check",
+  "label": "trace-structure-check",
+  "createdAt": "2026-10-30T14:49:50.393Z",
+  "filter": "real-order-01",
+  "runs": 1,
+  "minPass": 0.66,
+  "manifest": {
+    "arch": "router",
+    "models": {
+      "router": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:commercial": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:supply_chain": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:warehouse": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:catalog": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "agent:facilities": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ],
+      "summary": [
+        "google/gemini-2.5-flash-lite",
+        "google/gemini-2.5-flash",
+        "anthropic/claude-haiku-4.5"
+      ]
+    },
+    "hashes": {
+      "prompt.router": "84e0c60c",
+      "prompt.commercial": "2a3a3be2",
+      "prompt.supply_chain": "d447db3a",
+      "prompt.warehouse": "266a35eb",
+      "prompt.catalog": "c507efb5",
+      "prompt.facilities": "f5d1927b",
+      "prompt.summary": "c87b8ca8",
+      "prompt.for_summary_note": "39f053c2",
+      "tools": "36f165dd",
+      "cases": "1cf6423d",
+      "fixtures": "ea8e2ec4"
+    },
+    "git": {
+      "commit": "0ec53e6",
+      "dirty": true
+    },
+    "prompts": {
+      "label": "candidate",
+      "versions": {
+        "query-router": 2,
+        "query-agent-commercial": 2,
+        "query-agent-supply_chain": 2,
+        "query-agent-warehouse": 2,
+        "query-agent-catalog": 2,
+        "query-agent-facilities": 2,
+        "query-agent-single": 1,
+        "query-summary": 1
+      }
+    }
+  },
+  "dataset": {
+    "name": "query-agent",
+    "version": null,
+    "snapshot": "20261014T1611-502aa148.json"
+  },
+  "dbCheck": "passed",
+  "cases": [
+    {
+      "id": "real-order-01",
+      "itemId": "real-order-01",
+      "name": "永泰要 20 公斤雲朵眠藍的，一公斤 80",
+      "category": "正常",
+      "domain": "order",
+      "expectsDraft": true
+    }
+  ],
+  "metrics": {
+    "taskCompletion": 1,
+    "taskCompletionCI": [
+      0.20654329147389294,
+      1
+    ],
+    "rules": 1,
+    "outcome": 1,
+    "writeCompletion": 1,
+    "toolSelection": null,
+    "routing": null,
+    "toolConfusion": [],
+    "errorRate": 0,
+    "fallbackRate": 0,
+    "byCategory": {
+      "正常": 1
+    },
+    "policyJudge": null,
+    "policyJudgeByCategory": {},
+    "byDomain": {
+      "order": 1
+    },
+    "latencyMs": {
+      "avg": 6117,
+      "p50": 6117,
+      "p90": 6117,
+      "max": 6117
+    },
+    "phaseLatencyMs": {
+      "agent:catalog": {
+        "p50": 1790,
+        "p90": 1790
+      },
+      "agent:commercial": {
+        "p50": 3867,
+        "p90": 3867
+      },
+      "router": {
+        "p50": 1264,
+        "p90": 1264
+      },
+      "summary": {
+        "p50": 980,
+        "p90": 980
+      }
+    },
+    "totalCostUsd": 0.0019648,
+    "costPerCompletedTask": 0.0019648,
+    "avgInputTokens": 17976,
+    "avgOutputTokens": 418
+  },
+  "gates": [
+    {
+      "id": "overall",
+      "label": "整體任務完成率",
+      "unit": "ratio",
+      "value": 1,
+      "min": 0.85,
+      "pass": true
+    },
+    {
+      "id": "rules",
+      "label": "不可違反的規則",
+      "unit": "ratio",
+      "value": 1,
+      "min": 1,
+      "pass": true
+    },
+    {
+      "id": "write",
+      "label": "寫入類案例（應產生草稿）",
+      "unit": "ratio",
+      "value": 1,
+      "min": 1,
+      "pass": true
+    },
+    {
+      "id": "latency",
+      "label": "平均延遲",
+      "unit": "ms",
+      "value": 6117,
+      "max": 10000,
+      "pass": true
+    }
+  ],
+  "results": [
+    {
+      "caseId": "real-order-01",
+      "run": 1,
+      "reply": "好的，為您建立訂單草稿：\n\n客戶：永泰布行\n品項：雲朵眠 - 藍\n數量：20 公斤\n單價：80 元\n訂單總額：1600 元\n\n目前產品「雲朵眠 - 藍」庫存有 320 公斤，足夠出貨。\n\n請在下方的確認卡片上點選「確認」以完成訂單。",
+      "route": {
+        "agents": [
+          "commercial",
+          "catalog"
+        ],
+        "tasks": {
+          "commercial": "Create sales order for customer 永泰布行 with product 雲朵眠, quantity 20kg, price 80 per kg.",
+          "catalog": "Get product details for 雲朵眠 in color 藍."
+        }
+      },
+      "toolCalls": [
+        {
+          "toolName": "list_customers",
+          "args": {
+            "search": "永泰"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠"
+          }
+        },
+        {
+          "toolName": "list_products",
+          "args": {
+            "search": "雲朵眠"
+          }
+        },
+        {
+          "toolName": "create_order",
+          "args": {
+            "items": [
+              {
+                "quantity": 20,
+                "product_id": "a1000000-0000-4000-8000-000000000001",
+                "unit_price": 80
+              }
+            ],
+            "customer_id": "c1000000-0000-4000-8000-000000000001"
+          }
+        }
+      ],
+      "writes": [],
+      "drafts": [
+        {
+          "tool": "create_order",
+          "payload": {
+            "customer_id": "c1000000-0000-4000-8000-000000000001",
+            "items": [
+              {
+                "product_id": "a1000000-0000-4000-8000-000000000001",
+                "quantity": 20,
+                "unit_price": 80
+              }
+            ]
+          },
+          "summary": {
+            "title": "建立訂單",
+            "fields": [
+              {
+                "label": "客戶",
+                "value": "永泰布行"
+              },
+              {
+                "label": "品項 1",
+                "value": "雲朵眠 - 藍 × 20 公斤，單價 80"
+              },
+              {
+                "label": "訂單總額",
+                "value": "1600"
+              }
+            ]
+          }
+        }
+      ],
+      "latencyMs": 6117,
+      "routeFromFallback": false,
+      "modelErrors": [],
+      "startedAt": 1793371791537,
+      "attempts": [
+        {
+          "phase": "router",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793371791540,
+          "durationMs": 1264,
+          "calls": [
+            {
+              "startedAt": 1793371791542,
+              "durationMs": 1257,
+              "inputTokens": 941,
+              "outputTokens": 70,
+              "costUsd": 0.0001221,
+              "provider": "Google AI Studio"
+            }
+          ]
+        },
+        {
+          "phase": "agent:catalog",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793371792806,
+          "durationMs": 1790,
+          "calls": [
+            {
+              "startedAt": 1793371792808,
+              "durationMs": 1023,
+              "inputTokens": 1986,
+              "outputTokens": 17,
+              "costUsd": 0.0002054,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1793371793836,
+              "durationMs": 759,
+              "inputTokens": 2399,
+              "outputTokens": 43,
+              "costUsd": 0.0002571,
+              "provider": "Google AI Studio"
+            }
+          ]
+        },
+        {
+          "phase": "agent:commercial",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793371792805,
+          "durationMs": 3867,
+          "calls": [
+            {
+              "startedAt": 1793371792807,
+              "durationMs": 918,
+              "inputTokens": 2615,
+              "outputTokens": 16,
+              "costUsd": 0.0002679,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1793371793730,
+              "durationMs": 876,
+              "inputTokens": 2736,
+              "outputTokens": 17,
+              "costUsd": 0.0002804,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1793371794608,
+              "durationMs": 1181,
+              "inputTokens": 3149,
+              "outputTokens": 114,
+              "costUsd": 0.0003605,
+              "provider": "Google AI Studio"
+            },
+            {
+              "startedAt": 1793371795794,
+              "durationMs": 877,
+              "inputTokens": 3345,
+              "outputTokens": 46,
+              "costUsd": 0.0003529,
+              "provider": "Google AI Studio"
+            }
+          ]
+        },
+        {
+          "phase": "summary",
+          "modelId": "google/gemini-2.5-flash-lite",
+          "startedAt": 1793371796672,
+          "durationMs": 980,
+          "calls": [
+            {
+              "startedAt": 1793371796673,
+              "durationMs": 974,
+              "inputTokens": 805,
+              "outputTokens": 95,
+              "costUsd": 0.0001185,
+              "provider": "Google AI Studio"
+            }
+          ]
+        }
+      ],
+      "steps": [
+        {
+          "agent": "commercial",
+          "at": 1793371793729,
+          "toolCalls": [
+            {
+              "toolName": "list_customers",
+              "args": {
+                "search": "永泰"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "catalog",
+          "at": 1793371793836,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "catalog",
+          "at": 1793371794596,
+          "toolCalls": []
+        },
+        {
+          "agent": "commercial",
+          "at": 1793371794607,
+          "toolCalls": [
+            {
+              "toolName": "list_products",
+              "args": {
+                "search": "雲朵眠"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1793371795794,
+          "toolCalls": [
+            {
+              "toolName": "create_order",
+              "args": {
+                "items": [
+                  {
+                    "quantity": 20,
+                    "product_id": "a1000000-0000-4000-8000-000000000001",
+                    "unit_price": 80
+                  }
+                ],
+                "customer_id": "c1000000-0000-4000-8000-000000000001"
+              }
+            }
+          ]
+        },
+        {
+          "agent": "commercial",
+          "at": 1793371796672,
+          "toolCalls": []
+        }
+      ],
+      "checks": [
+        {
+          "kind": "rule",
+          "check": "rule_no_error",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_write",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_id_leak",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_no_false_draft",
+          "pass": true,
+          "detail": "回覆提到確認卡片，但沒有草稿"
+        },
+        {
+          "kind": "rule",
+          "check": "rule_permission",
+          "pass": true
+        },
+        {
+          "kind": "rule",
+          "check": "rule_latency",
+          "pass": true,
+          "detail": "6.1s"
+        },
+        {
+          "kind": "outcome",
+          "check": "one create_order draft",
+          "pass": true,
+          "detail": "草稿：create_order"
+        },
+        {
+          "kind": "outcome",
+          "check": "draft「客戶」= 永泰布行",
+          "pass": true,
+          "detail": "永泰布行"
+        },
+        {
+          "kind": "outcome",
+          "check": "draft「品項 1」= 雲朵眠 - 藍 × 20 公斤，單價 80",
+          "pass": true,
+          "detail": "雲朵眠 - 藍 × 20 公斤，單價 80"
+        }
+      ],
+      "pass": true
+    }
+  ],
+  "langfuse": {
+    "experimentUrl": "https://cloud.langfuse.com/project/cmuzfs6i307a2ad0ejqc33ap1/experiments/results?baseline=465ef973d2d1e123",
+    "runs": {
+      "real-order-01#1": {
+        "traceId": "96cee2a9b3963b466415b0829bdda098",
+        "observationId": "b22d569b39ed4420"
+      }
+    }
+  }
+}
